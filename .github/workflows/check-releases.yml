@@ -3,10 +3,9 @@ name: Check for New Releases
 on:
   schedule:
     - cron: "0 * * * *" # Runs every hour
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   actions: write
 
 jobs:
@@ -30,7 +29,7 @@ jobs:
         run: |
           echo "New release found: ${latest_release}"
           echo "${latest_release}" > .last_release
-          echo "::set-output name=release_tag::${latest_release}"
+          echo "release_tag=${latest_release}" >> $GITHUB_ENV
 
       - name: Trigger build workflow
         if: env.latest_release != env.last_release
@@ -46,14 +45,14 @@ jobs:
                 release_tag: '${{ env.latest_release }}'
               }
             })
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_PAT_TOKEN }}
 
-      - name: Create a release
+      - name: Release
         if: env.latest_release != env.last_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.latest_release }}
-          release_name: Release ${{ env.latest_release }}
-          draft: false
-          prerelease: false
+          name: Release ${{ env.latest_release }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_PAT_TOKEN }}
