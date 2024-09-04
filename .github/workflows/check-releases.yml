@@ -9,6 +9,9 @@ jobs:
   check_release:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Check for new Photon release
         id: check_release
         run: |
