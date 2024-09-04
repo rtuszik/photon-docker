@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: read
-  workflow: write
+  actions: write
 
 jobs:
   check_release:
