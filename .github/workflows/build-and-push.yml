@@ -23,11 +23,10 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
-          context: .
           build-args: |
             PHOTON_VERSION=${{ github.event.inputs.release_tag }}
           push: true
-          tags: yourdockerhubusername/photon:${{ github.event.inputs.release_tag }}
+          tags: rtuszik/photon-docker:${{ github.event.inputs.release_tag }}
 
       - name: Store the latest release
         run: echo ${{ github.event.inputs.release_tag }} > .last_release

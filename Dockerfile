@@ -1,4 +1,3 @@
-# Use an official OpenJDK runtime as a parent image
 FROM openjdk:21-jdk
 
 WORKDIR /app
