@@ -2,7 +2,6 @@ version: "3.8"
 
 services:
   photon:
-    image: rtuszik/photon-docker:latest
     build:
       context: .
       dockerfile: Dockerfile

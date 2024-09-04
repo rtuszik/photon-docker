@@ -28,15 +28,9 @@ This setup allows for seamless integration with Dawarich, a service used for tra
 ### Pull and Run Pre-built Photon Image
 
 ```yaml
-version: "3.8"
-
 services:
   photon:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - PHOTON_VERSION=${PHOTON_VERSION}
+    image: rtuszik/photon-docker:latest
     ports:
       - "2322:2322"
 ```
