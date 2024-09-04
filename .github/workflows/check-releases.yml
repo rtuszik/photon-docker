@@ -39,7 +39,7 @@ jobs:
           git tag ${{ env.latest_release }}
           git push origin ${{ env.latest_release }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_PAT_TOKEN }}
 
       - name: Trigger build workflow
         if: env.latest_release != env.last_release
