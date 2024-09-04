@@ -4,17 +4,19 @@ on:
   schedule:
     - cron: "0 * * * *" # Runs every hour
   workflow_dispatch:
+
 jobs:
-  check_release:
+  check_and_release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4 # This step ensures that the repository is cloned
+        uses: actions/checkout@v4
 
       - name: Check for new Photon release
         id: check_release
         run: |
-          # Skip the first <title> (feed title) and extract version number from the second <title> (release title)
           latest_release=$(curl -s https://github.com/komoot/photon/releases.atom | grep '<title>' | sed -n '2p' | sed -E 's/.*Release ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           echo "latest_release=${latest_release}" >> $GITHUB_ENV
 
@@ -24,27 +26,36 @@ jobs:
           echo "last_release=$(cat .last_release)" >> $GITHUB_ENV
         continue-on-error: true
 
-      - name: Compare releases
+      - name: Create Release
         if: env.latest_release != env.last_release
-        run: |
-          echo "New release found: ${latest_release}"
-          echo "${latest_release}" > .last_release
-          echo "release_tag=${latest_release}" >> $GITHUB_ENV
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.latest_release }}
+          name: Release ${{ env.latest_release }}
+          body: |
+            New Photon release: ${{ env.latest_release }}
 
-      - name: Create Git Tag
-        if: env.latest_release != env.last_release
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git tag ${{ env.latest_release }}
-          git push origin ${{ env.latest_release }}
+            This is an automated release created by the GitHub Actions workflow.
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.MY_PAT_TOKEN }}
+
+      - name: Update last release file
+        if: env.latest_release != env.last_release
+        run: |
+          echo "${latest_release}" > .last_release
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .last_release
+          git commit -m "Update last processed release to ${latest_release}"
+          git push
 
       - name: Trigger build workflow
         if: env.latest_release != env.last_release
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.MY_PAT_TOKEN }}
           script: |
             github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
@@ -55,14 +66,3 @@ jobs:
                 release_tag: '${{ env.latest_release }}'
               }
             })
-        env:
-          GITHUB_TOKEN: ${{ secrets.MY_PAT_TOKEN }}
-
-      - name: Release
-        if: env.latest_release != env.last_release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.latest_release }}
-          name: Release ${{ env.latest_release }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.MY_PAT_TOKEN }}
