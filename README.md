@@ -1,4 +1,4 @@
-# Photon Docker Image for Privacy and Integration with Dawarich
+# Photon Docker Image
 
 ## Overview
 

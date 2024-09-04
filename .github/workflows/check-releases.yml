@@ -4,18 +4,18 @@ on:
   schedule:
     - cron: "0 * * * *" # Runs every hour
   workflow_dispatch:
-
 jobs:
   check_release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 # This step ensures that the repository is cloned
 
       - name: Check for new Photon release
         id: check_release
         run: |
-          latest_release=$(curl -s https://github.com/komoot/photon/releases.atom | grep -m 1 '<title>' | sed -E 's/.*Release (.+)<\/title>/\1/')
+          # Skip the first <title> (feed title) and extract version number from the second <title> (release title)
+          latest_release=$(curl -s https://github.com/komoot/photon/releases.atom | grep '<title>' | sed -n '2p' | sed -E 's/.*Release ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           echo "latest_release=${latest_release}" >> $GITHUB_ENV
 
       - name: Get last processed release
