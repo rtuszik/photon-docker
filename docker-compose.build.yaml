@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  photon:
+    image: rtuszik/photon-docker:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - PHOTON_VERSION=${PHOTON_VERSION}
+    ports:
+      - "2322:2322"

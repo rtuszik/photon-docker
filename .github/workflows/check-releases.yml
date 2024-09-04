@@ -1,0 +1,55 @@
+name: Check for New Releases
+
+on:
+  schedule:
+    - cron: "0 * * * *" # Runs every hour
+  workflow_dispatch:
+
+jobs:
+  check_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for new Photon release
+        id: check_release
+        run: |
+          latest_release=$(curl -s https://github.com/komoot/photon/releases.atom | grep -m 1 '<title>' | sed -E 's/.*Release (.+)<\/title>/\1/')
+          echo "latest_release=${latest_release}" >> $GITHUB_ENV
+
+      - name: Get last processed release
+        id: get_last_release
+        run: |
+          echo "last_release=$(cat .last_release)" >> $GITHUB_ENV
+        continue-on-error: true
+
+      - name: Compare releases
+        if: env.latest_release != env.last_release
+        run: |
+          echo "New release found: ${latest_release}"
+          echo "${latest_release}" > .last_release
+          echo "::set-output name=release_tag::${latest_release}"
+
+      - name: Trigger build workflow
+        if: env.latest_release != env.last_release
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-and-push.yml',
+              ref: 'main',
+              inputs: {
+                release_tag: '${{ env.latest_release }}'
+              }
+            })
+
+      - name: Create a release
+        if: env.latest_release != env.last_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ env.latest_release }}
+          release_name: Release ${{ env.latest_release }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
