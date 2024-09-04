@@ -3,6 +3,7 @@ name: Check for New Releases
 on:
   schedule:
     - cron: "0 * * * *" # Runs every hour
+  workflow_dispatch:
 
 permissions:
   contents: write
