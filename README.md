@@ -4,9 +4,7 @@
 
 Photon is an open-source geocoding solution built for OpenStreetMap (OSM) data, providing features such as search-as-you-type and reverse geocoding. This repository offers a Docker image for running Photon locally, enhancing data privacy and integration capabilities with services like Dawarich.
 
-### Integration with Dawarich
-
-This setup allows for seamless integration with Dawarich, a service used for tracking and analyzing location data. Running Photon locally enables:
+Running Photon locally enables:
 
 1. **Data Privacy**: Local geocoding operations ensure that location data is not sent to external servers.
 2. **Performance Optimization**: Reducing the need for external API calls minimizes latency and improves response times.
