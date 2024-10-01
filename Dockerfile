@@ -1,5 +1,4 @@
-FROM openjdk:21-jdk
-
+FROM adoptopenjdk/openjdk11
 WORKDIR /app
 
 # Define an argument to accept the Photon version
