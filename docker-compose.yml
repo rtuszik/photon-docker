@@ -3,3 +3,10 @@ services:
     image: rtuszik/photon-docker:latest
     ports:
       - "2322:2322"
+    volumes:
+      - photon_data:/app/photon_data
+    environment:
+      - AUTO_UPDATE_INDEX=true # Set to false to disable automatic updates
+
+volumes:
+  photon_data:
