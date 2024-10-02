@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   photon:
     build:
@@ -7,5 +5,12 @@ services:
       dockerfile: Dockerfile
       args:
         - PHOTON_VERSION=${PHOTON_VERSION}
+    environment:
+      - AUTO_UPDATE_INDEX=false
+    volumes:
+      - photon_data:/app/photon_data
+    restart: unless-stopped
     ports:
       - "2322:2322"
+volumes:
+  photon_data:
