@@ -6,6 +6,9 @@ on:
       release_tag:
         description: "Release version to build"
         required: true
+      revision:
+        description: "Revision number (optional)"
+        required: false
 
 jobs:
   build-and-push:
@@ -23,17 +26,26 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Determine tag
+        id: determine_tag
+        run: |
+          if [ "${{ github.event.inputs.revision }}" ]; then
+            echo "RELEASE_TAG=${{ github.event.inputs.release_tag }}-rev.${{ github.event.inputs.revision }}" >> $GITHUB_ENV
+          else
+            echo "RELEASE_TAG=${{ github.event.inputs.release_tag }}" >> $GITHUB_ENV
+          fi
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           build-args: |
-            PHOTON_VERSION=${{ github.event.inputs.release_tag }}
+            PHOTON_VERSION=${{ env.RELEASE_TAG }}
           push: true
           tags: |
-            rtuszik/photon-docker:${{ github.event.inputs.release_tag }}
+            rtuszik/photon-docker:${{ env.RELEASE_TAG }}
             rtuszik/photon-docker:latest
 
       - name: Store the latest release
-        run: echo ${{ github.event.inputs.release_tag }} > .last_release
+        run: echo ${{ env.RELEASE_TAG }} > .last_release
         if: success()
         continue-on-error: false
