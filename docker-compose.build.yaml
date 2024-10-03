@@ -4,9 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - PHOTON_VERSION=0.5.0
-    environment:
-      - COUNTRY_CODE=de
+        - PHOTON_VERSION=${PHOTON_VERSION}
     volumes:
       - photon_data:/photon/photon_data
     restart: unless-stopped
