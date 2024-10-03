@@ -18,5 +18,5 @@ RUN chmod +x start-photon.sh
 VOLUME /photon/photon_data
 EXPOSE 2322
 
-ENTRYPOINT /photon/start-photon.sh
+ENTRYPOINT ["/photon/start-photon.sh"]
 
