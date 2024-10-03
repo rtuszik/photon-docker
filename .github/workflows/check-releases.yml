@@ -18,12 +18,12 @@ jobs:
         id: check_release
         run: |
           latest_release=$(curl -s https://github.com/komoot/photon/releases.atom | grep '<title>' | sed -n '2p' | sed -E 's/.*Release ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
-          echo "latest_release=${latest_release}" >> $GITHUB_ENV
+          echo "latest_release=${latest_release}" >> "$GITHUB_ENV"
 
       - name: Get last processed release
         id: get_last_release
         run: |
-          echo "last_release=$(cat .last_release)" >> $GITHUB_ENV
+          echo "last_release=$(cat .last_release)" >> "$GITHUB_ENV"
         continue-on-error: true
 
       - name: Create Release

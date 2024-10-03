@@ -29,10 +29,11 @@ jobs:
       - name: Determine tag
         id: determine_tag
         run: |
-          if [ "${{ github.event.inputs.revision }}" ]; then
-            echo "RELEASE_TAG=${{ github.event.inputs.release_tag }}-rev.${{ github.event.inputs.revision }}" >> $GITHUB_ENV
+          revision="${{ github.event.inputs.revision }}"
+          if [ "$revision" ]; then
+            echo "RELEASE_TAG=${{ github.event.inputs.release_tag }}-rev.$revision" >> "$GITHUB_ENV"
           else
-            echo "RELEASE_TAG=${{ github.event.inputs.release_tag }}" >> $GITHUB_ENV
+            echo "RELEASE_TAG=${{ github.event.inputs.release_tag }}" >> "$GITHUB_ENV"
           fi
 
       - name: Build and push Docker image
