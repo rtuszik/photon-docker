@@ -35,12 +35,13 @@ jobs:
           else
             echo "RELEASE_TAG=${{ github.event.inputs.release_tag }}" >> "$GITHUB_ENV"
           fi
+          echo "PHOTON_VERSION=${{ github.event.inputs.release_tag }}" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           build-args: |
-            PHOTON_VERSION=${{ env.RELEASE_TAG }}
+            PHOTON_VERSION=${{ env.PHOTON_VERSION }}
           push: true
           tags: |
             rtuszik/photon-docker:${{ env.RELEASE_TAG }}
