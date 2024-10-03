@@ -1,12 +1,12 @@
 services:
   photon:
     image: rtuszik/photon-docker:latest
+    # environment:
+    # - COUNTRY_CODE=zw
+    volumes:
+      - photon_data:/photon/photon_data
+    restart: unless-stopped
     ports:
       - "2322:2322"
-    volumes:
-      - photon_data:/app/photon_data
-    environment:
-      - AUTO_UPDATE_INDEX=true # Set to false to disable automatic updates
-
 volumes:
   photon_data:

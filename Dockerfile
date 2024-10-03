@@ -1,23 +1,22 @@
-FROM adoptopenjdk/openjdk11:jdk-11.0.11_9
+FROM eclipse-temurin:21.0.4_7-jre-noble
 
-# Set the working directory
-WORKDIR /app
+RUN apt-get update \  
+  && apt-get -y install \
+  pbzip2 \
+  wget \
+  && rm -rf /var/lib/apt/lists/*
 
-# Install necessary tools
-RUN apt-get update && apt-get install -y wget pbzip2 curl
-
-# Define build argument for Photon version
+WORKDIR /photon
 ARG PHOTON_VERSION
 
-# Download the specified Photon release
-RUN wget https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-${PHOTON_VERSION}.jar -O photon.jar
+ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-${PHOTON_VERSION}.jar /photon/photon.jar
 
-# Copy the startup script
-COPY start-photon.sh /app/start-photon.sh
-RUN chmod +x /app/start-photon.sh
+COPY start-photon.sh ./start-photon.sh
+RUN chmod +x start-photon.sh
 
-# Expose the default Photon port
+
+VOLUME /photon/photon_data
 EXPOSE 2322
 
-# Set the command to run the startup script
-CMD ["/app/start-photon.sh"]
+ENTRYPOINT ["/photon/start-photon.sh"]
+
