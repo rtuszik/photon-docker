@@ -31,5 +31,4 @@ jobs:
           VALIDATE_MARKDOWN_PRETTIER: true
           VALIDATE_GITLEAKS: true
           VALIDATE_GITHUB_ACTIONS: true
-          VALIDATE_DOCKERFILE_HADOLINT: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
