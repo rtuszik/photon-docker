@@ -4,7 +4,8 @@
 
 This is an unofficial docker image for [Photon](https://github.com/komoot/photon)
 
-Photon is an open-source geocoding solution built for OpenStreetMap (OSM) data, providing features such as search-as-you-type and reverse geocoding. This repository offers a Docker image for running Photon locally, enhancing data privacy and integration capabilities with services like Dawarich.
+Photon is an open-source geocoding solution built for OpenStreetMap (OSM) data, providing features such as search-as-you-type and reverse geocoding.
+This repository offers a Docker image for running Photon locally, enhancing data privacy and integration capabilities with services like [Dawarich](https://github.com/Freika/dawarich).
 
 Running Photon locally enables:
 
@@ -19,6 +20,11 @@ Running Photon locally enables:
 - The Photon index file is fairly large (approximately 75-76GB compressed, 150-160GB uncompressed).
 - Ensure you have sufficient disk space available before running the container.
 - The initial download and extraction process may take a considerable amount of time.
+
+### Photon-Docker + Dawarich
+
+To integrate Photon with Dawarich, the Photon service needs to be accessible over HTTPS. This requires setting up SSL certificates for secure communication.
+You can achieve this by using a reverse proxy like Caddy or Traefik, which can handle the certificate generation and HTTPS configuration automatically.
 
 ## Usage
 
@@ -77,8 +83,6 @@ The Photon index is stored in a Docker volume (`photon_data`) to persist the dat
 ## Initial Download and Updates
 
 - On first run, the container will download and extract the latest Photon index, which may take several hours depending on your internet connection and system performance.
-- By default, the container checks for updates to the index weekly. This behavior can be disabled by setting `AUTO_UPDATE_INDEX=false`.
-- Even with auto-updates disabled, the container will perform the initial download if the data directory is empty.
 
 ## Contributing
 
