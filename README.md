@@ -1,3 +1,5 @@
+![Docker Pulls](https://img.shields.io/docker/pulls/rtuszik/photon-docker)
+
 # Photon Docker Image
 
 ## Overview
