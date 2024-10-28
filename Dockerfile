@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21.0.4_7-jre-noble
+FROM eclipse-temurin:23.0.1_11-jre-noble
 
 RUN apt-get update \  
   && apt-get -y install \
