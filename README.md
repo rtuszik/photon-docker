@@ -19,33 +19,28 @@ Running Photon locally enables:
 
 ⚠️ **Warning: Large File Sizes** ⚠️
 
-- The Photon index file is fairly large (approximately 75-76GB compressed, 150-160GB uncompressed).
-- Ensure you have sufficient disk space available before running the container.
-- The initial download and extraction process may take a considerable amount of time.
-
-### Photon-Docker + Dawarich
-
-To integrate Photon with Dawarich, the Photon service needs to be accessible over HTTPS. This requires setting up SSL certificates for secure communication.
-You can achieve this by using a reverse proxy like Caddy or Traefik, which can handle the certificate generation and HTTPS configuration automatically.
+-   The Photon index file is fairly large (approximately 75-76GB compressed, 150-160GB uncompressed).
+-   Ensure you have sufficient disk space available before running the container.
+-   The initial download and extraction process may take a considerable amount of time.
 
 ## Usage
 
-- If you want to download only a single country, you may specify the country code using the "COUNTRY_CODE" variable in docker compose.
-- You can find a list of available country codes [here](https://download1.graphhopper.com/public/extracts/by-country-code/)
+-   If you want to download only a single country, you may specify the country code using the "COUNTRY_CODE" variable in docker compose.
+-   You can find a list of available country codes [here](https://download1.graphhopper.com/public/extracts/by-country-code/)
 
 ```yaml
 services:
-  photon:
-    image: rtuszik/photon-docker:latest
-    environment:
-      - COUNTRY_CODE=zw
-    volumes:
-      - photon_data:/photon/photon_data
-    restart: unless-stopped
-    ports:
-      - "2322:2322"
+    photon:
+        image: rtuszik/photon-docker:latest
+        environment:
+            - COUNTRY_CODE=zw
+        volumes:
+            - photon_data:/photon/photon_data
+        restart: unless-stopped
+        ports:
+            - "2322:2322"
 volumes:
-  photon_data:
+    photon_data:
 ```
 
 ```bash
@@ -56,27 +51,27 @@ docker-compose up -d
 
 1. Set the `PHOTON_VERSION` environment variable to the desired version:
 
-   ```bash
-   export PHOTON_VERSION=0.5.0
-   ```
+    ```bash
+    export PHOTON_VERSION=0.5.0
+    ```
 
 2. Use Docker Compose to build the image locally and start Photon:
 
-   ```bash
-   docker-compose -f docker-compose.build.yml up --build
-   ```
+    ```bash
+    docker-compose -f docker-compose.build.yml up --build
+    ```
 
-   This will build and run Photon using the specified version.
+    This will build and run Photon using the specified version.
 
 ### Accessing Photon
 
-- The Photon API can be accessed at:
+-   The Photon API can be accessed at:
 
-  ```
-  http://localhost:2322/api?q=Harare
-  ```
+    ```
+    http://localhost:2322/api?q=Harare
+    ```
 
-  Replace `Harare` with any other query as needed.
+    Replace `Harare` with any other query as needed.
 
 ## Data Persistence
 
@@ -84,7 +79,7 @@ The Photon index is stored in a Docker volume (`photon_data`) to persist the dat
 
 ## Initial Download and Updates
 
-- On first run, the container will download and extract the latest Photon index, which may take several hours depending on your internet connection and system performance.
+-   On first run, the container will download and extract the latest Photon index, which may take several hours depending on your internet connection and system performance.
 
 ## Contributing
 
@@ -96,5 +91,5 @@ This project is licensed under the Apache License, Version 2.0.
 
 ## Acknowledgments
 
-- [Photon](https://github.com/komoot/photon)
-- [Dawarich](https://github.com/Freika/dawarich)
+-   [Photon](https://github.com/komoot/photon)
+-   [Dawarich](https://github.com/Freika/dawarich)
