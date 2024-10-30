@@ -1,4 +1,4 @@
-![Docker Pulls](https://img.shields.io/docker/pulls/rtuszik/photon-docker)
+![Docker Pulls](https://img.shields.io/docker/pulls/rtuszik/photon-docker) ![Docker Image Size](https://img.shields.io/docker/image-size/rtuszik/photon-docker) ![Docker Image Version](https://img.shields.io/docker/v/rtuszik/photon-docker) ![GitHub Release](https://img.shields.io/github/v/release/komoot/photon?label=Photon)
 
 # Photon Docker Image
 
