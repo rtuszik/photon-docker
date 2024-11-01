@@ -1,13 +1,14 @@
 FROM eclipse-temurin:21.0.4_7-jre-noble
 
+ARG PHOTON_VERSION
+
 RUN apt-get update \  
-  && apt-get -y install \
+  && apt-get -y install --no-install-recommends \
   pbzip2 \
   wget \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /photon
-ARG PHOTON_VERSION
 
 ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-${PHOTON_VERSION}.jar /photon/photon.jar
 
