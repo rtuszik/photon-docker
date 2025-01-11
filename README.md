@@ -29,13 +29,13 @@ Running Photon locally enables:
 
 The container can be configured using the following environment variables:
 
-- `UPDATE_STRATEGY`: Controls how index updates are handled
-  - `SEQUENTIAL`: Stops Photon, updates index, then restarts (default)
-  - `PARALLEL`: Downloads new index in background, then swaps with minimal downtime
-  - `DISABLED`: No automatic updates
-- `UPDATE_INTERVAL`: How often to check for updates (e.g., "24h", "60m", "3600s")
-- `LOG_LEVEL`: Logging verbosity ("DEBUG", "INFO", "ERROR")
-- `COUNTRY_CODE`: Optional country code for smaller index (see [available codes](https://download1.graphhopper.com/public/extracts/by-country-code/))
+-   `UPDATE_STRATEGY`: Controls how index updates are handled
+    -   `SEQUENTIAL`: Stops Photon, updates index, then restarts (default)
+    -   `PARALLEL`: Downloads new index in background, then swaps with minimal downtime
+    -   `DISABLED`: No automatic updates
+-   `UPDATE_INTERVAL`: How often to check for updates (e.g., "24h", "60m", "3600s")
+-   `LOG_LEVEL`: Logging verbosity ("DEBUG", "INFO", "ERROR")
+-   `COUNTRY_CODE`: Optional country code for smaller index (see [available codes](https://download1.graphhopper.com/public/extracts/by-country-code/))
 
 ### Example Docker Compose
 
@@ -64,6 +64,7 @@ docker-compose up -d
 ### Build and Run Locally
 
 1. Set the Photon version:
+
     ```bash
     export PHOTON_VERSION=0.6.1
     ```
@@ -76,6 +77,7 @@ docker-compose up -d
 ### Accessing the API
 
 The Photon API is available at:
+
 ```
 http://localhost:2322/api?q=Harare
 ```
@@ -83,19 +85,22 @@ http://localhost:2322/api?q=Harare
 ## Data Management
 
 ### Index Updates
-- The container automatically checks for newer index versions
-- Updates respect a 1-hour tolerance to prevent unnecessary downloads
-- Progress and status are logged based on LOG_LEVEL setting
+
+-   The container automatically checks for newer index versions
+-   Updates respect a 1-hour tolerance to prevent unnecessary downloads
+-   Progress and status are logged based on LOG_LEVEL setting
 
 ### Data Persistence
-- Indexes are stored in the `photon_data` Docker volume
-- Data persists across container restarts
-- Initial download occurs only if no valid index exists
+
+-   Indexes are stored in the `photon_data` Docker volume
+-   Data persists across container restarts
+-   Initial download occurs only if no valid index exists
 
 ### Storage Requirements
-- Full index: ~75-76GB compressed, ~150-160GB uncompressed
-- Country-specific indexes are significantly smaller
-- Ensure sufficient disk space before deployment
+
+-   Full index: ~75-76GB compressed, ~150-160GB uncompressed
+-   Country-specific indexes are significantly smaller
+-   Ensure sufficient disk space before deployment
 
 ## Contributing
 
