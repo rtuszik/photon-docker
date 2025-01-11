@@ -6,6 +6,8 @@ RUN apt-get update \
   && apt-get -y install --no-install-recommends \
   pbzip2 \
   wget \
+  procps \
+  coreutils \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /photon
