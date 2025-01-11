@@ -8,11 +8,9 @@ services:
             - UPDATE_INTERVAL=24h
             # - COUNTRY_CODE=zw
         volumes:
-            - photon_data:/photon/app/photon_data
-            - photon_temp:/photon/app/temp
+            - photon_data:/photon/photon_data
         restart: unless-stopped
         ports:
             - "2322:2322"
 volumes:
     photon_data:
-    photon_temp:

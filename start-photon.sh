@@ -1,18 +1,23 @@
 #!/bin/bash
 
 # Configuration
-DATA_DIR="/photon/app/photon_data"
-INDEX_DIR="$DATA_DIR/elasticsearch"
-TEMP_DIR="/photon/app/temp"
-LOG_FILE="/photon/app/photon.log"
+DATA_DIR="/photon"
+INDEX_DIR="/photon/photon_data/elasticsearch"
+TEMP_DIR="/photon/photon_data/temp"
 UPDATE_STRATEGY="${UPDATE_STRATEGY:-SEQUENTIAL}"
 UPDATE_INTERVAL="${UPDATE_INTERVAL:-24h}"
 MIN_DISK_SPACE=100000000  # 100GB in bytes
 
+# ANSI color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
 # Logging functions
-log_info() { echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') - $*" | tee -a "$LOG_FILE"; }
-log_error() { echo "[ERROR] $(date '+%Y-%m-%d %H:%M:%S') - $*" | tee -a "$LOG_FILE" >&2; }
-log_debug() { echo "[DEBUG] $(date '+%Y-%m-%d %H:%M:%S') - $*" | tee -a "$LOG_FILE"; }
+log_info() { echo -e "${GREEN}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*" >&2; }
+log_debug() { echo -e "${BLUE}[DEBUG]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"; }
 
 # Error handling
 set -euo pipefail
@@ -46,13 +51,18 @@ check_disk_space() {
     fi
 }
 
-# Verify directory structure
+# Verify directory structure and index
 verify_structure() {
     local dir=$1
     if [ ! -d "$dir/photon_data/elasticsearch" ]; then
         log_error "Invalid structure: missing elasticsearch directory"
         return 1
     fi
+    
+    # Ensure proper permissions
+    chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    
     return 0
 }
 
@@ -81,11 +91,56 @@ download_index() {
         return 1
     fi
     
-    log_info "Extracting index to $target_dir"
-    mkdir -p "$target_dir"
-    pbzip2 -dc "$temp_file" | tar x -C "$target_dir"
+    log_info "Extracting index to temporary location"
+    local extract_dir="$TEMP_DIR/extract"
+    mkdir -p "$extract_dir"
     
-    verify_structure "$target_dir"
+    # Extract to temporary location first
+    if ! pbzip2 -dc "$temp_file" | tar x -C "$extract_dir"; then
+        log_error "Failed to extract index files"
+        return 1
+    fi
+    
+    log_info "Moving extracted files to final location"
+    mkdir -p "$target_dir/photon_data"
+    
+    # Find elasticsearch directory recursively
+    local es_dir
+    es_dir=$(find "$extract_dir" -type d -name "elasticsearch" | head -n 1)
+    
+    if [ -n "$es_dir" ]; then
+        log_info "Found elasticsearch directory at $es_dir"
+        
+        log_debug "Extract directory structure:"
+        find "$extract_dir" -type d -maxdepth 3 | while read -r line; do log_debug "DIR: $line"; done
+        
+        log_debug "Target directory structure before move:"
+        find "$target_dir" -type d -maxdepth 3 | while read -r line; do log_debug "DIR: $line"; done
+        
+        log_info "Removing old elasticsearch directory at $target_dir/photon_data/elasticsearch"
+        rm -rf "$target_dir/photon_data/elasticsearch"
+        
+        log_info "Moving elasticsearch from $es_dir to $target_dir/photon_data/elasticsearch"
+        mkdir -p "$target_dir/photon_data"
+        mv "$es_dir" "$target_dir/photon_data/elasticsearch"
+        
+        log_debug "Target directory structure after move:"
+        find "$target_dir" -type d -maxdepth 3 | while read -r line; do log_debug "DIR: $line"; done
+        
+        log_info "Cleaning up extract directory at $extract_dir"
+        rm -rf "$extract_dir"
+    else
+        log_error "Could not find elasticsearch directory in extracted files"
+        log_debug "Extract directory contents:"
+        find "$extract_dir" -type d | while read -r line; do log_debug "$line"; done
+        rm -rf "$extract_dir"
+        return 1
+    fi
+    
+    if ! verify_structure "$target_dir"; then
+        log_error "Index verification failed after extraction"
+        return 1
+    fi
 }
 
 # Update index based on strategy
@@ -123,7 +178,7 @@ update_index() {
 # Start Photon service
 start_photon() {
     log_info "Starting Photon service"
-    java -jar photon.jar -data-dir /photon/app "$@" &
+    java -jar photon.jar -data-dir /photon "$@" &
     echo $! > /photon/photon.pid
 }
 

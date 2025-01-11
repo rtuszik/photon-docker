@@ -1,14 +1,19 @@
 services:
-  photon:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - PHOTON_VERSION=${PHOTON_VERSION}
-    volumes:
-      - photon_data:/photon/photon_data
-    restart: unless-stopped
-    ports:
-      - "2322:2322"
+    photon:
+        build:
+            context: .
+            dockerfile: Dockerfile
+            args:
+                - PHOTON_VERSION=0.6.1
+        environment:
+            - UPDATE_STRATEGY=SEQUENTIAL
+            - UPDATE_INTERVAL=24h
+            - COUNTRY_CODE=zw
+
+        volumes:
+            - photon_data:/photon
+        restart: unless-stopped
+        ports:
+            - "2322:2322"
 volumes:
-  photon_data:
+    photon_data:
