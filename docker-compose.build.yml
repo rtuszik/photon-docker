@@ -4,12 +4,12 @@ services:
             context: .
             dockerfile: Dockerfile
             args:
-                - PHOTON_VERSION=0.6.1
+                - PHOTON_VERSION=${PHOTON_VERSION}
         environment:
             - UPDATE_STRATEGY=PARALLEL
-            - UPDATE_INTERVAL=2m
+            - UPDATE_INTERVAL=1d
             - LOG_LEVEL=DEBUG
-            - COUNTRY_CODE=zw
+            # - COUNTRY_CODE=zw
 
         volumes:
             - photon_data:/photon/photon_data
