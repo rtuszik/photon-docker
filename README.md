@@ -25,16 +25,29 @@ Running Photon locally enables:
 
 ## Usage
 
--   If you want to download only a single country, you may specify the country code using the "COUNTRY_CODE" variable in docker compose.
--   You can find a list of available country codes [here](https://download1.graphhopper.com/public/extracts/by-country-code/)
+### Configuration Options
+
+The container can be configured using the following environment variables:
+
+- `UPDATE_STRATEGY`: Controls how index updates are handled
+  - `SEQUENTIAL`: Stops Photon, updates index, then restarts (default)
+  - `PARALLEL`: Downloads new index in background, then swaps with minimal downtime
+  - `DISABLED`: No automatic updates
+- `UPDATE_INTERVAL`: How often to check for updates (e.g., "24h", "60m", "3600s")
+- `LOG_LEVEL`: Logging verbosity ("DEBUG", "INFO", "ERROR")
+- `COUNTRY_CODE`: Optional country code for smaller index (see [available codes](https://download1.graphhopper.com/public/extracts/by-country-code/))
+
+### Example Docker Compose
 
 ```yaml
 services:
     photon:
         image: rtuszik/photon-docker:latest
         environment:
-            - COUNTRY_CODE=zw
-            - LOG_LEVEL=INFO # Options: DEBUG, INFO, ERROR
+            - UPDATE_STRATEGY=SEQUENTIAL
+            - UPDATE_INTERVAL=24h
+            - LOG_LEVEL=INFO
+            # - COUNTRY_CODE=zw  # Optional: country-specific index
         volumes:
             - photon_data:/photon/photon_data
         restart: unless-stopped
@@ -48,39 +61,41 @@ volumes:
 docker-compose up -d
 ```
 
-### Build and Run Photon Image Locally
+### Build and Run Locally
 
-1. Set the `PHOTON_VERSION` environment variable to the desired version:
-
+1. Set the Photon version:
     ```bash
-    export PHOTON_VERSION=0.5.0
+    export PHOTON_VERSION=0.6.1
     ```
 
-2. Use Docker Compose to build the image locally and start Photon:
-
+2. Build and run using the build configuration:
     ```bash
     docker-compose -f docker-compose.build.yml up --build
     ```
 
-    This will build and run Photon using the specified version.
+### Accessing the API
 
-### Accessing Photon
+The Photon API is available at:
+```
+http://localhost:2322/api?q=Harare
+```
 
--   The Photon API can be accessed at:
+## Data Management
 
-    ```
-    http://localhost:2322/api?q=Harare
-    ```
+### Index Updates
+- The container automatically checks for newer index versions
+- Updates respect a 1-hour tolerance to prevent unnecessary downloads
+- Progress and status are logged based on LOG_LEVEL setting
 
-    Replace `Harare` with any other query as needed.
+### Data Persistence
+- Indexes are stored in the `photon_data` Docker volume
+- Data persists across container restarts
+- Initial download occurs only if no valid index exists
 
-## Data Persistence
-
-The Photon index is stored in a Docker volume (`photon_data`) to persist the data across container restarts and removals. This also allows you to pre-populate the volume with an existing index if needed.
-
-## Initial Download and Updates
-
--   On first run, the container will download and extract the latest Photon index, which may take several hours depending on your internet connection and system performance.
+### Storage Requirements
+- Full index: ~75-76GB compressed, ~150-160GB uncompressed
+- Country-specific indexes are significantly smaller
+- Ensure sufficient disk space before deployment
 
 ## Contributing
 
