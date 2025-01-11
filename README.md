@@ -4,7 +4,7 @@
 
 ## Overview
 
-This is an unofficial docker image for [Photon](https://github.com/komoot/photon)
+This is an _unofficial_ docker image for [Photon](https://github.com/komoot/photon)
 
 Photon is an open-source geocoding solution built for OpenStreetMap (OSM) data, providing features such as search-as-you-type and reverse geocoding.
 This repository offers a Docker image for running Photon locally, enhancing data privacy and integration capabilities with services like [Dawarich](https://github.com/Freika/dawarich).
@@ -34,6 +34,7 @@ services:
         image: rtuszik/photon-docker:latest
         environment:
             - COUNTRY_CODE=zw
+            - LOG_LEVEL=INFO # Options: DEBUG, INFO, ERROR
         volumes:
             - photon_data:/photon/photon_data
         restart: unless-stopped

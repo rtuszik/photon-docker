@@ -6,6 +6,7 @@ INDEX_DIR="/photon/photon_data/elasticsearch"
 TEMP_DIR="/photon/photon_data/temp"
 UPDATE_STRATEGY="${UPDATE_STRATEGY:-SEQUENTIAL}"
 UPDATE_INTERVAL="${UPDATE_INTERVAL:-24h}"
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
 MIN_DISK_SPACE=100000000  # 100GB in bytes
 
 # ANSI color codes
@@ -15,9 +16,17 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Logging functions
-log_info() { echo -e "${GREEN}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"; }
+log_info() { 
+    if [[ "$LOG_LEVEL" != "ERROR" ]]; then
+        echo -e "${GREEN}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"
+    fi
+}
 log_error() { echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*" >&2; }
-log_debug() { echo -e "${BLUE}[DEBUG]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"; }
+log_debug() { 
+    if [[ "$LOG_LEVEL" == "DEBUG" ]]; then
+        echo -e "${BLUE}[DEBUG]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"
+    fi
+}
 
 # Error handling
 set -euo pipefail
@@ -64,6 +73,47 @@ verify_structure() {
     chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
     
     return 0
+}
+
+# Check if remote index is newer than local
+check_remote_index() {
+    local url=$1
+    local remote_time
+    local local_time
+
+    # Get remote file timestamp using HEAD request
+    remote_time=$(wget --spider -S "$url.tar.bz2" 2>&1 | grep "Last-Modified" | cut -d' ' -f4-)
+    if [ -z "$remote_time" ]; then
+        log_error "Failed to get remote index timestamp"
+        return 2
+    fi
+    
+    # Convert remote time to epoch
+    remote_epoch=$(date -d "$remote_time" +%s 2>/dev/null)
+    
+    # Get local index timestamp if it exists
+    if [ -d "$INDEX_DIR" ]; then
+        local_epoch=$(stat -c %Y "$INDEX_DIR" 2>/dev/null)
+        
+        log_debug "Remote index timestamp: $remote_time (${remote_epoch})"
+        log_debug "Local index timestamp: $(date -d "@$local_epoch" 2>/dev/null) (${local_epoch})"
+        
+        # Compare timestamps with 1 hour tolerance
+        local time_diff=$((remote_epoch - local_epoch))
+        if [ "${time_diff#-}" -lt 3600 ]; then
+            log_info "Local index is up to date (within 1 hour tolerance)"
+            return 1
+        elif [ "$remote_epoch" -gt "$local_epoch" ]; then
+            log_info "Remote index is newer than local index"
+            return 0
+        else
+            log_info "Local index is up to date"
+            return 1
+        fi
+    else
+        log_info "No local index found"
+        return 0
+    fi
 }
 
 # Download and verify index
@@ -148,13 +198,20 @@ update_index() {
     case "$UPDATE_STRATEGY" in
         PARALLEL)
             local temp_data_dir="$TEMP_DIR/photon_data"
-            download_index "$temp_data_dir"
-            if verify_structure "$temp_data_dir"; then
+            download_index "$TEMP_DIR"
+            if verify_structure "$TEMP_DIR"; then
+                log_info "Stopping Photon service for index swap"
+                if [ -f /photon/photon.pid ]; then
+                    kill -15 "$(cat /photon/photon.pid)"
+                    sleep 5
+                fi
                 log_info "Swapping index directories"
-                mv "$INDEX_DIR" "$INDEX_DIR.old"
-                mv "$temp_data_dir/elasticsearch" "$INDEX_DIR"
-                rm -rf "$INDEX_DIR.old"
+                mv "$INDEX_DIR" "$INDEX_DIR.old" 2>/dev/null || true
+                mv "$TEMP_DIR/photon_data/elasticsearch" "$INDEX_DIR"
+                rm -rf "$INDEX_DIR.old" 2>/dev/null || true
+                start_photon
             fi
+            rm -rf "$temp_data_dir" 2>/dev/null || true
             ;;
         SEQUENTIAL)
             log_info "Stopping Photon service for update"
@@ -162,8 +219,17 @@ update_index() {
                 kill -15 "$(cat /photon/photon.pid)"
                 sleep 5
             fi
+            if [ -d "$INDEX_DIR" ]; then
+                log_info "Removing existing elasticsearch directory at $INDEX_DIR"
+                rm -rf "$INDEX_DIR"
+            fi
             download_index "$DATA_DIR"
-            start_photon
+            if verify_structure "$DATA_DIR"; then
+                start_photon
+            else
+                log_error "Failed to verify new index structure"
+                return 1
+            fi
             ;;
         DISABLED)
             log_info "Index updates are disabled"
@@ -202,13 +268,32 @@ main() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
     check_disk_space
     
-    if [ ! -d "$INDEX_DIR" ]; then
-        log_info "Initial index download required"
+    if [ -d "$INDEX_DIR" ]; then
+        if verify_structure "$DATA_DIR"; then
+            log_info "Found existing valid elasticsearch index"
+            if [[ -n "${COUNTRY_CODE}" ]]; then
+                local url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
+            else
+                local url="https://download1.graphhopper.com/public/photon-db-latest"
+            fi
+            
+            if check_remote_index "$url"; then
+                log_info "Downloading newer index version"
+                rm -rf "$INDEX_DIR"
+                download_index "$DATA_DIR"
+            fi
+        else
+            log_error "Found invalid index structure, downloading fresh index"
+            rm -rf "$INDEX_DIR"
+            download_index "$DATA_DIR"
+        fi
+    else
+        log_info "No elasticsearch index found, performing initial download"
         download_index "$DATA_DIR"
     fi
     
     if ! verify_structure "$DATA_DIR"; then
-        log_error "Invalid index structure detected"
+        log_error "Invalid index structure detected after setup"
         exit 1
     fi
     
@@ -217,12 +302,26 @@ main() {
     if [ "$UPDATE_STRATEGY" != "DISABLED" ]; then
         local update_seconds
         update_seconds=$(interval_to_seconds "$UPDATE_INTERVAL")
+        log_info "Update strategy: $UPDATE_STRATEGY"
+        log_info "Update interval: $UPDATE_INTERVAL (${update_seconds} seconds)"
         
         while true; do
+            log_info "Sleeping for ${update_seconds} seconds until next update"
             sleep "$update_seconds"
-            log_info "Performing scheduled index update"
-            update_index
+            log_info "Checking for index updates"
+            if [[ -n "${COUNTRY_CODE}" ]]; then
+                local url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
+            else
+                local url="https://download1.graphhopper.com/public/photon-db-latest"
+            fi
+            
+            if check_remote_index "$url"; then
+                log_info "Performing scheduled index update"
+                update_index
+            fi
         done
+    else
+        log_info "Update strategy is disabled, skipping update loop"
     fi
     
     wait

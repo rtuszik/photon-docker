@@ -6,12 +6,13 @@ services:
             args:
                 - PHOTON_VERSION=0.6.1
         environment:
-            - UPDATE_STRATEGY=SEQUENTIAL
-            - UPDATE_INTERVAL=24h
+            - UPDATE_STRATEGY=PARALLEL
+            - UPDATE_INTERVAL=2m
+            - LOG_LEVEL=DEBUG
             - COUNTRY_CODE=zw
 
         volumes:
-            - photon_data:/photon
+            - photon_data:/photon/photon_data
         restart: unless-stopped
         ports:
             - "2322:2322"
