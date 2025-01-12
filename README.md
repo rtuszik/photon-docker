@@ -36,6 +36,8 @@ The container can be configured using the following environment variables:
 -   `UPDATE_INTERVAL`: How often to check for updates (e.g., "24h", "60m", "3600s")
 -   `LOG_LEVEL`: Logging verbosity ("DEBUG", "INFO", "ERROR")
 -   `COUNTRY_CODE`: Optional country code for smaller index (see [available codes](https://download1.graphhopper.com/public/extracts/by-country-code/))
+    Please note, that you may only specify a single country code. Specifying multiple country codes will make the script default to the full planet index.
+    This is a limitation with the public data dumps provided by graphhopper.
 
 ### Example Docker Compose
 
@@ -98,7 +100,7 @@ http://localhost:2322/api?q=Harare
 
 ### Storage Requirements
 
--   Full index: ~75-76GB compressed, ~150-160GB uncompressed
+-   Full index: ~80GB compressed, ~up to 200GB uncompressed (Entire Planet)
 -   Country-specific indexes are significantly smaller
 -   Ensure sufficient disk space before deployment
 
