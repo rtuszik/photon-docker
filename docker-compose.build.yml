@@ -1,0 +1,20 @@
+services:
+    photon:
+        build:
+            context: .
+            dockerfile: Dockerfile
+            args:
+                - PHOTON_VERSION=${PHOTON_VERSION}
+        environment:
+            - UPDATE_STRATEGY=PARALLEL
+            - UPDATE_INTERVAL=1d
+            - LOG_LEVEL=DEBUG
+            # - COUNTRY_CODE=zw
+
+        volumes:
+            - photon_data:/photon/photon_data
+        restart: unless-stopped
+        ports:
+            - "2322:2322"
+volumes:
+    photon_data:
