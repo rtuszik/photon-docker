@@ -4,7 +4,7 @@
 DATA_DIR="/photon"
 INDEX_DIR="/photon/photon_data/elasticsearch"
 TEMP_DIR="/photon/photon_data/temp"
-UPDATE_STRATEGY="${UPDATE_STRATEGY:-SEQUENTIAL}"
+UPDATE_STRATEGY="${UPDATE_STRATEGY:-PARALLEL}"
 UPDATE_INTERVAL="${UPDATE_INTERVAL:-24h}"
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
 MIN_DISK_SPACE=100000000  # 100GB in bytes
@@ -124,10 +124,9 @@ download_index() {
     
     mkdir -p "$TEMP_DIR"
     
-    if [[ -n "${COUNTRY_CODE}" ]]; then
-        local url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-    else
-        local url="https://download1.graphhopper.com/public/photon-db-latest"
+    local url="https://download1.graphhopper.com/public/photon-db-latest"
+    if [[ -n "${COUNTRY_CODE:-}" ]]; then
+        url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
     fi
     
     log_info "Downloading index from $url"
@@ -271,10 +270,9 @@ main() {
     if [ -d "$INDEX_DIR" ]; then
         if verify_structure "$DATA_DIR"; then
             log_info "Found existing valid elasticsearch index"
+            local url="https://download1.graphhopper.com/public/photon-db-latest"
             if [[ -n "${COUNTRY_CODE}" ]]; then
-                local url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-            else
-                local url="https://download1.graphhopper.com/public/photon-db-latest"
+                url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
             fi
             
             if check_remote_index "$url"; then
@@ -309,7 +307,7 @@ main() {
             log_info "Sleeping for ${update_seconds} seconds until next update"
             sleep "$update_seconds"
             log_info "Checking for index updates"
-            if [[ -n "${COUNTRY_CODE}" ]]; then
+            if [[ -n "${COUNTRY_CODE:-}" ]]; then
                 local url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
             else
                 local url="https://download1.graphhopper.com/public/photon-db-latest"
