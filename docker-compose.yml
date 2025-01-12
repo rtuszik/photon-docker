@@ -2,11 +2,10 @@ services:
     photon:
         image: rtuszik/photon-docker:latest
         container_name: "photon-docker"
-
         environment:
-            - UPDATE_STRATEGY=SEQUENTIAL
+            - UPDATE_STRATEGY=PARALLEL
             - UPDATE_INTERVAL=24h
-            - LOG_LEVEL=INFO  # Options: DEBUG, INFO, ERROR
+            - LOG_LEVEL=INFO # Options: DEBUG, INFO, ERROR
             # - COUNTRY_CODE=zw
         volumes:
             - photon_data:/photon/photon_data
