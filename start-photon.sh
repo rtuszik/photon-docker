@@ -7,7 +7,6 @@ TEMP_DIR="/photon/photon_data/temp"
 UPDATE_STRATEGY="${UPDATE_STRATEGY:-PARALLEL}"
 UPDATE_INTERVAL="${UPDATE_INTERVAL:-24h}"
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
-MIN_DISK_SPACE=100000000  # 100GB in bytes
 
 # ANSI color codes
 GREEN='\033[0;32m'
@@ -50,14 +49,29 @@ cleanup_and_exit() {
     exit 1
 }
 
-# Check available disk space
+# Check available disk space against remote file size
 check_disk_space() {
+    local url=$1
     local available
-    available=$(df -B1 "$DATA_DIR" | awk 'NR==2 {print $4}')
-    if [ "$available" -lt "$MIN_DISK_SPACE" ]; then
-        log_error "Insufficient disk space. Required: ${MIN_DISK_SPACE}B, Available: ${available}B"
+    local required_space
+
+    # Get remote file size using wget spider
+    local remote_size
+    remote_size=$(wget --spider --server-response "$url.tar.bz2" 2>&1 | grep "Content-Length" | awk '{print $2}' | tail -1)
+    
+    if [ -z "$remote_size" ]; then
+        log_error "Failed to get remote file size"
         return 1
     fi
+    
+    # Check available space
+    available=$(df -B1 "$DATA_DIR" | awk 'NR==2 {print $4}')
+    if [ "$available" -lt "$remote_size" ]; then
+        log_error "Insufficient disk space. Required: ${remote_size}B , Available: ${available}B"
+        return 1
+    fi
+    
+    log_info "Sufficient disk space available. Required: ${remote_size}B, Available: ${available}B"
 }
 
 # Verify directory structure and index
@@ -266,7 +280,11 @@ interval_to_seconds() {
 # Main execution
 main() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
-    check_disk_space
+    url="https://download1.graphhopper.com/public/photon-db-latest"
+    if [[ -n "${COUNTRY_CODE:-}" ]]; then
+        url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
+    fi
+    check_disk_space "$url"
     
     if [ -d "$INDEX_DIR" ]; then
         if verify_structure "$DATA_DIR"; then
