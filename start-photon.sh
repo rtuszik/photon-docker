@@ -62,19 +62,16 @@ check_disk_space() {
     if [ -z "$remote_size" ]; then
         log_error "Failed to get remote file size"
         return 1
-    }
-
-    # Calculate required space (remote size * 3 for extraction buffer)
-    required_space=$((remote_size * 3))
+    fi
     
     # Check available space
     available=$(df -B1 "$DATA_DIR" | awk 'NR==2 {print $4}')
-    if [ "$available" -lt "$required_space" ]; then
-        log_error "Insufficient disk space. Required: ${required_space}B (3x compressed size), Available: ${available}B"
+    if [ "$available" -lt "$remote_size" ]; then
+        log_error "Insufficient disk space. Required: ${remote_size}B , Available: ${available}B"
         return 1
-    }
+    fi
     
-    log_info "Sufficient disk space available. Required: ${required_space}B, Available: ${available}B"
+    log_info "Sufficient disk space available. Required: ${remote_size}B, Available: ${available}B"
 }
 
 # Verify directory structure and index
