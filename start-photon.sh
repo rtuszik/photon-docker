@@ -125,6 +125,7 @@ download_index() {
     mkdir -p "$TEMP_DIR"
     
     local url="https://download1.graphhopper.com/public/photon-db-latest"
+    url="https://download1.graphhopper.com/public/photon-db-latest"
     if [[ -n "${COUNTRY_CODE:-}" ]]; then
         url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
     fi
@@ -307,10 +308,9 @@ main() {
             log_info "Sleeping for ${update_seconds} seconds until next update"
             sleep "$update_seconds"
             log_info "Checking for index updates"
+            local url="https://download1.graphhopper.com/public/photon-db-latest"
             if [[ -n "${COUNTRY_CODE:-}" ]]; then
-                local url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-            else
-                local url="https://download1.graphhopper.com/public/photon-db-latest"
+                url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
             fi
             
             if check_remote_index "$url"; then
