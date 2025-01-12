@@ -124,10 +124,9 @@ download_index() {
     
     mkdir -p "$TEMP_DIR"
     
+    local url="https://download1.graphhopper.com/public/photon-db-latest"
     if [[ -n "${COUNTRY_CODE}" ]]; then
-        local url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-    else
-        local url="https://download1.graphhopper.com/public/photon-db-latest"
+        url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
     fi
     
     log_info "Downloading index from $url"
@@ -271,10 +270,9 @@ main() {
     if [ -d "$INDEX_DIR" ]; then
         if verify_structure "$DATA_DIR"; then
             log_info "Found existing valid elasticsearch index"
+            local url="https://download1.graphhopper.com/public/photon-db-latest"
             if [[ -n "${COUNTRY_CODE}" ]]; then
-                local url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-            else
-                local url="https://download1.graphhopper.com/public/photon-db-latest"
+                url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
             fi
             
             if check_remote_index "$url"; then
