@@ -113,9 +113,9 @@ check_remote_index() {
         log_debug "Remote index timestamp: $remote_time (${remote_epoch})"
         log_debug "Local index timestamp: $(date -d "@$local_epoch" 2>/dev/null) (${local_epoch})"
         
-        # Compare timestamps with 1 hour tolerance
+        # Compare timestamps with 1 day tolerance
         local time_diff=$((remote_epoch - local_epoch))
-        if [ "${time_diff#-}" -lt 3600 ]; then
+        if [ "${time_diff#-}" -lt 86400 ]; then
             log_info "Local index is up to date (within 1 hour tolerance)"
             return 1
         elif [ "$remote_epoch" -gt "$local_epoch" ]; then
@@ -284,7 +284,6 @@ interval_to_seconds() {
     esac
 }
 
-# Main execution
 main() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
     
@@ -296,16 +295,12 @@ main() {
                 url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
             fi
             
-            if check_remote_index "$url"; then
-                log_info "Downloading newer index version"
-                rm -rf "$INDEX_DIR"
-                download_index "$DATA_DIR"
-            fi
         else
             log_error "Found invalid index structure, downloading fresh index"
             rm -rf "$INDEX_DIR"
             download_index "$DATA_DIR"
         fi
+
     else
         log_info "No elasticsearch index found, performing initial download"
         download_index "$DATA_DIR"
