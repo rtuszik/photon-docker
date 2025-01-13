@@ -284,7 +284,6 @@ interval_to_seconds() {
     esac
 }
 
-# Main execution
 main() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
     
@@ -296,16 +295,12 @@ main() {
                 url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
             fi
             
-            if check_remote_index "$url"; then
-                log_info "Downloading newer index version"
-                rm -rf "$INDEX_DIR"
-                download_index "$DATA_DIR"
-            fi
         else
             log_error "Found invalid index structure, downloading fresh index"
             rm -rf "$INDEX_DIR"
             download_index "$DATA_DIR"
         fi
+
     else
         log_info "No elasticsearch index found, performing initial download"
         download_index "$DATA_DIR"
