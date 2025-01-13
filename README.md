@@ -30,8 +30,8 @@ Running Photon locally enables:
 The container can be configured using the following environment variables:
 
 -   `UPDATE_STRATEGY`: Controls how index updates are handled
-    -   `SEQUENTIAL`: Stops Photon, deletes the existing index files, downloads the new index, then restarts (default)
-    -   `PARALLEL`: Downloads new index in background, then swaps with minimal downtime, requires 2x index space
+    -   `PARALLEL`: Downloads new index in background, then swaps with minimal downtime, requires 2x index space (Default)
+    -   `SEQUENTIAL`: Stops Photon, deletes the existing index files, downloads the new index, then restarts
     -   `DISABLED`: No automatic updates
 -   `UPDATE_INTERVAL`: How often to check for updates (e.g., "24h", "60m", "3600s")
 -   `LOG_LEVEL`: Logging verbosity ("DEBUG", "INFO", "ERROR")
