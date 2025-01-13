@@ -113,9 +113,9 @@ check_remote_index() {
         log_debug "Remote index timestamp: $remote_time (${remote_epoch})"
         log_debug "Local index timestamp: $(date -d "@$local_epoch" 2>/dev/null) (${local_epoch})"
         
-        # Compare timestamps with 1 hour tolerance
+        # Compare timestamps with 1 day tolerance
         local time_diff=$((remote_epoch - local_epoch))
-        if [ "${time_diff#-}" -lt 3600 ]; then
+        if [ "${time_diff#-}" -lt 86400 ]; then
             log_info "Local index is up to date (within 1 hour tolerance)"
             return 1
         elif [ "$remote_epoch" -gt "$local_epoch" ]; then
