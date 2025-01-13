@@ -64,8 +64,9 @@ check_disk_space() {
         return 1
     fi
     
-    # Check available space
-    available=$(df -B1 "$DATA_DIR" | awk 'NR==2 {print $4}')
+    # Check available space in photon_data directory
+    mkdir -p "$DATA_DIR/photon_data"
+    available=$(df -B1 "$DATA_DIR/photon_data" | awk 'NR==2 {print $4}')
     if [ "$available" -lt "$remote_size" ]; then
         log_error "Insufficient disk space. Required: ${remote_size}B , Available: ${available}B"
         return 1
