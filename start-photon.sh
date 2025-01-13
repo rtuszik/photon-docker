@@ -140,6 +140,12 @@ download_index() {
     mkdir -p "$TEMP_DIR"
     
     local url="https://download1.graphhopper.com/public/photon-db-latest"
+    if [[ -n "${COUNTRY_CODE:-}" ]]; then
+        url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
+    fi
+    
+    # Check disk space before downloading
+    check_disk_space "$url"
     url="https://download1.graphhopper.com/public/photon-db-latest"
     if [[ -n "${COUNTRY_CODE:-}" ]]; then
         url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
@@ -281,11 +287,6 @@ interval_to_seconds() {
 # Main execution
 main() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
-    url="https://download1.graphhopper.com/public/photon-db-latest"
-    if [[ -n "${COUNTRY_CODE:-}" ]]; then
-        url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-    fi
-    check_disk_space "$url"
     
     if [ -d "$INDEX_DIR" ]; then
         if verify_structure "$DATA_DIR"; then
