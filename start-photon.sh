@@ -44,7 +44,20 @@ handle_error() {
 # Cleanup function
 cleanup_and_exit() {
     log_info "Cleaning up temporary files..."
-    rm -rf "${TEMP_DIR:?}"/*
+    
+    # Stop service if running
+    stop_photon
+    
+    # Remove temporary files
+    if [ -d "$TEMP_DIR" ]; then
+        if ! rm -rf "${TEMP_DIR:?}"/*; then
+            log_error "Failed to clean up temporary directory"
+        fi
+    fi
+    
+    # Remove PID file if it exists
+    rm -f /photon/photon.pid
+    
     exit 1
 }
 
@@ -131,134 +144,229 @@ check_remote_index() {
     fi
 }
 
+# Core utility functions
+download_file() {
+    local url=$1
+    local output_file=$2
+    
+    log_info "Downloading from $url"
+    if ! wget --progress=dot:giga -O "$output_file" "$url"; then
+        log_error "Failed to download file from $url"
+        return 1
+    fi
+    return 0
+}
+
+verify_checksum() {
+    local file=$1
+    local md5_file=$2
+    local dir
+    dir=$(dirname "$file")
+    
+    log_info "Verifying MD5 checksum"
+    if ! (cd "$dir" && md5sum -c <(cut -d' ' -f1 "$(basename "$md5_file")" > temp.md5 && echo "$(cat temp.md5)  $(basename "$file")" && rm temp.md5)); then
+        log_error "MD5 verification failed"
+        return 1
+    fi
+    return 0
+}
+
+extract_archive() {
+    local archive=$1
+    local extract_dir=$2
+    
+    log_debug "Creating extraction directory $extract_dir"
+    mkdir -p "$extract_dir"
+    
+    log_debug "Extracting $archive to $extract_dir"
+    if ! pbzip2 -dc "$archive" | tar x -C "$extract_dir"; then
+        log_error "Failed to extract files"
+        return 1
+    fi
+    return 0
+}
+
+stop_photon() {
+    if [ -f /photon/photon.pid ]; then
+        local pid
+        pid=$(cat /photon/photon.pid)
+        
+        if ps -p "$pid" > /dev/null; then
+            log_info "Stopping Photon service (PID: $pid)"
+            if ! kill -15 "$pid"; then
+                log_error "Failed to stop Photon service gracefully, attempting force kill"
+                kill -9 "$pid" || true
+            fi
+            
+            # Wait for process to stop
+            local count=0
+            while ps -p "$pid" > /dev/null && [ $count -lt 10 ]; do
+                sleep 1
+                ((count++))
+            done
+            
+            if ps -p "$pid" > /dev/null; then
+                log_error "Failed to stop Photon service"
+                return 1
+            fi
+        else
+            log_info "Photon service not running"
+        fi
+        rm -f /photon/photon.pid
+    fi
+    return 0
+}
+
+move_index() {
+    local source_dir=$1
+    local target_dir=$2
+    
+    # Find elasticsearch directory recursively
+    local es_dir
+    es_dir=$(find "$source_dir" -type d -name "elasticsearch" | head -n 1)
+    
+    if [ -n "$es_dir" ]; then
+        log_info "Found elasticsearch directory at $es_dir"
+        log_debug "Moving elasticsearch from $es_dir to $target_dir"
+        mkdir -p "$(dirname "$target_dir")"
+        mv "$es_dir" "$target_dir"
+        return 0
+    else
+        log_error "Could not find elasticsearch directory in extracted files"
+        return 1
+    fi
+}
+
+cleanup_temp() {
+    log_info "Cleaning up temporary directory"
+    rm -rf "${TEMP_DIR:?}"/*
+}
+
+# Prepare download URL based on country code
+prepare_download_url() {
+    local base_url="https://download1.graphhopper.com/public/photon-db-latest"
+    if [[ -n "${COUNTRY_CODE:-}" ]]; then
+        echo "https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
+    else
+        echo "$base_url"
+    fi
+}
+
 # Download and verify index
 download_index() {
-    local target_dir=$1
-    local temp_file="$TEMP_DIR/photon-db.tar.bz2"
-    local md5_file="$TEMP_DIR/photon-db.md5"
+    local url
+    url=$(prepare_download_url)
     
     mkdir -p "$TEMP_DIR"
-    
-    local url="https://download1.graphhopper.com/public/photon-db-latest"
-    if [[ -n "${COUNTRY_CODE:-}" ]]; then
-        url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-    fi
     
     # Check disk space before downloading
     check_disk_space "$url"
     
-    log_info "Downloading index from $url"
-    if ! wget --progress=dot:giga -O "$temp_file" "${url}.tar.bz2"; then
-        log_error "Failed to download index file"
+    # Download files
+    if ! wget --progress=dot:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${url}.tar.bz2"; then
+        cleanup_temp
         return 1
     fi
     
-    if ! wget -O "$md5_file" "${url}.tar.bz2.md5"; then
-        log_error "Failed to download MD5 checksum file"
+    if ! wget -O "$TEMP_DIR/photon-db.md5" "${url}.tar.bz2.md5"; then
+        cleanup_temp
         return 1
     fi
     
-    log_info "Verifying MD5 checksum"
-    # Get just the MD5 hash from the file and verify against our downloaded file
+    # Verify checksum
     if ! (cd "$TEMP_DIR" && md5sum -c <(cut -d' ' -f1 photon-db.md5 > temp.md5 && echo "$(cat temp.md5)  photon-db.tar.bz2" && rm temp.md5)); then
         log_error "MD5 verification failed"
+        cleanup_temp
         return 1
     fi
     
-    local extract_dir="$TEMP_DIR/extract"
-    log_debug "Creating extraction directory $extract_dir"
-    mkdir -p "$extract_dir"
-    
-    # Extract to temporary location first
-    log_debug "Extracting $temp_file to $extract_dir"
-    if ! pbzip2 -dc "$temp_file" | tar x -C "$extract_dir"; then
-        log_error "Failed to extract index files"
+    # Extract archive in place
+    if ! pbzip2 -dc "$TEMP_DIR/photon-db.tar.bz2" | tar x -C "$TEMP_DIR"; then
+        log_error "Failed to extract files"
+        cleanup_temp
         return 1
     fi
     
-    log_debug "Creating $target_dir/photon_data"
-    mkdir -p "$target_dir/photon_data"
-    
-    # Find elasticsearch directory recursively
-    local es_dir
-    es_dir=$(find "$extract_dir" -type d -name "elasticsearch" | head -n 1)
-    
-    if [ -n "$es_dir" ]; then
-        log_info "Found elasticsearch directory at $es_dir"
-        
-        log_debug "Extract directory structure:"
-        find "$extract_dir" -type d -maxdepth 2 | while read -r line; do log_debug "DIR: $line"; done
-        
-        log_debug "Target directory structure before move:"
-        find "$target_dir" -type d -maxdepth 2 | while read -r line; do log_debug "DIR: $line"; done
-        
-        log_info "Removing old elasticsearch directory at $target_dir/photon_data/elasticsearch"
-        rm -rf "$target_dir/photon_data/elasticsearch"
-        
-        log_info "Moving elasticsearch from $es_dir to $target_dir/photon_data/elasticsearch"
-        mkdir -p "$target_dir/photon_data"
-        mv "$es_dir" "$target_dir/photon_data/elasticsearch"
-        
-        log_debug "Target directory structure after move:"
-        find "$target_dir" -type d -maxdepth 3 | while read -r line; do log_debug "DIR: $line"; done
-        
-        log_info "Cleaning up temp directory at $TEMP_DIR"
-        rm -rf "$TEMP_DIR"
-        
-        log_debug "Final photon_data directory structure:"
-        find "$DATA_DIR/photon_data" -type d | while read -r line; do log_debug "DIR: $line"; done
-    else
-        log_error "Could not find elasticsearch directory in extracted files"
-        log_debug "Extract directory contents:"
-        find "$extract_dir" -type d | while read -r line; do log_debug "$line"; done
-        rm -rf "$TEMP_DIR"
+    return 0
+}
+
+# Strategy-specific update functions
+parallel_update() {
+    # Download and prepare new index while current one is running
+    if ! download_index; then
         return 1
     fi
     
+    # Verify the downloaded index
+    if ! verify_structure "$EXTRACT_DIR"; then
+        cleanup_temp "$TEMP_DIR"
+        return 1
+    fi
+    
+    # Stop service and swap indexes
+    stop_photon
+    
+    # Backup and swap
+    mv "$INDEX_DIR" "$INDEX_DIR.old" 2>/dev/null || true
+    if ! move_index "$EXTRACT_DIR" "$INDEX_DIR"; then
+        # Restore backup on failure
+        mv "$INDEX_DIR.old" "$INDEX_DIR" 2>/dev/null || true
+        cleanup_temp "$TEMP_DIR"
+        return 1
+    fi
+    
+    # Clean up
+    rm -rf "$INDEX_DIR.old" 2>/dev/null || true
+    cleanup_temp "$TEMP_DIR"
+    
+    # Start service
+    start_photon
+    return 0
+}
+
+sequential_update() {
+    # Stop service first
+    stop_photon
+    
+    # Remove existing index
+    if [ -d "$INDEX_DIR" ]; then
+        log_info "Removing existing elasticsearch directory at $INDEX_DIR"
+        rm -rf "$INDEX_DIR"
+    fi
+    
+    # Download new index
+    if ! download_index; then
+        return 1
+    fi
+    
+    # Move to final location
+    if ! move_index "$EXTRACT_DIR" "$INDEX_DIR"; then
+        cleanup_temp "$TEMP_DIR"
+        return 1
+    fi
+    
+    # Verify and clean up
     if ! verify_structure "$DATA_DIR"; then
-        log_error "Index verification failed after extraction"
+        log_error "Failed to verify new index structure"
+        cleanup_temp "$TEMP_DIR"
         return 1
     fi
+    
+    cleanup_temp "$TEMP_DIR"
+    
+    # Start service
+    start_photon
+    return 0
 }
 
 # Update index based on strategy
 update_index() {
     case "$UPDATE_STRATEGY" in
         PARALLEL)
-            local temp_data_dir="$TEMP_DIR/photon_data"
-            download_index "$TEMP_DIR"
-            if verify_structure "$TEMP_DIR"; then
-                log_info "Stopping Photon service for index swap"
-                if [ -f /photon/photon.pid ]; then
-                    kill -15 "$(cat /photon/photon.pid)"
-                    sleep 5
-                fi
-                log_info "Swapping index directories"
-                mv "$INDEX_DIR" "$INDEX_DIR.old" 2>/dev/null || true
-                mv "$TEMP_DIR/photon_data/elasticsearch" "$INDEX_DIR"
-                rm -rf "$INDEX_DIR.old" 2>/dev/null || true
-                start_photon
-            fi
-            # Always clean up TEMP_DIR regardless of verification outcome
-            rm -rf "$TEMP_DIR"
+            parallel_update
             ;;
         SEQUENTIAL)
-            log_info "Stopping Photon service for update"
-            if [ -f /photon/photon.pid ]; then
-                kill -15 "$(cat /photon/photon.pid)"
-                sleep 5
-            fi
-            if [ -d "$INDEX_DIR" ]; then
-                log_info "Removing existing elasticsearch directory at $INDEX_DIR"
-                rm -rf "$INDEX_DIR"
-            fi
-            download_index "$DATA_DIR"
-            if verify_structure "$DATA_DIR"; then
-                start_photon
-            else
-                log_error "Failed to verify new index structure"
-                return 1
-            fi
+            sequential_update
             ;;
         DISABLED)
             log_info "Index updates are disabled"
@@ -275,6 +383,7 @@ start_photon() {
     log_info "Starting Photon service"
     java -jar photon.jar -data-dir /photon "$@" &
     echo $! > /photon/photon.pid
+    return 0
 }
 
 # Convert update interval to seconds
@@ -292,30 +401,32 @@ interval_to_seconds() {
     esac
 }
 
-main() {
+# Initialize or verify index
+setup_index() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
     
     if [ -d "$INDEX_DIR" ]; then
         if verify_structure "$DATA_DIR"; then
             log_info "Found existing valid elasticsearch index"
-            local url="https://download1.graphhopper.com/public/photon-db-latest"
-            if [[ -n "${COUNTRY_CODE:-}" ]]; then
-                url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-            fi
-            
+            return 0
         else
             log_error "Found invalid index structure, downloading fresh index"
             rm -rf "$INDEX_DIR"
-            download_index "$DATA_DIR"
         fi
-
     else
         log_info "No elasticsearch index found, performing initial download"
-        download_index "$DATA_DIR"
     fi
     
-    if ! verify_structure "$DATA_DIR"; then
-        log_error "Invalid index structure detected after setup"
+    if ! sequential_update; then
+        log_error "Failed to setup initial index"
+        return 1
+    fi
+    
+    return 0
+}
+
+main() {
+    if ! setup_index; then
         exit 1
     fi
     
@@ -331,10 +442,9 @@ main() {
             log_info "Sleeping for ${update_seconds} seconds until next update"
             sleep "$update_seconds"
             log_info "Checking for index updates"
-            local url="https://download1.graphhopper.com/public/photon-db-latest"
-            if [[ -n "${COUNTRY_CODE:-}" ]]; then
-                url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-            fi
+            
+            local url
+            url=$(prepare_download_url)
             
             if check_remote_index "$url"; then
                 log_info "Performing scheduled index update"
