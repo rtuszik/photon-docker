@@ -298,8 +298,8 @@ parallel_update() {
     fi
     
     # Verify the downloaded index
-    if ! verify_structure "$EXTRACT_DIR"; then
-        cleanup_temp "$TEMP_DIR"
+    if ! verify_structure "$TEMP_DIR"; then
+        cleanup_temp
         return 1
     fi
     
@@ -308,10 +308,10 @@ parallel_update() {
     
     # Backup and swap
     mv "$INDEX_DIR" "$INDEX_DIR.old" 2>/dev/null || true
-    if ! move_index "$EXTRACT_DIR" "$INDEX_DIR"; then
+    if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
         # Restore backup on failure
         mv "$INDEX_DIR.old" "$INDEX_DIR" 2>/dev/null || true
-        cleanup_temp "$TEMP_DIR"
+        cleanup_temp
         return 1
     fi
     
@@ -340,8 +340,8 @@ sequential_update() {
     fi
     
     # Move to final location
-    if ! move_index "$EXTRACT_DIR" "$INDEX_DIR"; then
-        cleanup_temp "$TEMP_DIR"
+    if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
+        cleanup_temp
         return 1
     fi
     
@@ -381,7 +381,7 @@ update_index() {
 # Start Photon service
 start_photon() {
     log_info "Starting Photon service"
-    java -jar photon.jar -data-dir /photon "$@" &
+    java -jar photon.jar -data-dir /photon &
     echo $! > /photon/photon.pid
     return 0
 }
@@ -407,7 +407,8 @@ setup_index() {
     
     if [ -d "$INDEX_DIR" ]; then
         if verify_structure "$DATA_DIR"; then
-            log_info "Found existing valid elasticsearch index"
+            log_info "Found existing valid elasticsearch index, starting photon"
+            start_photon
             return 0
         else
             log_error "Found invalid index structure, downloading fresh index"
@@ -429,8 +430,6 @@ main() {
     if ! setup_index; then
         exit 1
     fi
-    
-    start_photon "$@"
     
     if [ "$UPDATE_STRATEGY" != "DISABLED" ]; then
         local update_seconds
