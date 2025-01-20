@@ -55,7 +55,10 @@ check_disk_space() {
 
     # Get remote file size using wget spider
     local remote_size
-    remote_size=$(wget --spider --server-response "$url.tar.bz2" 2>&1 | grep "Content-Length" | awk '{print $2}' | tail -1)
+    if ! remote_size=$(wget --spider --server-response "$url.tar.bz2" 2>&1 | grep "Content-Length" | awk '{print $2}' | tail -1); then
+        log_error "Failed to execute wget spider command"
+        return 1
+    fi
     
     if [ -z "$remote_size" ]; then
         log_error "Failed to get remote file size"
@@ -145,8 +148,15 @@ download_index() {
     check_disk_space "$url"
     
     log_info "Downloading index from $url"
-    wget --progress=dot:giga -O "$temp_file" "${url}.tar.bz2"
-    wget -O "$md5_file" "${url}.tar.bz2.md5"
+    if ! wget --progress=dot:giga -O "$temp_file" "${url}.tar.bz2"; then
+        log_error "Failed to download index file"
+        return 1
+    fi
+    
+    if ! wget -O "$md5_file" "${url}.tar.bz2.md5"; then
+        log_error "Failed to download MD5 checksum file"
+        return 1
+    fi
     
     log_info "Verifying MD5 checksum"
     # Get just the MD5 hash from the file and verify against our downloaded file
@@ -155,17 +165,18 @@ download_index() {
         return 1
     fi
     
-    log_info "Extracting index to temporary location"
     local extract_dir="$TEMP_DIR/extract"
+    log_debug "Creating extraction directory $extract_dir"
     mkdir -p "$extract_dir"
     
     # Extract to temporary location first
+    log_debug "Extracting $temp_file to $extract_dir"
     if ! pbzip2 -dc "$temp_file" | tar x -C "$extract_dir"; then
         log_error "Failed to extract index files"
         return 1
     fi
     
-    log_info "Moving extracted files to final location"
+    log_debug "Creating $target_dir/photon_data"
     mkdir -p "$target_dir/photon_data"
     
     # Find elasticsearch directory recursively
@@ -176,10 +187,10 @@ download_index() {
         log_info "Found elasticsearch directory at $es_dir"
         
         log_debug "Extract directory structure:"
-        find "$extract_dir" -type d -maxdepth 3 | while read -r line; do log_debug "DIR: $line"; done
+        find "$extract_dir" -type d -maxdepth 2 | while read -r line; do log_debug "DIR: $line"; done
         
         log_debug "Target directory structure before move:"
-        find "$target_dir" -type d -maxdepth 3 | while read -r line; do log_debug "DIR: $line"; done
+        find "$target_dir" -type d -maxdepth 2 | while read -r line; do log_debug "DIR: $line"; done
         
         log_info "Removing old elasticsearch directory at $target_dir/photon_data/elasticsearch"
         rm -rf "$target_dir/photon_data/elasticsearch"
@@ -193,15 +204,18 @@ download_index() {
         
         log_info "Cleaning up temp directory at $TEMP_DIR"
         rm -rf "$TEMP_DIR"
+        
+        log_debug "Final photon_data directory structure:"
+        find "$DATA_DIR/photon_data" -type d | while read -r line; do log_debug "DIR: $line"; done
     else
         log_error "Could not find elasticsearch directory in extracted files"
         log_debug "Extract directory contents:"
         find "$extract_dir" -type d | while read -r line; do log_debug "$line"; done
-        rm -rf "$extract_dir"
+        rm -rf "$TEMP_DIR"
         return 1
     fi
     
-    if ! verify_structure "$target_dir"; then
+    if ! verify_structure "$DATA_DIR"; then
         log_error "Index verification failed after extraction"
         return 1
     fi
@@ -225,7 +239,8 @@ update_index() {
                 rm -rf "$INDEX_DIR.old" 2>/dev/null || true
                 start_photon
             fi
-            rm -rf "$temp_data_dir" 2>/dev/null || true
+            # Always clean up TEMP_DIR regardless of verification outcome
+            rm -rf "$TEMP_DIR"
             ;;
         SEQUENTIAL)
             log_info "Stopping Photon service for update"
