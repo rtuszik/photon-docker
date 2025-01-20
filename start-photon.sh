@@ -29,12 +29,11 @@ log_debug() {
 
 # Error handling
 set -euo pipefail
-trap 'handle_error $? $LINENO $BASH_LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]:-})' ERR
+trap 'handle_error $? $LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]:-})' ERR
 
 handle_error() {
     local exit_code=$1
     local line_no=$2
-    local bash_lineno=$3
     local last_command=$4
     local func_trace=$5
     log_error "Error $exit_code occurred on line $line_no: $last_command"
@@ -53,7 +52,6 @@ cleanup_and_exit() {
 check_disk_space() {
     local url=$1
     local available
-    local required_space
 
     # Get remote file size using wget spider
     local remote_size
@@ -94,7 +92,6 @@ verify_structure() {
 check_remote_index() {
     local url=$1
     local remote_time
-    local local_time
 
     # Get remote file timestamp using HEAD request
     remote_time=$(wget --spider -S "$url.tar.bz2" 2>&1 | grep "Last-Modified" | cut -d' ' -f4-)
@@ -146,10 +143,6 @@ download_index() {
     
     # Check disk space before downloading
     check_disk_space "$url"
-    url="https://download1.graphhopper.com/public/photon-db-latest"
-    if [[ -n "${COUNTRY_CODE:-}" ]]; then
-        url="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
-    fi
     
     log_info "Downloading index from $url"
     wget --progress=dot:giga -O "$temp_file" "${url}.tar.bz2"
