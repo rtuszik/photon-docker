@@ -116,7 +116,7 @@ check_remote_index() {
         # Compare timestamps with 1 day tolerance
         local time_diff=$((remote_epoch - local_epoch))
         if [ "${time_diff#-}" -lt 86400 ]; then
-            log_info "Local index is up to date (within 1 hour tolerance)"
+            log_info "Local index is up to date (within 1 day tolerance)"
             return 1
         elif [ "$remote_epoch" -gt "$local_epoch" ]; then
             log_info "Remote index is newer than local index"
@@ -198,8 +198,8 @@ download_index() {
         log_debug "Target directory structure after move:"
         find "$target_dir" -type d -maxdepth 3 | while read -r line; do log_debug "DIR: $line"; done
         
-        log_info "Cleaning up extract directory at $extract_dir"
-        rm -rf "$extract_dir"
+        log_info "Cleaning up temp directory at $TEMP_DIR"
+        rm -rf "$TEMP_DIR"
     else
         log_error "Could not find elasticsearch directory in extracted files"
         log_debug "Extract directory contents:"
