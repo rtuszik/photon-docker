@@ -439,8 +439,8 @@ main() {
         exit 1
     fi
     
-    # Start Photon service first
-    start_photon "$@"
+    # # Start Photon service first
+    # start_photon "$@"
 
     if [ "$UPDATE_STRATEGY" != "DISABLED" ]; then
         local update_seconds
