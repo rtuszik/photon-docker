@@ -21,7 +21,7 @@ jobs:
             - name: Checkout Code
               uses: actions/checkout@v4
               with:
-                  fetch-depth: 0
+                  fetch-depth: 2
 
             - name: Lint Code Base
               uses: github/super-linter/slim@v7
