@@ -7,6 +7,7 @@ TEMP_DIR="/photon/photon_data/temp"
 UPDATE_STRATEGY="${UPDATE_STRATEGY:-PARALLEL}"
 UPDATE_INTERVAL="${UPDATE_INTERVAL:-24h}"
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
+FORCE_UPDATE="${FORCE_UPDATE:-FALSE}"
 
 # ANSI color codes
 GREEN='\033[0;32m'
@@ -107,6 +108,13 @@ verify_structure() {
 # Check if remote index is newer than local
 check_remote_index() {
     local url=$1
+
+    # If FORCE_UPDATE is TRUE, skip timestamp check
+    if [ "${FORCE_UPDATE}" = "TRUE" ]; then
+        log_info "Force update requested, skipping timestamp check"
+        return 0
+    fi
+
     local remote_time
 
     # Get remote file timestamp using HEAD request
@@ -431,11 +439,20 @@ main() {
         exit 1
     fi
     
+    # Start Photon service first
+    start_photon "$@"
+
     if [ "$UPDATE_STRATEGY" != "DISABLED" ]; then
         local update_seconds
         update_seconds=$(interval_to_seconds "$UPDATE_INTERVAL")
         log_info "Update strategy: $UPDATE_STRATEGY"
         log_info "Update interval: $UPDATE_INTERVAL (${update_seconds} seconds)"
+
+        # Handle force update if enabled
+        if [ "${FORCE_UPDATE}" = "TRUE" ]; then
+            log_info "Performing forced update on startup"
+            update_index
+        fi
         
         while true; do
             log_info "Sleeping for ${update_seconds} seconds until next update"

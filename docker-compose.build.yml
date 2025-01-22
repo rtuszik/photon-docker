@@ -9,6 +9,7 @@ services:
             - UPDATE_STRATEGY=PARALLEL
             - UPDATE_INTERVAL=1d
             - LOG_LEVEL=DEBUG
+            - FORCE_UPDATE=FALSE
             # - COUNTRY_CODE=zw
 
         volumes:
