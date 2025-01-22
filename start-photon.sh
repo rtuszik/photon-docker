@@ -326,9 +326,6 @@ parallel_update() {
     # Clean up
     rm -rf "$INDEX_DIR.old" 2>/dev/null || true
     cleanup_temp "$TEMP_DIR"
-    
-    # Start service
-    start_photon
     return 0
 }
 
@@ -415,8 +412,7 @@ setup_index() {
     
     if [ -d "$INDEX_DIR" ]; then
         if verify_structure "$DATA_DIR"; then
-            log_info "Found existing valid elasticsearch index, starting photon"
-            start_photon
+            log_info "Found existing valid elasticsearch index"
             return 0
         else
             log_error "Found invalid index structure, downloading fresh index"
@@ -435,24 +431,25 @@ setup_index() {
 }
 
 main() {
+    # Initial setup
     if ! setup_index; then
         exit 1
     fi
-    
-    # # Start Photon service first
-    # start_photon "$@"
+
+    # Handle force update if enabled, regardless of update strategy
+    if [ "${FORCE_UPDATE}" = "TRUE" ]; then
+        log_info "Performing forced update on startup"
+        update_index
+    fi
+
+    # Start Photon service after initial setup and any forced updates
+    start_photon
 
     if [ "$UPDATE_STRATEGY" != "DISABLED" ]; then
         local update_seconds
         update_seconds=$(interval_to_seconds "$UPDATE_INTERVAL")
         log_info "Update strategy: $UPDATE_STRATEGY"
         log_info "Update interval: $UPDATE_INTERVAL (${update_seconds} seconds)"
-
-        # Handle force update if enabled
-        if [ "${FORCE_UPDATE}" = "TRUE" ]; then
-            log_info "Performing forced update on startup"
-            update_index
-        fi
         
         while true; do
             log_info "Sleeping for ${update_seconds} seconds until next update"
@@ -470,7 +467,8 @@ main() {
     else
         log_info "Update strategy is disabled, skipping update loop"
     fi
-    
+
+    # Wait for Photon process to finish
     wait
 }
 
