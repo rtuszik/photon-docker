@@ -35,6 +35,7 @@ The container can be configured using the following environment variables:
     -   `DISABLED`: No automatic updates
 -   `UPDATE_INTERVAL`: How often to check for updates (e.g., "24h", "60m", "3600s")
 -   `LOG_LEVEL`: Logging verbosity ("DEBUG", "INFO", "ERROR")
+-   `FORCE_UPDATE`: Forces an index update on container startup, regardless of UPDATE_STRATEGY setting ("TRUE", "FALSE")
 -   `COUNTRY_CODE`: Optional country code for smaller index (see [available codes](https://download1.graphhopper.com/public/extracts/by-country-code/))
     Please note, that you may only specify a single country code. Specifying multiple country codes will make the script default to the full planet index.
     This is a limitation with the public data dumps provided by graphhopper.
@@ -49,6 +50,7 @@ services:
             - UPDATE_STRATEGY=SEQUENTIAL
             - UPDATE_INTERVAL=24h
             - LOG_LEVEL=INFO
+            # - FORCE_UPDATE=TRUE  # Optional: force index update on startup
             # - COUNTRY_CODE=zw  # Optional: country-specific index
         volumes:
             - photon_data:/photon/photon_data
