@@ -6,6 +6,7 @@ services:
             - UPDATE_STRATEGY=PARALLEL
             - UPDATE_INTERVAL=24h
             - LOG_LEVEL=INFO # Options: DEBUG, INFO, ERROR
+            # - FORCE_UPDATE=TRUE
             # - COUNTRY_CODE=zw
         volumes:
             - photon_data:/photon/photon_data

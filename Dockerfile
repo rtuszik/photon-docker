@@ -8,6 +8,7 @@ RUN apt-get update \
   wget \
   procps \
   coreutils \
+  tree \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /photon
