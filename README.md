@@ -65,6 +65,30 @@ volumes:
 docker-compose up -d
 ```
 
+
+### Use with Dawarich
+
+This docker container for photon can be used as your reverse-geocoder for the [Dawarich Location History Tracker](https://github.com/Freika/dawarich)
+
+To connect dawarich to your photon instance, the following environment variables need to be set in your dawarich docker-compose.yml:
+
+```yaml
+PHOTON_API_HOST={PHOTON-IP}:{PORT}
+PHOTON_API_USE_HTTPS=false
+```
+
+for example:
+
+```yaml
+PHOTON_API_HOST=192.168.10.10:2322
+PHOTON_API_USE_HTTPS=false
+```
+
+- Do *not* set PHOTON_API_USE_HTTPS to true unless your photon instance is available using HTTPS.
+- Only use the host address for your photon instance. Do not append `/api`
+
+
+
 ### Build and Run Locally
 
 1. Set the Photon version:
