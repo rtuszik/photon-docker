@@ -80,7 +80,9 @@ check_disk_space() {
     fi
     
     # Check available space in photon_data directory
+    log_debug "Creating data directory structure at $DATA_DIR/photon_data"
     mkdir -p "$DATA_DIR/photon_data"
+    log_debug "Directory created. Contents: $(ls -l $DATA_DIR/photon_data 2>/dev/null || echo '<none>')"
     available=$(df -B1 "$DATA_DIR/photon_data" | awk 'NR==2 {print $4}')
     if [ "$available" -lt "$remote_size" ]; then
         log_error "Insufficient disk space. Required: ${remote_size}B , Available: ${available}B"
@@ -93,14 +95,19 @@ check_disk_space() {
 # Verify directory structure and index
 verify_structure() {
     local dir=$1
+    log_debug "Verifying directory structure at: $dir/photon_data"
     if [ ! -d "$dir/photon_data/elasticsearch" ]; then
+        log_debug "Directory structure failed verification. Existing paths: $(find $dir -maxdepth 3 -type d | tr '\n' ' ')"
         log_error "Invalid structure: missing elasticsearch directory"
         return 1
     fi
     
     # Ensure proper permissions
+    log_debug "Setting permissions for elasticsearch directory"
+    log_debug "Pre-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
     chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
     chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    log_debug "Post-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
     
     return 0
 }
@@ -230,14 +237,20 @@ move_index() {
     local target_dir=$2
     
     # Find elasticsearch directory recursively
+    log_debug "Searching for elasticsearch directory in: $source_dir"
     local es_dir
     es_dir=$(find "$source_dir" -type d -name "elasticsearch" | head -n 1)
+    log_debug "Found elasticsearch candidates: $(find "$source_dir" -type d -name "elasticsearch" | tr '\n' ' ')"
     
     if [ -n "$es_dir" ]; then
         log_info "Found elasticsearch directory at $es_dir"
         log_debug "Moving elasticsearch from $es_dir to $target_dir"
+        log_debug "Current target directory state: $(ls -ld $target_dir 2>/dev/null || echo '<not exists>')"
         mkdir -p "$(dirname "$target_dir")"
-        mv "$es_dir" "$target_dir"
+        log_debug "Parent directory prepared. New state: $(ls -ld $(dirname "$target_dir") 2>/dev/null || echo '<not exists>')"
+        log_debug "Executing mv command: mv $es_dir $target_dir"
+        mv -v "$es_dir" "$target_dir" | while read line; do log_debug "mv: $line"; done
+        log_debug "Move completed. Target directory now contains: $(ls -l $target_dir | wc -l) items"
         return 0
     else
         log_error "Could not find elasticsearch directory in extracted files"
@@ -247,7 +260,10 @@ move_index() {
 
 cleanup_temp() {
     log_info "Cleaning up temporary directory"
-    rm -rf "${TEMP_DIR:?}"/*
+    log_debug "Pre-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
+    log_debug "Executing: rm -rf ${TEMP_DIR:?}/*"
+    rm -rfv "${TEMP_DIR:?}"/* | while read line; do log_debug "rm: $line"; done
+    log_debug "Post-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
 }
 
 # Prepare download URL based on country code
