@@ -346,7 +346,7 @@ parallel_update() {
 }
 
 sequential_update() {
-    # Stop service first
+
     stop_photon
     
     # Remove existing index
@@ -355,18 +355,15 @@ sequential_update() {
         rm -rf "$INDEX_DIR"
     fi
     
-    # Download new index
     if ! download_index; then
         return 1
     fi
     
-    # Move to final location
     if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
         cleanup_temp
         return 1
     fi
     
-    # Verify and clean up
     if ! verify_structure "$DATA_DIR"; then
         log_error "Failed to verify new index structure"
         cleanup_temp "$TEMP_DIR"
@@ -374,13 +371,9 @@ sequential_update() {
     fi
     
     cleanup_temp "$TEMP_DIR"
-    
-    # Start service
-    start_photon
     return 0
 }
 
-# Update index based on strategy
 update_index() {
     case "$UPDATE_STRATEGY" in
         PARALLEL)
@@ -399,15 +392,29 @@ update_index() {
     esac
 }
 
-# Start Photon service
 start_photon() {
+    # Check if already running
+    if [ -f /photon/photon.pid ]; then
+        local pid
+        pid=$(cat /photon/photon.pid)
+        if ps -p "$pid" > /dev/null; then
+            log_info "Photon service already running with PID: $pid"
+            return 0
+        else
+            log_info "Removing stale PID file"
+            rm -f /photon/photon.pid
+        fi
+    fi
+
     log_info "Starting Photon service"
     java -jar photon.jar -data-dir /photon &
-    echo $! > /photon/photon.pid
+    local new_pid=$!
+    echo $new_pid > /photon/photon.pid
+    
+    log_info "Photon service started successfully with PID: $new_pid"
     return 0
 }
 
-# Convert update interval to seconds
 interval_to_seconds() {
     local interval=$1
     local value=${interval%[smhd]}
@@ -422,7 +429,6 @@ interval_to_seconds() {
     esac
 }
 
-# Initialize or verify index
 setup_index() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
     
@@ -447,19 +453,22 @@ setup_index() {
 }
 
 main() {
-    # Initial setup
     if ! setup_index; then
         exit 1
     fi
 
-    # Handle force update if enabled, regardless of update strategy
     if [ "${FORCE_UPDATE}" = "TRUE" ]; then
         log_info "Performing forced update on startup"
-        update_index
+        if ! update_index; then
+            log_error "Forced update failed"
+            exit 1
+        fi
     fi
 
-    # Start Photon service after initial setup and any forced updates
-    start_photon
+    if ! start_photon; then
+        log_error "Failed to start Photon service"
+        exit 1
+    fi
 
     if [ "$UPDATE_STRATEGY" != "DISABLED" ]; then
         local update_seconds
@@ -478,6 +487,11 @@ main() {
             if check_remote_index "$url"; then
                 log_info "Performing scheduled index update"
                 update_index
+                # Restart service after update
+                if ! start_photon; then
+                    log_error "Failed to restart Photon service after update"
+                    exit 1
+                fi
             fi
         done
     else
