@@ -80,7 +80,9 @@ check_disk_space() {
     fi
     
     # Check available space in photon_data directory
+    log_debug "Creating data directory structure at $DATA_DIR/photon_data"
     mkdir -p "$DATA_DIR/photon_data"
+    log_debug "Directory created. Contents: $(ls -l $DATA_DIR/photon_data 2>/dev/null || echo '<none>')"
     available=$(df -B1 "$DATA_DIR/photon_data" | awk 'NR==2 {print $4}')
     if [ "$available" -lt "$remote_size" ]; then
         log_error "Insufficient disk space. Required: ${remote_size}B , Available: ${available}B"
@@ -93,14 +95,19 @@ check_disk_space() {
 # Verify directory structure and index
 verify_structure() {
     local dir=$1
+    log_debug "Verifying directory structure at: $dir/photon_data"
     if [ ! -d "$dir/photon_data/elasticsearch" ]; then
+        log_debug "Directory structure failed verification. Existing paths: $(find $dir -maxdepth 3 -type d | tr '\n' ' ')"
         log_error "Invalid structure: missing elasticsearch directory"
         return 1
     fi
     
     # Ensure proper permissions
-    chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
-    chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    log_debug "Setting permissions for elasticsearch directory"
+    log_debug "Pre-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
+    # chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    # chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    # log_debug "Post-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
     
     return 0
 }
@@ -230,14 +237,20 @@ move_index() {
     local target_dir=$2
     
     # Find elasticsearch directory recursively
+    log_debug "Searching for elasticsearch directory in: $source_dir"
     local es_dir
     es_dir=$(find "$source_dir" -type d -name "elasticsearch" | head -n 1)
+    log_debug "Found elasticsearch candidates: $(find "$source_dir" -type d -name "elasticsearch" | tr '\n' ' ')"
     
     if [ -n "$es_dir" ]; then
         log_info "Found elasticsearch directory at $es_dir"
         log_debug "Moving elasticsearch from $es_dir to $target_dir"
+        log_debug "Current target directory state: $(ls -ld $target_dir 2>/dev/null || echo '<not exists>')"
         mkdir -p "$(dirname "$target_dir")"
-        mv "$es_dir" "$target_dir"
+        log_debug "Parent directory prepared. New state: $(ls -ld $(dirname "$target_dir") 2>/dev/null || echo '<not exists>')"
+        log_debug "Executing mv command: mv $es_dir $target_dir"
+        mv -v "$es_dir" "$target_dir" | while read line; do log_debug "mv: $line"; done
+        log_debug "Move completed. Target directory now contains: $(ls -l $target_dir | wc -l) items"
         return 0
     else
         log_error "Could not find elasticsearch directory in extracted files"
@@ -247,7 +260,10 @@ move_index() {
 
 cleanup_temp() {
     log_info "Cleaning up temporary directory"
-    rm -rf "${TEMP_DIR:?}"/*
+    log_debug "Pre-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
+    log_debug "Executing: rm -rf ${TEMP_DIR:?}/*"
+    rm -rfv "${TEMP_DIR:?}"/* | while read line; do log_debug "rm: $line"; done
+    log_debug "Post-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
 }
 
 # Prepare download URL based on country code
@@ -330,7 +346,7 @@ parallel_update() {
 }
 
 sequential_update() {
-    # Stop service first
+
     stop_photon
     
     # Remove existing index
@@ -339,18 +355,15 @@ sequential_update() {
         rm -rf "$INDEX_DIR"
     fi
     
-    # Download new index
     if ! download_index; then
         return 1
     fi
     
-    # Move to final location
     if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
         cleanup_temp
         return 1
     fi
     
-    # Verify and clean up
     if ! verify_structure "$DATA_DIR"; then
         log_error "Failed to verify new index structure"
         cleanup_temp "$TEMP_DIR"
@@ -358,13 +371,9 @@ sequential_update() {
     fi
     
     cleanup_temp "$TEMP_DIR"
-    
-    # Start service
-    start_photon
     return 0
 }
 
-# Update index based on strategy
 update_index() {
     case "$UPDATE_STRATEGY" in
         PARALLEL)
@@ -383,15 +392,29 @@ update_index() {
     esac
 }
 
-# Start Photon service
 start_photon() {
+    # Check if already running
+    if [ -f /photon/photon.pid ]; then
+        local pid
+        pid=$(cat /photon/photon.pid)
+        if ps -p "$pid" > /dev/null; then
+            log_info "Photon service already running with PID: $pid"
+            return 0
+        else
+            log_info "Removing stale PID file"
+            rm -f /photon/photon.pid
+        fi
+    fi
+
     log_info "Starting Photon service"
     java -jar photon.jar -data-dir /photon &
-    echo $! > /photon/photon.pid
+    local new_pid=$!
+    echo $new_pid > /photon/photon.pid
+    
+    log_info "Photon service started successfully with PID: $new_pid"
     return 0
 }
 
-# Convert update interval to seconds
 interval_to_seconds() {
     local interval=$1
     local value=${interval%[smhd]}
@@ -406,7 +429,6 @@ interval_to_seconds() {
     esac
 }
 
-# Initialize or verify index
 setup_index() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
     
@@ -431,19 +453,22 @@ setup_index() {
 }
 
 main() {
-    # Initial setup
     if ! setup_index; then
         exit 1
     fi
 
-    # Handle force update if enabled, regardless of update strategy
     if [ "${FORCE_UPDATE}" = "TRUE" ]; then
         log_info "Performing forced update on startup"
-        update_index
+        if ! update_index; then
+            log_error "Forced update failed"
+            exit 1
+        fi
     fi
 
-    # Start Photon service after initial setup and any forced updates
-    start_photon
+    if ! start_photon; then
+        log_error "Failed to start Photon service"
+        exit 1
+    fi
 
     if [ "$UPDATE_STRATEGY" != "DISABLED" ]; then
         local update_seconds
@@ -462,6 +487,11 @@ main() {
             if check_remote_index "$url"; then
                 log_info "Performing scheduled index update"
                 update_index
+                # Restart service after update
+                if ! start_photon; then
+                    log_error "Failed to restart Photon service after update"
+                    exit 1
+                fi
             fi
         done
     else
