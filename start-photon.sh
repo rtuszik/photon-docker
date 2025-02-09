@@ -105,9 +105,9 @@ verify_structure() {
     # Ensure proper permissions
     log_debug "Setting permissions for elasticsearch directory"
     log_debug "Pre-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
-    chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
-    chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
-    log_debug "Post-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
+    # chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    # chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    # log_debug "Post-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
     
     return 0
 }
