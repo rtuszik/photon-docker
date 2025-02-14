@@ -1,6 +1,6 @@
 services:
     photon:
-        image: rtuszik/photon-docker:latest
+        image: rtuszik/photon-docker:lite
         # environment:
         # - COUNTRY_CODE=zw
         volumes:
