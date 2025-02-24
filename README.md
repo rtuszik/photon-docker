@@ -6,8 +6,12 @@
 
 _Unofficial_ docker image for [Photon](https://github.com/komoot/photon)
 
+This repository offers two Docker images for running Photon locally:
+- **Full Image** (`latest` tag): Complete installation with automatic index updates and management features
+- **Lite Image** (`lite` tag): Basic installation that downloads the index once, without update functionality
+
 Photon is an open-source geocoding solution built for OpenStreetMap (OSM) data, providing features such as search-as-you-type and reverse geocoding.
-This repository offers a Docker image for running Photon locally, enhancing data privacy and integration capabilities with services like [Dawarich](https://github.com/Freika/dawarich).
+It enhances data privacy and offers integration capabilities with services like [Dawarich](https://github.com/Freika/dawarich).
 
 ## Important Notes
 
@@ -36,6 +40,7 @@ The container can be configured using the following environment variables:
 
 ### Example Docker Compose
 
+#### Full Image
 ```yaml
 services:
     photon:
@@ -55,6 +60,23 @@ volumes:
     photon_data:
 ```
 
+#### Lite Image
+```yaml
+services:
+    photon:
+        image: rtuszik/photon-docker:lite
+        # environment:
+            # - COUNTRY_CODE=zw  # Optional: country-specific index
+        volumes:
+            - photon_data:/photon/photon_data
+        restart: unless-stopped
+        ports:
+            - "2322:2322"
+volumes:
+    photon_data:
+```
+
+To start either version:
 ```bash
 docker-compose up -d
 ```
