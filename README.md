@@ -4,16 +4,10 @@
 
 ## Overview
 
-This is an _unofficial_ docker image for [Photon](https://github.com/komoot/photon)
+_Unofficial_ docker image for [Photon](https://github.com/komoot/photon)
 
 Photon is an open-source geocoding solution built for OpenStreetMap (OSM) data, providing features such as search-as-you-type and reverse geocoding.
 This repository offers a Docker image for running Photon locally, enhancing data privacy and integration capabilities with services like [Dawarich](https://github.com/Freika/dawarich).
-
-Running Photon locally enables:
-
-1. **Data Privacy**: Local geocoding operations ensure that location data is not sent to external servers.
-2. **Performance Optimization**: Reducing the need for external API calls minimizes latency and improves response times.
-3. **Operational Control**: Using Docker containers allows for straightforward management, updates, and scalability of the geocoding service.
 
 ## Important Notes
 
@@ -65,7 +59,6 @@ volumes:
 docker-compose up -d
 ```
 
-
 ### Use with Dawarich
 
 This docker container for photon can be used as your reverse-geocoder for the [Dawarich Location History Tracker](https://github.com/Freika/dawarich)
@@ -84,23 +77,8 @@ PHOTON_API_HOST=192.168.10.10:2322
 PHOTON_API_USE_HTTPS=false
 ```
 
-- Do *not* set PHOTON_API_USE_HTTPS to true unless your photon instance is available using HTTPS.
-- Only use the host address for your photon instance. Do not append `/api`
-
-
-
-### Build and Run Locally
-
-1. Set the Photon version:
-
-    ```bash
-    export PHOTON_VERSION=0.6.1
-    ```
-
-2. Build and run using the build configuration:
-    ```bash
-    docker-compose -f docker-compose.build.yml up --build
-    ```
+-   Do _not_ set PHOTON_API_USE_HTTPS to true unless your photon instance is available using HTTPS.
+-   Only use the host address for your photon instance. Do not append `/api`
 
 ### Accessing the API
 
