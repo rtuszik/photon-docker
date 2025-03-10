@@ -67,27 +67,41 @@ cleanup_and_exit() {
 check_disk_space() {
     local url=$1
     local available
+    local full_url="${url}.tar.bz2"
 
-    log_debug "Checking disk space for URL: $url.tar.bz2"
+    log_debug "Checking disk space for URL: $full_url"
+    log_debug "URL components - Protocol: ${full_url%%://*}, Host: ${full_url#*://}, Path: ${full_url#*://*/}"
     
     # Get remote file size using wget spider
+    log_debug "Executing wget spider command: wget --spider --server-response \"$full_url\""
+    local wget_output
+    wget_output=$(wget --spider --server-response "$full_url" 2>&1)
+    local wget_status=$?
+    log_debug "wget spider command output: $(echo "$wget_output" | head -20)"
+    
     local remote_size
-    if ! remote_size=$(wget --spider --server-response "$url.tar.bz2" 2>&1 | grep "Content-Length" | awk '{print $2}' | tail -1); then
+    if ! remote_size=$(echo "$wget_output" | grep "Content-Length" | awk '{print $2}' | tail -1); then
         log_error "Failed to execute wget spider command"
-        log_debug "wget spider command failed for URL: $url.tar.bz2"
+        log_debug "wget spider command failed with status: $wget_status"
+        log_debug "Full wget output: $wget_output"
         return 1
     fi
     
     if [ -z "$remote_size" ]; then
         log_error "Failed to get remote file size"
+        log_debug "No Content-Length found in wget output"
         return 1
     fi
+    
+    log_debug "Remote file size detected: $remote_size bytes"
     
     # Check available space in photon_data directory
     log_debug "Creating data directory structure at $DATA_DIR/photon_data"
     mkdir -p "$DATA_DIR/photon_data"
     log_debug "Directory created. Contents: $(ls -l $DATA_DIR/photon_data 2>/dev/null || echo '<none>')"
     available=$(df -B1 "$DATA_DIR/photon_data" | awk 'NR==2 {print $4}')
+    log_debug "Available disk space: $available bytes"
+    
     if [ "$available" -lt "$remote_size" ]; then
         log_error "Insufficient disk space. Required: ${remote_size}B , Available: ${available}B"
         return 1
@@ -119,6 +133,10 @@ verify_structure() {
 # Check if remote index is newer than local
 check_remote_index() {
     local url=$1
+    local full_url="${url}.tar.bz2"
+
+    log_debug "Checking if remote index is newer than local"
+    log_debug "Remote URL: $full_url"
 
     # If FORCE_UPDATE is TRUE, skip timestamp check
     if [ "${FORCE_UPDATE}" = "TRUE" ]; then
@@ -127,13 +145,29 @@ check_remote_index() {
     fi
 
     local remote_time
+    local wget_output
 
     # Get remote file timestamp using HEAD request
-    remote_time=$(wget --spider -S "$url.tar.bz2" 2>&1 | grep "Last-Modified" | cut -d' ' -f4-)
+    log_debug "Executing: wget --spider -S \"$full_url\""
+    wget_output=$(wget --spider -S "$full_url" 2>&1)
+    local wget_status=$?
+    
+    log_debug "wget spider command output: $(echo "$wget_output" | head -20)"
+    
+    if [ $wget_status -ne 0 ]; then
+        log_error "Failed to check remote index timestamp"
+        log_debug "wget exit status: $wget_status"
+        return 2
+    }
+    
+    remote_time=$(echo "$wget_output" | grep "Last-Modified" | cut -d' ' -f4-)
     if [ -z "$remote_time" ]; then
         log_error "Failed to get remote index timestamp"
+        log_debug "No Last-Modified header found in wget output"
         return 2
     fi
+    
+    log_debug "Remote timestamp: $remote_time"
     
     # Convert remote time to epoch
     remote_epoch=$(date -d "$remote_time" +%s 2>/dev/null)
@@ -272,13 +306,20 @@ cleanup_temp() {
 
 # Prepare download URL based on country code or custom base URL
 prepare_download_url() {
-    log_debug "Using base URL: $BASE_URL"
+    # Ensure BASE_URL doesn't have trailing slash
+    local base_url="${BASE_URL%/}"
+    log_debug "Using base URL: $base_url"
+    log_debug "BASE_URL environment variable: $BASE_URL"
     
+    local result_url
     if [[ -n "${COUNTRY_CODE:-}" ]]; then
-        echo "${BASE_URL}/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
+        result_url="${base_url}/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
     else
-        echo "${BASE_URL}/photon-db-latest"
+        result_url="${base_url}/photon-db-latest"
     fi
+    
+    log_debug "Constructed download URL: $result_url"
+    echo "$result_url"
 }
 
 # Download and verify index
@@ -286,10 +327,14 @@ download_index() {
     local url
     url=$(prepare_download_url)
     log_debug "Download URL: $url"
+    log_debug "Full tar.bz2 URL: ${url}.tar.bz2"
+    log_debug "Full MD5 URL: ${url}.tar.bz2.md5"
     
     mkdir -p "$TEMP_DIR"
+    log_debug "Created temp directory: $TEMP_DIR"
     
     # Check disk space before downloading
+    log_debug "Checking disk space for download"
     if ! check_disk_space "$url"; then
         log_error "Disk space check failed"
         cleanup_temp
@@ -298,18 +343,38 @@ download_index() {
     
     # Download files
     log_debug "Downloading index from ${url}.tar.bz2"
-    if ! wget --progress=dot:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${url}.tar.bz2"; then
+    log_debug "Executing: wget --progress=dot:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${url}.tar.bz2\""
+    
+    local wget_output
+    wget_output=$(wget --progress=dot:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${url}.tar.bz2" 2>&1)
+    local wget_status=$?
+    
+    if [ $wget_status -ne 0 ]; then
         log_error "Failed to download index file from ${url}.tar.bz2"
+        log_debug "wget exit status: $wget_status"
+        log_debug "wget output: $(echo "$wget_output" | head -20)"
         cleanup_temp
         return 1
     fi
     
+    log_debug "Index download successful. File size: $(du -h "$TEMP_DIR/photon-db.tar.bz2" | awk '{print $1}')"
+    
     log_debug "Downloading MD5 from ${url}.tar.bz2.md5"
-    if ! wget -O "$TEMP_DIR/photon-db.md5" "${url}.tar.bz2.md5"; then
+    log_debug "Executing: wget -O \"$TEMP_DIR/photon-db.md5\" \"${url}.tar.bz2.md5\""
+    
+    local md5_output
+    md5_output=$(wget -O "$TEMP_DIR/photon-db.md5" "${url}.tar.bz2.md5" 2>&1)
+    local md5_status=$?
+    
+    if [ $md5_status -ne 0 ]; then
         log_error "Failed to download MD5 file from ${url}.tar.bz2.md5"
+        log_debug "wget exit status: $md5_status"
+        log_debug "wget output: $(echo "$md5_output" | head -20)"
         cleanup_temp
         return 1
     fi
+    
+    log_debug "MD5 download successful. MD5 content: $(cat "$TEMP_DIR/photon-db.md5" | head -1)"
     
     # Verify checksum
     if ! (cd "$TEMP_DIR" && md5sum -c <(cut -d' ' -f1 photon-db.md5 > temp.md5 && echo "$(cat temp.md5)  photon-db.tar.bz2" && rm temp.md5)); then
