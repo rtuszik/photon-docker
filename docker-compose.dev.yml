@@ -1,0 +1,21 @@
+services:
+    photon:
+        build:
+            context: .
+            dockerfile: Dockerfile
+            args:
+                - PHOTON_VERSION=0.6.2
+        image: rtuszik/photon-docker:dev
+        environment:
+            - UPDATE_STRATEGY=PARALLEL
+            - UPDATE_INTERVAL=1m
+            - LOG_LEVEL=DEBUG
+            - COUNTRY_CODE=ad
+
+        volumes:
+            - photon_data:/photon/photon_data
+        restart: unless-stopped
+        ports:
+            - "2322:2322"
+volumes:
+    photon_data:
