@@ -11,6 +11,7 @@ services:
             - UPDATE_INTERVAL=1m
             - LOG_LEVEL=DEBUG
             - COUNTRY_CODE=ad
+            # - BASE_URL=https://download1.graphhopper.com/public
 
         volumes:
             - photon_data:/photon/photon_data
