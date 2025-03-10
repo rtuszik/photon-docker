@@ -11,6 +11,7 @@ services:
             - LOG_LEVEL=DEBUG
             # - FORCE_UPDATE=TRUE
             # - COUNTRY_CODE=zw
+            # - BASE_URL=https://download1.graphhopper.com/public
 
         volumes:
             - photon_data:/photon/photon_data

@@ -8,6 +8,7 @@ UPDATE_STRATEGY="${UPDATE_STRATEGY:-PARALLEL}"
 UPDATE_INTERVAL="${UPDATE_INTERVAL:-24h}"
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
 FORCE_UPDATE="${FORCE_UPDATE:-FALSE}"
+BASE_URL="${BASE_URL:-https://download1.graphhopper.com/public}"
 
 # ANSI color codes
 GREEN='\033[0;32m'
@@ -266,13 +267,14 @@ cleanup_temp() {
     log_debug "Post-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
 }
 
-# Prepare download URL based on country code
+# Prepare download URL based on country code or custom base URL
 prepare_download_url() {
-    local base_url="https://download1.graphhopper.com/public/photon-db-latest"
+    log_debug "Using base URL: $BASE_URL"
+    
     if [[ -n "${COUNTRY_CODE:-}" ]]; then
-        echo "https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
+        echo "${BASE_URL}/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
     else
-        echo "$base_url"
+        echo "${BASE_URL}/photon-db-latest"
     fi
 }
 
