@@ -316,23 +316,34 @@ download_index() {
 
 # Strategy-specific update functions
 parallel_update() {
+    log_debug "Starting parallel update process"
+    
     # Download and prepare new index while current one is running
+    log_debug "Downloading new index while current service is running"
     if ! download_index; then
+        log_error "Failed to download index"
         return 1
     fi
     
     # Verify the downloaded index
+    log_debug "Verifying downloaded index structure"
     if ! verify_structure "$TEMP_DIR"; then
+        log_error "Downloaded index verification failed"
         cleanup_temp
         return 1
     fi
     
     # Stop service and swap indexes
+    log_debug "Stopping Photon service before swapping indexes"
     stop_photon
     
     # Backup and swap
+    log_debug "Backing up current index to $INDEX_DIR.old"
     mv "$INDEX_DIR" "$INDEX_DIR.old" 2>/dev/null || true
+    
+    log_debug "Moving new index from $TEMP_DIR to $INDEX_DIR"
     if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
+        log_error "Failed to move index, attempting to restore backup"
         # Restore backup on failure
         mv "$INDEX_DIR.old" "$INDEX_DIR" 2>/dev/null || true
         cleanup_temp
@@ -340,36 +351,47 @@ parallel_update() {
     fi
     
     # Clean up
+    log_debug "Removing old index backup"
     rm -rf "$INDEX_DIR.old" 2>/dev/null || true
+    log_debug "Parallel update completed successfully"
     cleanup_temp "$TEMP_DIR"
     return 0
 }
 
 sequential_update() {
-
+    log_debug "Starting sequential update process"
+    
+    log_debug "Stopping Photon service before update"
     stop_photon
     
     # Remove existing index
     if [ -d "$INDEX_DIR" ]; then
         log_info "Removing existing elasticsearch directory at $INDEX_DIR"
+        log_debug "Executing: rm -rf $INDEX_DIR"
         rm -rf "$INDEX_DIR"
     fi
     
+    log_debug "Downloading new index"
     if ! download_index; then
+        log_error "Failed to download index"
         return 1
     fi
     
+    log_debug "Moving index from $TEMP_DIR to $INDEX_DIR"
     if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
+        log_error "Failed to move index"
         cleanup_temp
         return 1
     fi
     
+    log_debug "Verifying new index structure"
     if ! verify_structure "$DATA_DIR"; then
         log_error "Failed to verify new index structure"
         cleanup_temp "$TEMP_DIR"
         return 1
     fi
     
+    log_debug "Sequential update completed successfully"
     cleanup_temp "$TEMP_DIR"
     return 0
 }
