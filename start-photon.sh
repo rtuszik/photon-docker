@@ -97,14 +97,14 @@ verify_structure() {
     local dir=$1
     log_debug "Verifying directory structure at: $dir/photon_data"
     if [ ! -d "$dir/photon_data/elasticsearch" ]; then
-        log_debug "Directory structure failed verification. Existing paths: $(find $dir -maxdepth 3 -type d | tr '\n' ' ')"
+        log_debug "Directory structure failed verification. Existing paths: $(find "$dir" -maxdepth 3 -type d | tr '\n' ' ')"
         log_error "Invalid structure: missing elasticsearch directory"
         return 1
     fi
     
     # Ensure proper permissions
-    log_debug "Setting permissions for elasticsearch directory"
-    log_debug "Pre-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
+    # log_debug "Setting permissions for elasticsearch directory"
+    log_debug "Pre-permission state: $(stat -c '%a %U:%G %n' "$dir/photon_data/elasticsearch" 2>/dev/null || echo 'missing')"
     # chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
     # chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
     # log_debug "Post-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
@@ -245,12 +245,12 @@ move_index() {
     if [ -n "$es_dir" ]; then
         log_info "Found elasticsearch directory at $es_dir"
         log_debug "Moving elasticsearch from $es_dir to $target_dir"
-        log_debug "Current target directory state: $(ls -ld $target_dir 2>/dev/null || echo '<not exists>')"
+        log_debug "Current target directory state: $(ls -ld "$target_dir" 2>/dev/null || echo '<not exists>')"
         mkdir -p "$(dirname "$target_dir")"
-        log_debug "Parent directory prepared. New state: $(ls -ld $(dirname "$target_dir") 2>/dev/null || echo '<not exists>')"
+        log_debug "Parent directory prepared. New state: $(ls -ld "$(dirname "$target_dir")" 2>/dev/null || echo '<not exists>')"
         log_debug "Executing mv command: mv $es_dir $target_dir"
-        mv -v "$es_dir" "$target_dir" | while read line; do log_debug "mv: $line"; done
-        log_debug "Move completed. Target directory now contains: $(ls -l $target_dir | wc -l) items"
+        mv -v "$es_dir" "$target_dir" | while read -r line; do log_debug "mv: $line"; done
+        log_debug "Move completed. Target directory now contains: $(ls -l "$target_dir" | wc -l) items"
         return 0
     else
         log_error "Could not find elasticsearch directory in extracted files"
@@ -262,7 +262,7 @@ cleanup_temp() {
     log_info "Cleaning up temporary directory"
     log_debug "Pre-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
     log_debug "Executing: rm -rf ${TEMP_DIR:?}/*"
-    rm -rfv "${TEMP_DIR:?}"/* | while read line; do log_debug "rm: $line"; done
+    rm -rfv "${TEMP_DIR:?}"/* | while read -r line; do log_debug "rm: $line"; done
     log_debug "Post-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
 }
 
