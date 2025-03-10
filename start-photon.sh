@@ -68,10 +68,13 @@ check_disk_space() {
     local url=$1
     local available
 
+    log_debug "Checking disk space for URL: $url.tar.bz2"
+    
     # Get remote file size using wget spider
     local remote_size
     if ! remote_size=$(wget --spider --server-response "$url.tar.bz2" 2>&1 | grep "Content-Length" | awk '{print $2}' | tail -1); then
         log_error "Failed to execute wget spider command"
+        log_debug "wget spider command failed for URL: $url.tar.bz2"
         return 1
     fi
     
@@ -282,19 +285,28 @@ prepare_download_url() {
 download_index() {
     local url
     url=$(prepare_download_url)
+    log_debug "Download URL: $url"
     
     mkdir -p "$TEMP_DIR"
     
     # Check disk space before downloading
-    check_disk_space "$url"
-    
-    # Download files
-    if ! wget --progress=dot:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${url}.tar.bz2"; then
+    if ! check_disk_space "$url"; then
+        log_error "Disk space check failed"
         cleanup_temp
         return 1
     fi
     
+    # Download files
+    log_debug "Downloading index from ${url}.tar.bz2"
+    if ! wget --progress=dot:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${url}.tar.bz2"; then
+        log_error "Failed to download index file from ${url}.tar.bz2"
+        cleanup_temp
+        return 1
+    fi
+    
+    log_debug "Downloading MD5 from ${url}.tar.bz2.md5"
     if ! wget -O "$TEMP_DIR/photon-db.md5" "${url}.tar.bz2.md5"; then
+        log_error "Failed to download MD5 file from ${url}.tar.bz2.md5"
         cleanup_temp
         return 1
     fi
