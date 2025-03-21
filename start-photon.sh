@@ -289,6 +289,7 @@ cleanup_temp() {
     log_debug "Executing: rm -rf ${TEMP_DIR:?}/*"
     rm -rfv "${TEMP_DIR:?}"/* | while read -r line; do log_debug "rm: $line"; done
     log_debug "Post-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
+    log_debug "Final photon_data directory structure:\n$(tree -L 2 $PHOTON_DATA_DIR 2>/dev/null || echo '<empty>')"
 }
 
 # Prepare download URL based on country code or custom base URL
@@ -331,14 +332,7 @@ download_index() {
     log_debug "Executing: wget --progress=dot:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${download_url}\""
     
     if ! wget --progress=bar:force -O "$TEMP_DIR/photon-db.tar.bz2" "${download_url}" 2>&1; then
-        log_error "Failed to download index file"
-        return 1
-    fi
-    
-    if [ $wget_status -ne 0 ]; then
-        log_error "Failed to download index file from ${url}.tar.bz2"
-        log_debug "wget exit status: $wget_status"
-        log_debug "wget output: $(echo "$wget_output" | head -20)"
+        log_error "Failed to download index file from ${download_url}"
         cleanup_temp
         return 1
     fi
@@ -544,12 +538,16 @@ main() {
         exit 1
     fi
 
+    # Only run FORCE_UPDATE once during container startup
     if [ "${FORCE_UPDATE}" = "TRUE" ]; then
         log_info "Performing forced update on startup"
         if ! update_index; then
             log_error "Forced update failed"
             exit 1
         fi
+        # Disable FORCE_UPDATE after first run
+        FORCE_UPDATE="FALSE"
+        log_debug "FORCE_UPDATE disabled after initial run"
     fi
 
     if ! start_photon; then
