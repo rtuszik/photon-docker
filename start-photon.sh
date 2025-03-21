@@ -1,33 +1,25 @@
 #!/bin/bash
 
-# Configuration
-DATA_DIR="/photon"
-INDEX_DIR="/photon/photon_data/elasticsearch"
-TEMP_DIR="/photon/photon_data/temp"
-UPDATE_STRATEGY="${UPDATE_STRATEGY:-SEQUENTIAL}"
-UPDATE_INTERVAL="${UPDATE_INTERVAL:-24h}"
-LOG_LEVEL="${LOG_LEVEL:-INFO}"
-FORCE_UPDATE="${FORCE_UPDATE:-FALSE}"
-BASE_URL="${BASE_URL:-https://download1.graphhopper.com/public}"
+# Source modules
+source "src/logging.sh"
+source "src/config.sh"
+source "src/process.sh"
 
-# ANSI color codes
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Log environment variables
+log_debug "Environment variables:"
+log_debug "UPDATE_STRATEGY=$UPDATE_STRATEGY"
+log_debug "UPDATE_INTERVAL=$UPDATE_INTERVAL"
+log_debug "LOG_LEVEL=$LOG_LEVEL"
+log_debug "BASE_URL=$BASE_URL"
+log_debug "FORCE_UPDATE=$FORCE_UPDATE"
+log_debug "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
 
-# Logging functions
-log_info() { 
-    if [[ "$LOG_LEVEL" != "ERROR" ]]; then
-        echo -e "${GREEN}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"
-    fi
-}
-log_error() { echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*" >&2; }
-log_debug() { 
-    if [[ "$LOG_LEVEL" == "DEBUG" ]]; then
-        echo -e "${BLUE}[DEBUG]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"
-    fi
-}
+# Define DATA_DIR from config
+DATA_DIR="$PHOTON_DIR"
+
+# Error handling
+set -euo pipefail
+trap 'handle_error $? $LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]:-})' ERR
 
 # Error handling
 set -euo pipefail
@@ -149,16 +141,11 @@ check_remote_index() {
 
     # Get remote file timestamp using HEAD request
     log_debug "Executing: wget --spider -S \"$full_url\""
-    wget_output=$(wget --spider -S "$full_url" 2>&1)
-    local wget_status=$?
-    
-    log_debug "wget spider command output: $(echo "$wget_output" | head -20)"
-    
-    if [ $wget_status -ne 0 ]; then
+    if ! wget_output=$(wget --spider -S "$full_url" 2>&1); then
         log_error "Failed to check remote index timestamp"
-        log_debug "wget exit status: $wget_status"
+        log_debug "wget output: $(echo "$wget_output" | head -20)"
         return 2
-    }
+    fi
     
     remote_time=$(echo "$wget_output" | grep "Last-Modified" | cut -d' ' -f4-)
     if [ -z "$remote_time" ]; then
@@ -308,17 +295,14 @@ cleanup_temp() {
 prepare_download_url() {
     # Ensure BASE_URL doesn't have trailing slash
     local base_url="${BASE_URL%/}"
-    log_debug "Using base URL: $base_url"
-    log_debug "BASE_URL environment variable: $BASE_URL"
-    
     local result_url
+    
     if [[ -n "${COUNTRY_CODE:-}" ]]; then
         result_url="${base_url}/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
     else
         result_url="${base_url}/photon-db-latest"
     fi
     
-    log_debug "Constructed download URL: $result_url"
     echo "$result_url"
 }
 
@@ -342,12 +326,14 @@ download_index() {
     fi
     
     # Download files
-    log_debug "Downloading index from ${url}.tar.bz2"
-    log_debug "Executing: wget --progress=dot:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${url}.tar.bz2\""
+    local download_url="${url}.tar.bz2"
+    log_info "Downloading index from ${download_url}"
+    log_debug "Executing: wget --progress=dot:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${download_url}\""
     
-    local wget_output
-    wget_output=$(wget --progress=dot:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${url}.tar.bz2" 2>&1)
-    local wget_status=$?
+    if ! wget --progress=bar:force -O "$TEMP_DIR/photon-db.tar.bz2" "${download_url}" 2>&1; then
+        log_error "Failed to download index file"
+        return 1
+    fi
     
     if [ $wget_status -ne 0 ]; then
         log_error "Failed to download index file from ${url}.tar.bz2"

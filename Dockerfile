@@ -18,7 +18,8 @@ RUN mkdir -p /photon/photon_data
 ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-${PHOTON_VERSION}.jar /photon/photon.jar
 
 COPY start-photon.sh ./start-photon.sh
-RUN chmod +x start-photon.sh
+COPY src/ ./src/
+RUN chmod +x start-photon.sh src/*.sh
 
 
 VOLUME /photon/photon_data
