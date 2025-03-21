@@ -12,6 +12,7 @@ log_debug "UPDATE_INTERVAL=$UPDATE_INTERVAL"
 log_debug "LOG_LEVEL=$LOG_LEVEL"
 log_debug "BASE_URL=$BASE_URL"
 log_debug "FORCE_UPDATE=$FORCE_UPDATE"
+log_debug "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
 log_debug "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
 
 # Define DATA_DIR from config
@@ -143,11 +144,13 @@ check_remote_index() {
     log_debug "Executing: wget --spider -S \"$full_url\""
     if ! wget_output=$(wget --spider -S "$full_url" 2>&1); then
         log_error "Failed to check remote index timestamp"
-        log_debug "wget output: $(echo "$wget_output" | head -20)"
+        log_debug "Full wget output:\n$wget_output"
         return 2
     fi
     
-    remote_time=$(echo "$wget_output" | grep "Last-Modified" | cut -d' ' -f4-)
+    log_debug "Full wget spider response:\n$wget_output"
+    
+    remote_time=$(echo "$wget_output" | grep -i "Last-Modified:" | cut -d' ' -f4-)
     if [ -z "$remote_time" ]; then
         log_error "Failed to get remote index timestamp"
         log_debug "No Last-Modified header found in wget output"
@@ -286,9 +289,8 @@ move_index() {
 cleanup_temp() {
     log_info "Cleaning up temporary directory"
     log_debug "Pre-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
-    log_debug "Executing: rm -rf ${TEMP_DIR:?}/*"
-    rm -rfv "${TEMP_DIR:?}"/* | while read -r line; do log_debug "rm: $line"; done
-    log_debug "Post-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
+    log_debug "Executing: rm -rf ${TEMP_DIR:?}"
+    rm -rfv "${TEMP_DIR:?}" | while read -r line; do log_debug "rm: $line"; done
     log_debug "Final photon_data directory structure:\n$(tree -L 2 $PHOTON_DATA_DIR 2>/dev/null || echo '<empty>')"
 }
 
@@ -339,28 +341,33 @@ download_index() {
     
     log_debug "Index download successful. File size: $(du -h "$TEMP_DIR/photon-db.tar.bz2" | awk '{print $1}')"
     
-    log_debug "Downloading MD5 from ${url}.tar.bz2.md5"
-    log_debug "Executing: wget -O \"$TEMP_DIR/photon-db.md5\" \"${url}.tar.bz2.md5\""
-    
-    local md5_output
-    md5_output=$(wget -O "$TEMP_DIR/photon-db.md5" "${url}.tar.bz2.md5" 2>&1)
-    local md5_status=$?
-    
-    if [ $md5_status -ne 0 ]; then
-        log_error "Failed to download MD5 file from ${url}.tar.bz2.md5"
-        log_debug "wget exit status: $md5_status"
-        log_debug "wget output: $(echo "$md5_output" | head -20)"
-        cleanup_temp
-        return 1
-    fi
-    
-    log_debug "MD5 download successful. MD5 content: $(cat "$TEMP_DIR/photon-db.md5" | head -1)"
-    
-    # Verify checksum
-    if ! (cd "$TEMP_DIR" && md5sum -c <(cut -d' ' -f1 photon-db.md5 > temp.md5 && echo "$(cat temp.md5)  photon-db.tar.bz2" && rm temp.md5)); then
-        log_error "MD5 verification failed"
-        cleanup_temp
-        return 1
+    if [ "${SKIP_MD5_CHECK}" != "TRUE" ]; then
+        log_debug "Downloading MD5 from ${url}.tar.bz2.md5"
+        log_debug "Executing: wget -O \"$TEMP_DIR/photon-db.md5\" \"${url}.tar.bz2.md5\""
+        
+        local md5_output
+        md5_output=$(wget -O "$TEMP_DIR/photon-db.md5" "${url}.tar.bz2.md5" 2>&1)
+        local md5_status=$?
+        
+        if [ $md5_status -ne 0 ]; then
+            log_error "Failed to download MD5 file from ${url}.tar.bz2.md5"
+            log_debug "wget exit status: $md5_status"
+            log_debug "wget output: $(echo "$md5_output" | head -20)"
+            cleanup_temp
+            return 1
+        fi
+        
+        log_debug "MD5 download successful. MD5 content: $(cat "$TEMP_DIR/photon-db.md5" | head -1)"
+        
+        # Verify checksum
+        if ! (cd "$TEMP_DIR" && md5sum -c <(cut -d' ' -f1 photon-db.md5 > temp.md5 && echo "$(cat temp.md5)  photon-db.tar.bz2" && rm temp.md5)); then
+            log_error "MD5 verification failed"
+            cleanup_temp
+            return 1
+        fi
+        log_info "MD5 verification successful"
+    else
+        log_info "Skipping MD5 verification as requested"
     fi
     
     # Extract archive in place
@@ -394,17 +401,33 @@ parallel_update() {
     
     # Stop service and swap indexes
     log_debug "Stopping Photon service before swapping indexes"
-    stop_photon
+    if ! stop_photon; then
+        log_error "Failed to stop Photon service cleanly"
+        cleanup_temp
+        return 1
+    fi
+    
+    # Wait a moment for process to fully stop
+    sleep 2
     
     # Backup and swap
-    log_debug "Backing up current index to $INDEX_DIR.old"
-    mv "$INDEX_DIR" "$INDEX_DIR.old" 2>/dev/null || true
+    if [ -d "$INDEX_DIR" ]; then
+        log_debug "Backing up current index to $INDEX_DIR.old"
+        if ! mv "$INDEX_DIR" "$INDEX_DIR.old"; then
+            log_error "Failed to backup current index"
+            cleanup_temp
+            return 1
+        fi
+    fi
     
     log_debug "Moving new index from $TEMP_DIR to $INDEX_DIR"
     if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
         log_error "Failed to move index, attempting to restore backup"
-        # Restore backup on failure
-        mv "$INDEX_DIR.old" "$INDEX_DIR" 2>/dev/null || true
+        if [ -d "$INDEX_DIR.old" ]; then
+            if ! mv "$INDEX_DIR.old" "$INDEX_DIR"; then
+                log_error "Failed to restore backup index"
+            fi
+        fi
         cleanup_temp
         return 1
     fi
@@ -421,13 +444,22 @@ sequential_update() {
     log_debug "Starting sequential update process"
     
     log_debug "Stopping Photon service before update"
-    stop_photon
+    if ! stop_photon; then
+        log_error "Failed to stop Photon service cleanly"
+        return 1
+    fi
+    
+    # Wait a moment for process to fully stop
+    sleep 2
     
     # Remove existing index
     if [ -d "$INDEX_DIR" ]; then
         log_info "Removing existing elasticsearch directory at $INDEX_DIR"
         log_debug "Executing: rm -rf $INDEX_DIR"
-        rm -rf "$INDEX_DIR"
+        if ! rm -rf "$INDEX_DIR"; then
+            log_error "Failed to remove existing index"
+            return 1
+        fi
     fi
     
     log_debug "Downloading new index"
@@ -446,12 +478,12 @@ sequential_update() {
     log_debug "Verifying new index structure"
     if ! verify_structure "$DATA_DIR"; then
         log_error "Failed to verify new index structure"
-        cleanup_temp "$TEMP_DIR"
+        cleanup_temp
         return 1
     fi
     
     log_debug "Sequential update completed successfully"
-    cleanup_temp "$TEMP_DIR"
+    cleanup_temp
     return 0
 }
 
