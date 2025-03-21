@@ -6,12 +6,13 @@ services:
             args:
                 - PHOTON_VERSION=${PHOTON_VERSION}
         environment:
-            - UPDATE_STRATEGY=PARALLEL
-            - UPDATE_INTERVAL=1d
-            - LOG_LEVEL=DEBUG
+            - UPDATE_STRATEGY=SEQUENTIAL
+            - UPDATE_INTERVAL=3m
+            # - LOG_LEVEL=DEBUG
             # - FORCE_UPDATE=TRUE
             # - COUNTRY_CODE=zw
             # - BASE_URL=https://download1.graphhopper.com/public
+            # - SKIP_MD5_CHECK=TRUE
         volumes:
             - photon_data:/photon/photon_data
         restart: unless-stopped
