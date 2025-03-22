@@ -1,32 +1,26 @@
 #!/bin/bash
 
-# Configuration
-DATA_DIR="/photon"
-INDEX_DIR="/photon/photon_data/elasticsearch"
-TEMP_DIR="/photon/photon_data/temp"
-UPDATE_STRATEGY="${UPDATE_STRATEGY:-PARALLEL}"
-UPDATE_INTERVAL="${UPDATE_INTERVAL:-24h}"
-LOG_LEVEL="${LOG_LEVEL:-INFO}"
-FORCE_UPDATE="${FORCE_UPDATE:-FALSE}"
+# Source modules
+source "src/logging.sh"
+source "src/config.sh"
+source "src/process.sh"
 
-# ANSI color codes
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Log environment variables
+log_debug "Environment variables:"
+log_debug "UPDATE_STRATEGY=$UPDATE_STRATEGY"
+log_debug "UPDATE_INTERVAL=$UPDATE_INTERVAL"
+log_debug "LOG_LEVEL=$LOG_LEVEL"
+log_debug "BASE_URL=$BASE_URL"
+log_debug "FORCE_UPDATE=$FORCE_UPDATE"
+log_debug "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
+log_debug "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
 
-# Logging functions
-log_info() { 
-    if [[ "$LOG_LEVEL" != "ERROR" ]]; then
-        echo -e "${GREEN}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"
-    fi
-}
-log_error() { echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*" >&2; }
-log_debug() { 
-    if [[ "$LOG_LEVEL" == "DEBUG" ]]; then
-        echo -e "${BLUE}[DEBUG]${NC} $(date '+%Y-%m-%d %H:%M:%S') - $*"
-    fi
-}
+# Define DATA_DIR from config
+DATA_DIR="$PHOTON_DIR"
+
+# Error handling
+set -euo pipefail
+trap 'handle_error $? $LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]:-})' ERR
 
 # Error handling
 set -euo pipefail
@@ -66,22 +60,41 @@ cleanup_and_exit() {
 check_disk_space() {
     local url=$1
     local available
+    local full_url="${url}.tar.bz2"
 
+    log_debug "Checking disk space for URL: $full_url"
+    log_debug "URL components - Protocol: ${full_url%%://*}, Host: ${full_url#*://}, Path: ${full_url#*://*/}"
+    
     # Get remote file size using wget spider
+    log_debug "Executing wget spider command: wget --spider --server-response \"$full_url\""
+    local wget_output
+    wget_output=$(wget --spider --server-response "$full_url" 2>&1)
+    local wget_status=$?
+    log_debug "wget spider command output: $(echo "$wget_output" | head -20)"
+    
     local remote_size
-    if ! remote_size=$(wget --spider --server-response "$url.tar.bz2" 2>&1 | grep "Content-Length" | awk '{print $2}' | tail -1); then
+    if ! remote_size=$(echo "$wget_output" | grep "Content-Length" | awk '{print $2}' | tail -1); then
         log_error "Failed to execute wget spider command"
+        log_debug "wget spider command failed with status: $wget_status"
+        log_debug "Full wget output: $wget_output"
         return 1
     fi
     
     if [ -z "$remote_size" ]; then
         log_error "Failed to get remote file size"
+        log_debug "No Content-Length found in wget output"
         return 1
     fi
     
+    log_debug "Remote file size detected: $remote_size bytes"
+    
     # Check available space in photon_data directory
+    log_debug "Creating data directory structure at $DATA_DIR/photon_data"
     mkdir -p "$DATA_DIR/photon_data"
+    log_debug "Directory created. Contents: $(ls -l $DATA_DIR/photon_data 2>/dev/null || echo '<none>')"
     available=$(df -B1 "$DATA_DIR/photon_data" | awk 'NR==2 {print $4}')
+    log_debug "Available disk space: $available bytes"
+    
     if [ "$available" -lt "$remote_size" ]; then
         log_error "Insufficient disk space. Required: ${remote_size}B , Available: ${available}B"
         return 1
@@ -93,14 +106,19 @@ check_disk_space() {
 # Verify directory structure and index
 verify_structure() {
     local dir=$1
+    log_debug "Verifying directory structure at: $dir/photon_data"
     if [ ! -d "$dir/photon_data/elasticsearch" ]; then
+        log_debug "Directory structure failed verification. Existing paths: $(find "$dir" -maxdepth 3 -type d | tr '\n' ' ')"
         log_error "Invalid structure: missing elasticsearch directory"
         return 1
     fi
     
     # Ensure proper permissions
-    chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
-    chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    # log_debug "Setting permissions for elasticsearch directory"
+    log_debug "Pre-permission state: $(stat -c '%a %U:%G %n' "$dir/photon_data/elasticsearch" 2>/dev/null || echo 'missing')"
+    # chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    # chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
+    # log_debug "Post-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
     
     return 0
 }
@@ -108,6 +126,10 @@ verify_structure() {
 # Check if remote index is newer than local
 check_remote_index() {
     local url=$1
+    local full_url="${url}.tar.bz2"
+
+    log_debug "Checking if remote index is newer than local"
+    log_debug "Remote URL: $full_url"
 
     # If FORCE_UPDATE is TRUE, skip timestamp check
     if [ "${FORCE_UPDATE}" = "TRUE" ]; then
@@ -116,13 +138,26 @@ check_remote_index() {
     fi
 
     local remote_time
+    local wget_output
 
     # Get remote file timestamp using HEAD request
-    remote_time=$(wget --spider -S "$url.tar.bz2" 2>&1 | grep "Last-Modified" | cut -d' ' -f4-)
-    if [ -z "$remote_time" ]; then
-        log_error "Failed to get remote index timestamp"
+    log_debug "Executing: wget --spider -S \"$full_url\""
+    if ! wget_output=$(wget --spider -S "$full_url" 2>&1); then
+        log_error "Failed to check remote index timestamp"
+        log_debug "Full wget output:\n$wget_output"
         return 2
     fi
+    
+    log_debug "Full wget spider response:\n$wget_output"
+    
+    remote_time=$(echo "$wget_output" | grep -i "Last-Modified:" | cut -d' ' -f4-)
+    if [ -z "$remote_time" ]; then
+        log_error "Failed to get remote index timestamp"
+        log_debug "No Last-Modified header found in wget output"
+        return 2
+    fi
+    
+    log_debug "Remote timestamp: $remote_time"
     
     # Convert remote time to epoch
     remote_epoch=$(date -d "$remote_time" +%s 2>/dev/null)
@@ -158,7 +193,7 @@ download_file() {
     local output_file=$2
     
     log_info "Downloading from $url"
-    if ! wget --progress=dot:giga -O "$output_file" "$url"; then
+    if ! wget --progress=bar:force:noscroll:giga -O "$output_file" "$url"; then
         log_error "Failed to download file from $url"
         return 1
     fi
@@ -230,14 +265,20 @@ move_index() {
     local target_dir=$2
     
     # Find elasticsearch directory recursively
+    log_debug "Searching for elasticsearch directory in: $source_dir"
     local es_dir
     es_dir=$(find "$source_dir" -type d -name "elasticsearch" | head -n 1)
+    log_debug "Found elasticsearch candidates: $(find "$source_dir" -type d -name "elasticsearch" | tr '\n' ' ')"
     
     if [ -n "$es_dir" ]; then
         log_info "Found elasticsearch directory at $es_dir"
         log_debug "Moving elasticsearch from $es_dir to $target_dir"
+        log_debug "Current target directory state: $(ls -ld "$target_dir" 2>/dev/null || echo '<not exists>')"
         mkdir -p "$(dirname "$target_dir")"
-        mv "$es_dir" "$target_dir"
+        log_debug "Parent directory prepared. New state: $(ls -ld "$(dirname "$target_dir")" 2>/dev/null || echo '<not exists>')"
+        log_debug "Executing mv command: mv $es_dir $target_dir"
+        mv -v "$es_dir" "$target_dir" | while read -r line; do log_debug "mv: $line"; done
+        log_debug "Move completed. Target directory now contains: $(ls -l "$target_dir" | wc -l) items"
         return 0
     else
         log_error "Could not find elasticsearch directory in extracted files"
@@ -247,45 +288,91 @@ move_index() {
 
 cleanup_temp() {
     log_info "Cleaning up temporary directory"
-    rm -rf "${TEMP_DIR:?}"/*
+    log_debug "Pre-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
+    log_debug "Executing: rm -rf ${TEMP_DIR:?}"
+    rm -rfv "${TEMP_DIR:?}" | while read -r line; do log_debug "rm: $line"; done
+    log_debug "Final photon_data directory structure:\n$(tree -L 2 $PHOTON_DATA_DIR 2>/dev/null || echo '<empty>')"
 }
 
-# Prepare download URL based on country code
+# Prepare download URL based on country code or custom base URL
 prepare_download_url() {
-    local base_url="https://download1.graphhopper.com/public/photon-db-latest"
+    # Ensure BASE_URL doesn't have trailing slash
+    local base_url="${BASE_URL%/}"
+    local result_url
+    
     if [[ -n "${COUNTRY_CODE:-}" ]]; then
-        echo "https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
+        result_url="${base_url}/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest"
     else
-        echo "$base_url"
+        result_url="${base_url}/photon-db-latest"
     fi
+    
+    echo "$result_url"
 }
 
 # Download and verify index
 download_index() {
     local url
     url=$(prepare_download_url)
+    log_debug "Download URL: $url"
+    log_debug "Full tar.bz2 URL: ${url}.tar.bz2"
+    log_debug "Full MD5 URL: ${url}.tar.bz2.md5"
     
     mkdir -p "$TEMP_DIR"
+    log_debug "Created temp directory: $TEMP_DIR"
     
     # Check disk space before downloading
-    check_disk_space "$url"
+    log_debug "Checking disk space for download"
+    if ! check_disk_space "$url"; then
+        log_error "Disk space check failed"
+        cleanup_temp
+        return 1
+    fi
     
     # Download files
-    if ! wget --progress=dot:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${url}.tar.bz2"; then
+    local download_url="${url}.tar.bz2"
+    log_info "Downloading index from ${download_url}"
+    log_debug "Executing: wget --progress=bar:force:noscroll:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${download_url}\""
+    
+    if ! wget --progress=bar:force:noscroll:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${download_url}" 2>&1; then
+        log_error "Failed to download index file from ${download_url}"
         cleanup_temp
         return 1
     fi
     
-    if ! wget -O "$TEMP_DIR/photon-db.md5" "${url}.tar.bz2.md5"; then
-        cleanup_temp
-        return 1
-    fi
+    log_debug "Index download successful. File size: $(du -h "$TEMP_DIR/photon-db.tar.bz2" | awk '{print $1}')"
     
-    # Verify checksum
-    if ! (cd "$TEMP_DIR" && md5sum -c <(cut -d' ' -f1 photon-db.md5 > temp.md5 && echo "$(cat temp.md5)  photon-db.tar.bz2" && rm temp.md5)); then
-        log_error "MD5 verification failed"
-        cleanup_temp
-        return 1
+    if [ "${SKIP_MD5_CHECK}" != "TRUE" ]; then
+        log_debug "Downloading MD5 from ${url}.tar.bz2.md5"
+        log_debug "Executing: wget -O \"$TEMP_DIR/photon-db.md5\" \"${url}.tar.bz2.md5\""
+        
+        local md5_output
+        md5_output=$(wget -O "$TEMP_DIR/photon-db.md5" "${url}.tar.bz2.md5" 2>&1)
+        local md5_status=$?
+        
+        if [ $md5_status -ne 0 ]; then
+            log_error "Failed to download MD5 file from ${url}.tar.bz2.md5"
+            log_debug "wget exit status: $md5_status"
+            log_debug "wget output: $(echo "$md5_output" | head -20)"
+            cleanup_temp
+            return 1
+        fi
+        
+        log_debug "MD5 download successful. MD5 content: $(cat "$TEMP_DIR/photon-db.md5" | head -1)"
+        
+        # Verify checksum
+        log_debug "Starting MD5 verification"
+        if ! (cd "$TEMP_DIR" && md5sum -c <(awk '{print $1"  photon-db.tar.bz2"}' photon-db.md5)); then
+            log_error "MD5 verification failed"
+            cleanup_temp
+            return 1
+        fi
+        log_info "MD5 verification successful"
+        log_debug "MD5 verification completed"
+    
+        # Extract archive
+        log_info "Extracting archive, this may take some time..."
+    else
+        log_info "Skipping MD5 verification as requested"
     fi
     
     # Extract archive in place
@@ -300,71 +387,111 @@ download_index() {
 
 # Strategy-specific update functions
 parallel_update() {
+    log_debug "Starting parallel update process"
+    
     # Download and prepare new index while current one is running
+    log_debug "Downloading new index while current service is running"
     if ! download_index; then
+        log_error "Failed to download index"
         return 1
     fi
     
     # Verify the downloaded index
+    log_debug "Verifying downloaded index structure"
     if ! verify_structure "$TEMP_DIR"; then
+        log_error "Downloaded index verification failed"
         cleanup_temp
         return 1
     fi
     
     # Stop service and swap indexes
-    stop_photon
+    log_debug "Stopping Photon service before swapping indexes"
+    if ! stop_photon; then
+        log_error "Failed to stop Photon service cleanly"
+        cleanup_temp
+        return 1
+    fi
+    
+    # Wait a moment for process to fully stop
+    sleep 2
     
     # Backup and swap
-    mv "$INDEX_DIR" "$INDEX_DIR.old" 2>/dev/null || true
+    if [ -d "$INDEX_DIR" ]; then
+        log_debug "Backing up current index to $INDEX_DIR.old"
+        if ! mv "$INDEX_DIR" "$INDEX_DIR.old"; then
+            log_error "Failed to backup current index"
+            cleanup_temp
+            return 1
+        fi
+    fi
+    
+    log_debug "Moving new index from $TEMP_DIR to $INDEX_DIR"
     if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
-        # Restore backup on failure
-        mv "$INDEX_DIR.old" "$INDEX_DIR" 2>/dev/null || true
+        log_error "Failed to move index, attempting to restore backup"
+        if [ -d "$INDEX_DIR.old" ]; then
+            if ! mv "$INDEX_DIR.old" "$INDEX_DIR"; then
+                log_error "Failed to restore backup index"
+            fi
+        fi
         cleanup_temp
         return 1
     fi
     
     # Clean up
+    log_debug "Removing old index backup"
     rm -rf "$INDEX_DIR.old" 2>/dev/null || true
+    log_debug "Parallel update completed successfully"
     cleanup_temp "$TEMP_DIR"
     return 0
 }
 
 sequential_update() {
-    # Stop service first
-    stop_photon
+    log_debug "Starting sequential update process"
+    
+    log_debug "Stopping Photon service before update"
+    if ! stop_photon; then
+        log_error "Failed to stop Photon service cleanly"
+        return 1
+    fi
+    
+    # Wait a moment for process to fully stop
+    sleep 2
     
     # Remove existing index
     if [ -d "$INDEX_DIR" ]; then
         log_info "Removing existing elasticsearch directory at $INDEX_DIR"
-        rm -rf "$INDEX_DIR"
+        log_debug "Executing: rm -rf $INDEX_DIR"
+        if ! rm -rf "$INDEX_DIR"; then
+            log_error "Failed to remove existing index"
+            return 1
+        fi
     fi
     
-    # Download new index
+    log_debug "Downloading new index"
     if ! download_index; then
+        log_error "Failed to download index"
         return 1
     fi
     
-    # Move to final location
+    log_debug "Moving index from $TEMP_DIR to $INDEX_DIR"
     if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
+        log_error "Failed to move index"
         cleanup_temp
         return 1
     fi
     
-    # Verify and clean up
+    log_debug "Verifying new index structure"
     if ! verify_structure "$DATA_DIR"; then
         log_error "Failed to verify new index structure"
-        cleanup_temp "$TEMP_DIR"
+        cleanup_temp
         return 1
     fi
     
-    cleanup_temp "$TEMP_DIR"
-    
-    # Start service
-    start_photon
+    log_debug "Sequential update completed successfully"
+    cleanup_temp
     return 0
 }
 
-# Update index based on strategy
 update_index() {
     case "$UPDATE_STRATEGY" in
         PARALLEL)
@@ -383,15 +510,29 @@ update_index() {
     esac
 }
 
-# Start Photon service
 start_photon() {
+    # Check if already running
+    if [ -f /photon/photon.pid ]; then
+        local pid
+        pid=$(cat /photon/photon.pid)
+        if ps -p "$pid" > /dev/null; then
+            log_info "Photon service already running with PID: $pid"
+            return 0
+        else
+            log_info "Removing stale PID file"
+            rm -f /photon/photon.pid
+        fi
+    fi
+
     log_info "Starting Photon service"
     java -jar photon.jar -data-dir /photon &
-    echo $! > /photon/photon.pid
+    local new_pid=$!
+    echo $new_pid > /photon/photon.pid
+    
+    log_info "Photon service started successfully with PID: $new_pid"
     return 0
 }
 
-# Convert update interval to seconds
 interval_to_seconds() {
     local interval=$1
     local value=${interval%[smhd]}
@@ -406,7 +547,6 @@ interval_to_seconds() {
     esac
 }
 
-# Initialize or verify index
 setup_index() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
     
@@ -431,19 +571,26 @@ setup_index() {
 }
 
 main() {
-    # Initial setup
     if ! setup_index; then
         exit 1
     fi
 
-    # Handle force update if enabled, regardless of update strategy
+    # Only run FORCE_UPDATE once during container startup
     if [ "${FORCE_UPDATE}" = "TRUE" ]; then
         log_info "Performing forced update on startup"
-        update_index
+        if ! update_index; then
+            log_error "Forced update failed"
+            exit 1
+        fi
+        # Disable FORCE_UPDATE after first run
+        FORCE_UPDATE="FALSE"
+        log_debug "FORCE_UPDATE disabled after initial run"
     fi
 
-    # Start Photon service after initial setup and any forced updates
-    start_photon
+    if ! start_photon; then
+        log_error "Failed to start Photon service"
+        exit 1
+    fi
 
     if [ "$UPDATE_STRATEGY" != "DISABLED" ]; then
         local update_seconds
@@ -462,6 +609,11 @@ main() {
             if check_remote_index "$url"; then
                 log_info "Performing scheduled index update"
                 update_index
+                # Restart service after update
+                if ! start_photon; then
+                    log_error "Failed to restart Photon service after update"
+                    exit 1
+                fi
             fi
         done
     else
