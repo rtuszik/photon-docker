@@ -79,8 +79,6 @@ PHOTON_API_USE_HTTPS=false
 
 ### Build and Run Locally
 
-1. Set the Photon version:
-
     ```bash
     docker compose -f docker-compose.build.yml build --build-arg PHOTON_VERSION=0.6.2
     ```
