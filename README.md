@@ -82,12 +82,7 @@ PHOTON_API_USE_HTTPS=false
 1. Set the Photon version:
 
     ```bash
-    export PHOTON_VERSION=0.6.1
-    ```
-
-2. Build and run using the build configuration:
-    ```bash
-    docker-compose -f docker-compose.build.yml up --build
+    docker compose -f docker-compose.build.yml build --build-arg PHOTON_VERSION=0.6.2
     ```
 
 ### Accessing the API
