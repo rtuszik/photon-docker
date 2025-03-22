@@ -360,12 +360,14 @@ download_index() {
         log_debug "MD5 download successful. MD5 content: $(cat "$TEMP_DIR/photon-db.md5" | head -1)"
         
         # Verify checksum
-        if ! (cd "$TEMP_DIR" && md5sum -c <(cut -d' ' -f1 photon-db.md5 > temp.md5 && echo "$(cat temp.md5)  photon-db.tar.bz2" && rm temp.md5)); then
+        log_debug "Starting MD5 verification"
+        if ! (cd "$TEMP_DIR" && md5sum -c <(awk '{print $1"  photon-db.tar.bz2"}' photon-db.md5)); then
             log_error "MD5 verification failed"
             cleanup_temp
             return 1
         fi
         log_info "MD5 verification successful"
+        log_debug "MD5 verification completed"
     else
         log_info "Skipping MD5 verification as requested"
     fi
