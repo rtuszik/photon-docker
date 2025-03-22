@@ -368,6 +368,9 @@ download_index() {
         fi
         log_info "MD5 verification successful"
         log_debug "MD5 verification completed"
+    
+        # Extract archive
+        log_info "Extracting archive, this may take some time..."
     else
         log_info "Skipping MD5 verification as requested"
     fi
