@@ -13,9 +13,9 @@ This repository offers a Docker image for running Photon locally, enhancing data
 
 ⚠️ **Warning: Large File Sizes** ⚠️
 
--   The Photon index file is fairly large and growing steadily (approximately 75-76GB compressed, 150-160GB uncompressed).
+-   The Photon index file is fairly large and growing steadily. As of beginning of 2025, around 200GB is needed for the full index. Growing 10-20GB per year.
 -   Ensure you have sufficient disk space available before running the container.
--   The initial download and extraction process may take a considerable amount of time.
+-   The initial download and extraction process may take a considerable amount of time. Depending on your hardware, checksum verification and decompression may take multiple hours.
 
 ## Usage
 
