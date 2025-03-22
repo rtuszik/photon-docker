@@ -193,7 +193,7 @@ download_file() {
     local output_file=$2
     
     log_info "Downloading from $url"
-    if ! wget --progress=dot:giga -O "$output_file" "$url"; then
+    if ! wget --progress=bar:force:noscroll:giga -O "$output_file" "$url"; then
         log_error "Failed to download file from $url"
         return 1
     fi
@@ -331,9 +331,9 @@ download_index() {
     # Download files
     local download_url="${url}.tar.bz2"
     log_info "Downloading index from ${download_url}"
-    log_debug "Executing: wget --progress=dot:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${download_url}\""
+    log_debug "Executing: wget --progress=bar:force:noscroll:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${download_url}\""
     
-    if ! wget --progress=bar:force -O "$TEMP_DIR/photon-db.tar.bz2" "${download_url}" 2>&1; then
+    if ! wget --progress=bar:force:noscroll:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${download_url}" 2>&1; then
         log_error "Failed to download index file from ${download_url}"
         cleanup_temp
         return 1
