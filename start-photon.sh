@@ -493,6 +493,12 @@ sequential_update() {
 }
 
 update_index() {
+    if [ "${FORCE_UPDATE}" = "TRUE" ]; then
+        log_info "Force update requested, performing update regardless of strategy"
+        sequential_update
+        return 0
+    fi
+    
     case "$UPDATE_STRATEGY" in
         PARALLEL)
             parallel_update
@@ -592,7 +598,7 @@ main() {
         exit 1
     fi
 
-    if [ "$UPDATE_STRATEGY" != "DISABLED" ]; then
+    if [ "$UPDATE_STRATEGY" != "DISABLED" ] && [ "$UPDATE_INTERVAL" -ne 0 ]; then
         local update_seconds
         update_seconds=$(interval_to_seconds "$UPDATE_INTERVAL")
         log_info "Update strategy: $UPDATE_STRATEGY"
@@ -617,7 +623,7 @@ main() {
             fi
         done
     else
-        log_info "Update strategy is disabled, skipping update loop"
+        log_info "Update strategy is disabled or update interval is set to 0, skipping update loop"
     fi
 
     # Wait for Photon process to finish
