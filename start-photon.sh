@@ -6,14 +6,14 @@ source "src/config.sh"
 source "src/process.sh"
 
 # Log environment variables
-log_debug "Environment variables:"
-log_debug "UPDATE_STRATEGY=$UPDATE_STRATEGY"
-log_debug "UPDATE_INTERVAL=$UPDATE_INTERVAL"
-log_debug "LOG_LEVEL=$LOG_LEVEL"
-log_debug "BASE_URL=$BASE_URL"
-log_debug "FORCE_UPDATE=$FORCE_UPDATE"
-log_debug "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
-log_debug "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
+log_info "Environment variables:"
+log_info "UPDATE_STRATEGY=$UPDATE_STRATEGY"
+log_info "UPDATE_INTERVAL=$UPDATE_INTERVAL"
+log_info "LOG_LEVEL=$LOG_LEVEL"
+log_info "BASE_URL=$BASE_URL"
+log_info "FORCE_UPDATE=$FORCE_UPDATE"
+log_info "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
+log_info "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
 
 # Define DATA_DIR from config
 DATA_DIR="$PHOTON_DIR"
@@ -108,14 +108,14 @@ verify_structure() {
     local dir=$1
     log_debug "Verifying directory structure at: $dir/photon_data"
     if [ ! -d "$dir/photon_data/elasticsearch" ]; then
-        log_debug "Directory structure failed verification. Existing paths: $(find "$dir" -maxdepth 3 -type d | tr '\n' ' ')"
+        log_error "Directory structure failed verification. Existing paths: $(find "$dir" -maxdepth 3 -type d | tr '\n' ' ')"
         log_error "Invalid structure: missing elasticsearch directory"
         return 1
     fi
     
     # Ensure proper permissions
     # log_debug "Setting permissions for elasticsearch directory"
-    log_debug "Pre-permission state: $(stat -c '%a %U:%G %n' "$dir/photon_data/elasticsearch" 2>/dev/null || echo 'missing')"
+    log_info "Pre-permission state: $(stat -c '%a %U:%G %n' "$dir/photon_data/elasticsearch" 2>/dev/null || echo 'missing')"
     # chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
     # chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
     # log_debug "Post-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
@@ -197,6 +197,7 @@ download_file() {
         log_error "Failed to download file from $url"
         return 1
     fi
+    log_info "Index file downloaded successfully"
     return 0
 }
 
@@ -211,6 +212,7 @@ verify_checksum() {
         log_error "MD5 verification failed"
         return 1
     fi
+    log_info "Checksum verification successful"
     return 0
 }
 
@@ -221,11 +223,12 @@ extract_archive() {
     log_debug "Creating extraction directory $extract_dir"
     mkdir -p "$extract_dir"
     
-    log_debug "Extracting $archive to $extract_dir"
+    log_info "Extracting $archive to $extract_dir"
     if ! pbzip2 -dc "$archive" | tar x -C "$extract_dir"; then
         log_error "Failed to extract files"
         return 1
     fi
+    log_info: "Extraction completed successfully"
     return 0
 }
 
@@ -265,18 +268,18 @@ move_index() {
     local target_dir=$2
     
     # Find elasticsearch directory recursively
-    log_debug "Searching for elasticsearch directory in: $source_dir"
+    log_info "Searching for elasticsearch directory in: $source_dir"
     local es_dir
     es_dir=$(find "$source_dir" -type d -name "elasticsearch" | head -n 1)
-    log_debug "Found elasticsearch candidates: $(find "$source_dir" -type d -name "elasticsearch" | tr '\n' ' ')"
+    log_info "Found elasticsearch candidates: $(find "$source_dir" -type d -name "elasticsearch" | tr '\n' ' ')"
     
     if [ -n "$es_dir" ]; then
         log_info "Found elasticsearch directory at $es_dir"
         log_debug "Moving elasticsearch from $es_dir to $target_dir"
-        log_debug "Current target directory state: $(ls -ld "$target_dir" 2>/dev/null || echo '<not exists>')"
+        log_info "Current target directory state: $(ls -ld "$target_dir" 2>/dev/null || echo '<not exists>')"
         mkdir -p "$(dirname "$target_dir")"
-        log_debug "Parent directory prepared. New state: $(ls -ld "$(dirname "$target_dir")" 2>/dev/null || echo '<not exists>')"
-        log_debug "Executing mv command: mv $es_dir $target_dir"
+        log_info "Parent directory prepared. New state: $(ls -ld "$(dirname "$target_dir")" 2>/dev/null || echo '<not exists>')"
+        log_info "Executing mv command: mv $es_dir $target_dir"
         mv -v "$es_dir" "$target_dir" | while read -r line; do log_debug "mv: $line"; done
         log_debug "Move completed. Target directory now contains: $(ls -l "$target_dir" | wc -l) items"
         return 0
@@ -291,7 +294,7 @@ cleanup_temp() {
     log_debug "Pre-cleanup temporary directory contents: $(tree -a $TEMP_DIR 2>/dev/null || echo '<empty>')"
     log_debug "Executing: rm -rf ${TEMP_DIR:?}"
     rm -rfv "${TEMP_DIR:?}" | while read -r line; do log_debug "rm: $line"; done
-    log_debug "Final photon_data directory structure:\n$(tree -L 2 $PHOTON_DATA_DIR 2>/dev/null || echo '<empty>')"
+    log_info "Final photon_data directory structure:\n$(tree -L 2 $PHOTON_DATA_DIR 2>/dev/null || echo '<empty>')"
 }
 
 # Prepare download URL based on country code or custom base URL
@@ -375,6 +378,7 @@ download_index() {
         log_info "Skipping MD5 verification as requested"
     fi
     
+    log_info "Extracting archive to $TEMP_DIR"
     # Extract archive in place
     if ! pbzip2 -dc "$TEMP_DIR/photon-db.tar.bz2" | tar x -C "$TEMP_DIR"; then
         log_error "Failed to extract files"
@@ -382,12 +386,13 @@ download_index() {
         return 1
     fi
     
+    log_info "Extraction completed successfully"
     return 0
 }
 
 # Strategy-specific update functions
 parallel_update() {
-    log_debug "Starting parallel update process"
+    log_info "Starting parallel update process"
     
     # Download and prepare new index while current one is running
     log_debug "Downloading new index while current service is running"
@@ -397,7 +402,7 @@ parallel_update() {
     fi
     
     # Verify the downloaded index
-    log_debug "Verifying downloaded index structure"
+    log_info "Verifying downloaded index structure"
     if ! verify_structure "$TEMP_DIR"; then
         log_error "Downloaded index verification failed"
         cleanup_temp
@@ -405,7 +410,7 @@ parallel_update() {
     fi
     
     # Stop service and swap indexes
-    log_debug "Stopping Photon service before swapping indexes"
+    log_info "Stopping Photon service before swapping indexes"
     if ! stop_photon; then
         log_error "Failed to stop Photon service cleanly"
         cleanup_temp
@@ -413,7 +418,7 @@ parallel_update() {
     fi
     
     # Wait a moment for process to fully stop
-    sleep 2
+    sleep 5
     
     # Backup and swap
     if [ -d "$INDEX_DIR" ]; then
@@ -440,15 +445,15 @@ parallel_update() {
     # Clean up
     log_debug "Removing old index backup"
     rm -rf "$INDEX_DIR.old" 2>/dev/null || true
-    log_debug "Parallel update completed successfully"
+    log_info "Parallel update completed successfully"
     cleanup_temp "$TEMP_DIR"
     return 0
 }
 
 sequential_update() {
-    log_debug "Starting sequential update process"
+    log_info "Starting sequential update process"
     
-    log_debug "Stopping Photon service before update"
+    log_info "Stopping Photon service before update"
     if ! stop_photon; then
         log_error "Failed to stop Photon service cleanly"
         return 1
@@ -467,27 +472,27 @@ sequential_update() {
         fi
     fi
     
-    log_debug "Downloading new index"
+    log_info "Downloading new index"
     if ! download_index; then
         log_error "Failed to download index"
         return 1
     fi
     
-    log_debug "Moving index from $TEMP_DIR to $INDEX_DIR"
+    log_info "Moving index from $TEMP_DIR to $INDEX_DIR"
     if ! move_index "$TEMP_DIR" "$INDEX_DIR"; then
         log_error "Failed to move index"
         cleanup_temp
         return 1
     fi
     
-    log_debug "Verifying new index structure"
+    log_info "Verifying new index structure"
     if ! verify_structure "$DATA_DIR"; then
         log_error "Failed to verify new index structure"
         cleanup_temp
         return 1
     fi
     
-    log_debug "Sequential update completed successfully"
+    log_info "Sequential update completed successfully"
     cleanup_temp
     return 0
 }
@@ -584,7 +589,7 @@ main() {
         fi
         # Disable FORCE_UPDATE after first run
         FORCE_UPDATE="FALSE"
-        log_debug "FORCE_UPDATE disabled after initial run"
+        log_info "FORCE_UPDATE disabled after initial run"
     fi
 
     if ! start_photon; then
