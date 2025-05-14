@@ -15,8 +15,8 @@ log_info "FORCE_UPDATE=$FORCE_UPDATE"
 log_info "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
 log_info "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
 
-UID=1000
-GID=1000
+ES_UID=1000
+ES_GID=1000
 
 # Define DATA_DIR from config
 DATA_DIR="$PHOTON_DIR"
@@ -125,10 +125,10 @@ set_permissions() {
 
     # Change ownership
     # The -R flag makes it recursive.
-    if ! chown -R "$UID:$GID" "$dir"; then
-        log_info "WARNING: Failed to chown $dir to $UID:$GID. This might be due to host volume restrictions. Elasticsearch may encounter permission issues if not run as root or if host permissions are incorrect."
+    if ! chown -R "$ES_UID:$ES_GID" "$dir"; then
+        log_info "WARNING: Failed to chown $dir to $ES_UID:$ES_GID. This might be due to host volume restrictions. Elasticsearch may encounter permission issues if not run as root or if host permissions are incorrect."
     else
-        log_debug "Successfully changed ownership of $dir to $UID:$GID."
+        log_debug "Successfully changed ownership of $dir to $ES_UID:$ES_GID."
     fi
 
     # Change permissions
