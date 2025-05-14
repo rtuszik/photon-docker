@@ -15,6 +15,9 @@ log_info "FORCE_UPDATE=$FORCE_UPDATE"
 log_info "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
 log_info "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
 
+ES_UID="${ES_UID:-1000}"
+ES_GID="${ES_GID:-1000}"
+
 # Define DATA_DIR from config
 DATA_DIR="$PHOTON_DIR"
 
@@ -22,9 +25,6 @@ DATA_DIR="$PHOTON_DIR"
 set -euo pipefail
 trap 'handle_error $? $LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]:-})' ERR
 
-# Error handling
-set -euo pipefail
-trap 'handle_error $? $LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]:-})' ERR
 
 handle_error() {
     local exit_code=$1
@@ -113,15 +113,38 @@ verify_structure() {
         return 1
     fi
     
-    # Ensure proper permissions
-    # log_debug "Setting permissions for elasticsearch directory"
-    log_info "Pre-permission state: $(stat -c '%a %U:%G %n' "$dir/photon_data/elasticsearch" 2>/dev/null || echo 'missing')"
-    # chown -R 1000:1000 "$dir/photon_data/elasticsearch" 2>/dev/null || true
-    # chmod -R 755 "$dir/photon_data/elasticsearch" 2>/dev/null || true
-    # log_debug "Post-permission state: $(stat -c '%a %U:%G %n' $dir/photon_data/elasticsearch 2>/dev/null || echo 'missing')"
     
     return 0
 }
+
+set_permissions() {
+
+    local dir=$1
+    log_info "Ensuring correct ownership and permissions for $dir"
+    log_debug "Current state for $dir: $(stat -c 'Perms: %a, Owner: %U (%u), Group: %G (%g), Name: %n' "$dir" 2>/dev/null || echo "Path $dir not found or stat error")"
+
+    # Change ownership
+    # The -R flag makes it recursive.
+    if ! chown -R "$ES_UID:$ES_GID" "$dir"; then
+        log_info "WARNING: Failed to chown $dir to $ES_UID:$ES_GID. This might be due to host volume restrictions. Elasticsearch may encounter permission issues if not run as root or if host permissions are incorrect."
+    else
+        log_debug "Successfully changed ownership of $dir to $ES_UID:$ES_GID."
+    fi
+
+    # Change permissions
+    # 755 means: Owner (elasticsearch user): Read, Write, Execute (rwx)
+    #            Group (elasticsearch group): Read, Execute (r-x)
+    #            Others: Read, Execute (r-x)
+    
+    if ! chmod -R 755 "$dir"; then
+        log_info "WARNING: Failed to chmod $dir to 755. This might be due to host volume restrictions."
+    else
+        log_debug "Successfully changed permissions of $dir to 755."
+    fi
+
+    log_info "Post-permission state for $dir: $(stat -c 'Perms: %a, Owner: %U (%u), Group: %G (%g), Name: %n' "$dir" 2>/dev/null || echo "Path $dir not found or stat error after changes")"
+}
+
 
 # Check if remote index is newer than local
 check_remote_index() {
@@ -408,6 +431,7 @@ parallel_update() {
         cleanup_temp
         return 1
     fi
+
     
     # Stop service and swap indexes
     log_info "Stopping Photon service before swapping indexes"
@@ -442,11 +466,13 @@ parallel_update() {
         return 1
     fi
     
+    set_permissions "$INDEX_DIR" # Set permissions on the final index directory
+
     # Clean up
     log_debug "Removing old index backup"
     rm -rf "$INDEX_DIR.old" 2>/dev/null || true
     log_info "Parallel update completed successfully"
-    cleanup_temp "$TEMP_DIR"
+    cleanup_temp
     return 0
 }
 
@@ -485,8 +511,10 @@ sequential_update() {
         return 1
     fi
     
+    set_permissions "$INDEX_DIR" # Set permissions on the final index directory
+
     log_info "Verifying new index structure"
-    if ! verify_structure "$DATA_DIR"; then
+    if ! verify_structure "$DATA_DIR"; then # verify_structure "$DATA_DIR" checks $INDEX_DIR
         log_error "Failed to verify new index structure"
         cleanup_temp
         return 1
@@ -529,6 +557,13 @@ start_photon() {
         fi
     fi
 
+    if [ -d "$INDEX_DIR" ]; then
+        set_permissions "$INDEX_DIR" # Ensure permissions before start
+    else
+        log_error "Cannot start Photon: Index directory $INDEX_DIR does not exist."
+        return 1
+    fi
+
     log_info "Starting Photon service"
     java -jar photon.jar -data-dir /photon &
     local new_pid=$!
@@ -556,8 +591,9 @@ setup_index() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
     
     if [ -d "$INDEX_DIR" ]; then
-        if verify_structure "$DATA_DIR"; then
+        if verify_structure "$DATA_DIR"; then # verify_structure "$DATA_DIR" checks $INDEX_DIR
             log_info "Found existing valid elasticsearch index"
+            set_permissions "$INDEX_DIR" # Ensure permissions on existing valid index
             return 0
         else
             log_error "Found invalid index structure, downloading fresh index"
