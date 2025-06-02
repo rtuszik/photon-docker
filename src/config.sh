@@ -4,7 +4,7 @@
 PHOTON_DIR="/photon"
 PHOTON_DATA_DIR="${PHOTON_DIR}/photon_data"
 PHOTON_JAR="${PHOTON_DIR}/photon.jar"
-ES_DATA_DIR="${PHOTON_DATA_DIR}/elasticsearch"
+ES_DATA_DIR="${PHOTON_DATA_DIR}/node_1"
 INDEX_DIR="${ES_DATA_DIR}"
 TEMP_DIR="${PHOTON_DATA_DIR}/temp"
 PID_FILE="${PHOTON_DIR}/photon.pid"
@@ -13,7 +13,7 @@ PID_FILE="${PHOTON_DIR}/photon.pid"
 UPDATE_STRATEGY=${UPDATE_STRATEGY:-SEQUENTIAL}
 UPDATE_INTERVAL=${UPDATE_INTERVAL:-24h}
 LOG_LEVEL=${LOG_LEVEL:-INFO}
-BASE_URL=${BASE_URL:-https://download1.graphhopper.com/public}
+BASE_URL=${BASE_URL:-https://download1.graphhopper.com/public/experimental}
 FORCE_UPDATE=${FORCE_UPDATE:-FALSE}
 SKIP_MD5_CHECK=${SKIP_MD5_CHECK:-FALSE}
 

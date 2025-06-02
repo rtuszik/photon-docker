@@ -15,7 +15,7 @@ WORKDIR /photon
 
 RUN mkdir -p /photon/photon_data
 
-ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-${PHOTON_VERSION}.jar /photon/photon.jar
+ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-opensearch-${PHOTON_VERSION}.jar /photon/photon.jar
 
 COPY start-photon.sh ./start-photon.sh
 COPY src/ ./src/
