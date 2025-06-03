@@ -294,7 +294,7 @@ move_index() {
     log_info "Searching for opensearch directory in: $source_dir"
     local es_dir
     es_dir=$(find "$source_dir" -type d -name "node_1" | head -n 1)
-    log_info "Found opensearch candidates: $(find "$source_dir" -type d -name "opensearch" | tr '\n' ' ')"
+    log_info "Found opensearch candidates: $(find "$source_dir" -type d -name "node_1" | tr '\n' ' ')"
     
     if [ -n "$es_dir" ]; then
         log_info "Found opensearch directory at $es_dir"
