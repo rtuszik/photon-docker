@@ -107,9 +107,9 @@ check_disk_space() {
 verify_structure() {
     local dir=$1
     log_debug "Verifying directory structure at: $dir/photon_data"
-    if [ ! -d "$dir/photon_data/elasticsearch" ]; then
+    if [ ! -d "$dir/photon_data/node_1" ]; then
         log_error "Directory structure failed verification. Existing paths: $(find "$dir" -maxdepth 3 -type d | tr '\n' ' ')"
-        log_error "Invalid structure: missing elasticsearch directory"
+        log_error "Invalid structure: missing index directory"
         return 1
     fi
     
@@ -126,14 +126,14 @@ set_permissions() {
     # Change ownership
     # The -R flag makes it recursive.
     if ! chown -R "$ES_UID:$ES_GID" "$dir"; then
-        log_info "WARNING: Failed to chown $dir to $ES_UID:$ES_GID. This might be due to host volume restrictions. Elasticsearch may encounter permission issues if not run as root or if host permissions are incorrect."
+        log_info "WARNING: Failed to chown $dir to $ES_UID:$ES_GID. This might be due to host volume restrictions. Opensearch may encounter permission issues if not run as root or if host permissions are incorrect."
     else
         log_debug "Successfully changed ownership of $dir to $ES_UID:$ES_GID."
     fi
 
     # Change permissions
-    # 755 means: Owner (elasticsearch user): Read, Write, Execute (rwx)
-    #            Group (elasticsearch group): Read, Execute (r-x)
+    # 755 means: Owner (opensearch user): Read, Write, Execute (rwx)
+    #            Group (opensearch group): Read, Execute (r-x)
     #            Others: Read, Execute (r-x)
     
     if ! chmod -R 755 "$dir"; then
@@ -290,15 +290,15 @@ move_index() {
     local source_dir=$1
     local target_dir=$2
     
-    # Find elasticsearch directory recursively
-    log_info "Searching for elasticsearch directory in: $source_dir"
+    # Find opensearch directory recursively
+    log_info "Searching for opensearch directory in: $source_dir"
     local es_dir
-    es_dir=$(find "$source_dir" -type d -name "elasticsearch" | head -n 1)
-    log_info "Found elasticsearch candidates: $(find "$source_dir" -type d -name "elasticsearch" | tr '\n' ' ')"
+    es_dir=$(find "$source_dir" -type d -name "node_1" | head -n 1)
+    log_info "Found opensearch candidates: $(find "$source_dir" -type d -name "opensearch" | tr '\n' ' ')"
     
     if [ -n "$es_dir" ]; then
-        log_info "Found elasticsearch directory at $es_dir"
-        log_debug "Moving elasticsearch from $es_dir to $target_dir"
+        log_info "Found opensearch directory at $es_dir"
+        log_debug "Moving opensearch from $es_dir to $target_dir"
         log_info "Current target directory state: $(ls -ld "$target_dir" 2>/dev/null || echo '<not exists>')"
         mkdir -p "$(dirname "$target_dir")"
         log_info "Parent directory prepared. New state: $(ls -ld "$(dirname "$target_dir")" 2>/dev/null || echo '<not exists>')"
@@ -307,7 +307,7 @@ move_index() {
         log_debug "Move completed. Target directory now contains: $(ls -l "$target_dir" | wc -l) items"
         return 0
     else
-        log_error "Could not find elasticsearch directory in extracted files"
+        log_error "Could not find opensearch directory in extracted files"
         return 1
     fi
 }
@@ -490,7 +490,7 @@ sequential_update() {
     
     # Remove existing index
     if [ -d "$INDEX_DIR" ]; then
-        log_info "Removing existing elasticsearch directory at $INDEX_DIR"
+        log_info "Removing existing opensearch directory at $INDEX_DIR"
         log_debug "Executing: rm -rf $INDEX_DIR"
         if ! rm -rf "$INDEX_DIR"; then
             log_error "Failed to remove existing index"
@@ -592,7 +592,7 @@ setup_index() {
     
     if [ -d "$INDEX_DIR" ]; then
         if verify_structure "$DATA_DIR"; then # verify_structure "$DATA_DIR" checks $INDEX_DIR
-            log_info "Found existing valid elasticsearch index"
+            log_info "Found existing valid opensearch index"
             set_permissions "$INDEX_DIR" # Ensure permissions on existing valid index
             return 0
         else
@@ -600,7 +600,7 @@ setup_index() {
             rm -rf "$INDEX_DIR"
         fi
     else
-        log_info "No elasticsearch index found, performing initial download"
+        log_info "No opensearch index found, performing initial download"
     fi
     
     if ! sequential_update; then
