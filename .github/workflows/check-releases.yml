@@ -45,13 +45,17 @@ jobs:
               run: |
                   if [[ -n "${{ env.latest_release_version }}" && "${{ env.latest_release_version }}" != "${{ env.last_processed_version }}" ]]; then
                     echo "New version found: ${{ env.latest_release_version }}. (Previous: ${{ env.last_processed_version }})"
-                    echo "update_needed=true" >> "$GITHUB_OUTPUT"
-                    echo "new_version=${{ env.latest_release_version }}" >> "$GITHUB_OUTPUT"
-                    echo "new_branch_name=update-photon-${{ env.latest_release_version }}" >> "$GITHUB_OUTPUT"
+                    {
+                      echo "update_needed=true"
+                      echo "new_version=${{ env.latest_release_version }}"
+                      echo "new_branch_name=update-photon-${{ env.latest_release_version }}"
+                    } >> "$GITHUB_OUTPUT"
                   else
                     echo "No new Photon release detected or version is already up-to-date. Latest fetched: '${{ env.latest_release_version }}', last processed: '${{ env.last_processed_version }}'."
-                    echo "update_needed=false" >> "$GITHUB_OUTPUT"
-                    echo "new_version=${{ env.last_processed_version }}" >> "$GITHUB_OUTPUT" # Fallback to old version
+                    {
+                      echo "update_needed=false"
+                      echo "new_version=${{ env.last_processed_version }}"
+                    } >> "$GITHUB_OUTPUT"
                   fi
 
             - name: Update release file(s) locally
