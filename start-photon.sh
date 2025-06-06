@@ -320,6 +320,17 @@ cleanup_temp() {
     log_info "Final photon_data directory structure:\n$(tree -L 2 $PHOTON_DATA_DIR 2>/dev/null || echo '<empty>')"
 }
 
+cleanup_stale_es() {
+    # Remove old elasticsearch index 
+    if [ -d "$ES_DATA_DIR" ]; then
+        log_info "Removing old elasticsearch directory at $ES_DATA_DIR"
+        log_debug "Executing: rm -rf $ES_DATA_DIR"
+        if ! rm -rf "$ES_DATA_DIR"; then
+            log_error "Failed to remove old elasticsearch index"
+        fi
+    fi
+}
+
 # Prepare download URL based on country code or custom base URL
 prepare_download_url() {
     # Ensure BASE_URL doesn't have trailing slash
@@ -470,8 +481,15 @@ parallel_update() {
 
     # Clean up
     log_debug "Removing old index backup"
+
+
     rm -rf "$INDEX_DIR.old" 2>/dev/null || true
+
+
+    cleanup_stale_es
+
     log_info "Parallel update completed successfully"
+
     cleanup_temp
     return 0
 }
@@ -497,6 +515,8 @@ sequential_update() {
             return 1
         fi
     fi
+
+    cleanup_stale_es
     
     log_info "Downloading new index"
     if ! download_index; then
