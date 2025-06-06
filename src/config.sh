@@ -4,8 +4,9 @@
 PHOTON_DIR="/photon"
 PHOTON_DATA_DIR="${PHOTON_DIR}/photon_data"
 PHOTON_JAR="${PHOTON_DIR}/photon.jar"
-ES_DATA_DIR="${PHOTON_DATA_DIR}/node_1"
-INDEX_DIR="${ES_DATA_DIR}"
+OS_DATA_DIR="${PHOTON_DATA_DIR}/node_1"
+INDEX_DIR="${OS_DATA_DIR}"
+ES_DATA_DIR="${PHOTON_DATA_DIR}/elasticsearch"
 TEMP_DIR="${PHOTON_DATA_DIR}/temp"
 PID_FILE="${PHOTON_DIR}/photon.pid"
 
