@@ -563,6 +563,21 @@ update_index() {
     esac
 }
 
+force_update() {
+    case "$UPDATE_STRATEGY" in
+        PARALLEL)
+            parallel_update
+            ;;
+        SEQUENTIAL)
+            sequential_update
+            ;;
+        *)
+            log_info "Defaulting to sequential update for forced updates"
+            sequential_update
+            ;;
+    esac
+}
+
 start_photon() {
     # Check if already running
     if [ -f /photon/photon.pid ]; then
@@ -639,7 +654,7 @@ main() {
     # Only run FORCE_UPDATE once during container startup
     if [ "${FORCE_UPDATE}" = "TRUE" ]; then
         log_info "Performing forced update on startup"
-        if ! update_index; then
+        if ! force_update; then
             log_error "Forced update failed"
             exit 1
         fi
