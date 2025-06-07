@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21.0.5_11-jre-noble
+FROM eclipse-temurin:24.0.1_9-jre-noble
 
 ARG PHOTON_VERSION
 
