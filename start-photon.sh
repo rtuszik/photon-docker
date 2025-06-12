@@ -681,7 +681,7 @@ main() {
             
             local url
             if [[ -n "$FILE_URL" ]]; then
-                url=$FILE_URL
+                url="$FILE_URL"
                 log_info "FILE_URL is set to: $FILE_URL"
             else
                 url=$(prepare_download_url)
