@@ -684,7 +684,7 @@ main() {
                 url="$FILE_URL"
                 log_info "FILE_URL is set to: $FILE_URL"
             else
-                url=$(prepare_download_url)
+                url="$(prepare_download_url)"
             fi
 
             if check_remote_index "$url"; then
