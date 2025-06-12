@@ -364,9 +364,14 @@ download_index() {
         cleanup_temp
         return 1
     fi
-    
+    if [[ -n "$FILE_URL" ]]; then
+        local download_url="$FILE_URL"
+        log_info "FILE_URL is set to: $FILE_URL"
+    else
+        local download_url="${url}.tar.bz2"
+    fi
+   
     # Download files
-    local download_url="${url}.tar.bz2"
     log_info "Downloading index from ${download_url}"
     log_debug "Executing: wget --progress=bar:force:noscroll:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${download_url}\""
     
