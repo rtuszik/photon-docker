@@ -680,8 +680,13 @@ main() {
             log_info "Checking for index updates"
             
             local url
-            url=$(prepare_download_url)
-            
+            if [[ -n "$FILE_URL" ]]; then
+                url=$FILE_URL
+                log_info "FILE_URL is set to: $FILE_URL"
+            else
+                url=$(prepare_download_url)
+            fi
+
             if check_remote_index "$url"; then
                 log_info "Performing scheduled index update"
                 update_index
