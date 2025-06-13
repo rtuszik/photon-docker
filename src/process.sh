@@ -49,7 +49,7 @@ start_photon() {
     fi
 
     log_info "Starting Photon service"
-    java -jar "$PHOTON_JAR" -data-dir "$PHOTON_DIR" "$PHOTON_PARAMS" &
+    java -jar "$PHOTON_JAR" -data-dir "$PHOTON_DIR" ${PHOTON_PARAMS} &
     local new_pid=$!
     echo $new_pid > "$PID_FILE"
     
