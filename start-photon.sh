@@ -14,6 +14,8 @@ log_info "BASE_URL=$BASE_URL"
 log_info "FORCE_UPDATE=$FORCE_UPDATE"
 log_info "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
 log_info "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
+log_info "FILE_URL=${FILE_URL}"
+
 
 ES_UID="${ES_UID:-1000}"
 ES_GID="${ES_GID:-1000}"
@@ -364,9 +366,14 @@ download_index() {
         cleanup_temp
         return 1
     fi
-    
+    if [[ -n "$FILE_URL" ]]; then
+        local download_url="$FILE_URL"
+        log_info "FILE_URL is set to: $FILE_URL"
+    else
+        local download_url="${url}.tar.bz2"
+    fi
+   
     # Download files
-    local download_url="${url}.tar.bz2"
     log_info "Downloading index from ${download_url}"
     log_debug "Executing: wget --progress=bar:force:noscroll:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${download_url}\""
     
@@ -563,6 +570,21 @@ update_index() {
     esac
 }
 
+force_update() {
+    case "$UPDATE_STRATEGY" in
+        PARALLEL)
+            parallel_update
+            ;;
+        SEQUENTIAL)
+            sequential_update
+            ;;
+        *)
+            log_info "Defaulting to sequential update for forced updates"
+            sequential_update
+            ;;
+    esac
+}
+
 start_photon() {
     # Check if already running
     if [ -f /photon/photon.pid ]; then
@@ -636,18 +658,20 @@ main() {
         exit 1
     fi
 
-    # Only run FORCE_UPDATE once during container startup
-    if [ "${FORCE_UPDATE}" = "TRUE" ]; then
+    # Store initial FORCE_UPDATE value
+    local initial_force_update="${FORCE_UPDATE}"
+    
+    # set FORCE_UPDATE to FALSE after reading
+    export FORCE_UPDATE="FALSE"
+    
+    if [ "$initial_force_update" = "TRUE" ]; then
         log_info "Performing forced update on startup"
-        if ! update_index; then
+        if ! force_update; then
             log_error "Forced update failed"
             exit 1
         fi
-        # Disable FORCE_UPDATE after first run
-        FORCE_UPDATE="FALSE"
-        log_info "FORCE_UPDATE disabled after initial run"
+        log_info "Force update completed"
     fi
-
     if ! start_photon; then
         log_error "Failed to start Photon service"
         exit 1
@@ -665,8 +689,13 @@ main() {
             log_info "Checking for index updates"
             
             local url
-            url=$(prepare_download_url)
-            
+            if [[ -n "$FILE_URL" ]]; then
+                url="$FILE_URL"
+                log_info "FILE_URL is set to: $FILE_URL"
+            else
+                url="$(prepare_download_url)"
+            fi
+
             if check_remote_index "$url"; then
                 log_info "Performing scheduled index update"
                 update_index

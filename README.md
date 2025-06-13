@@ -13,9 +13,9 @@ This repository offers a Docker image for running Photon locally, enhancing data
 
 ⚠️ **Warning: Large File Sizes** ⚠️
 
--   The Photon index file is fairly large and growing steadily. As of beginning of 2025, around 200GB is needed for the full index. Growing 10-20GB per year.
--   Ensure you have sufficient disk space available before running the container.
--   The initial download and extraction process may take a considerable amount of time. Depending on your hardware, checksum verification and decompression may take multiple hours.
+- The Photon index file is fairly large and growing steadily. As of beginning of 2025, around 200GB is needed for the full index. Growing 10-20GB per year.
+- Ensure you have sufficient disk space available before running the container.
+- The initial download and extraction process may take a considerable amount of time. Depending on your hardware, checksum verification and decompression may take multiple hours.
 
 ## Usage
 
@@ -32,6 +32,8 @@ The container can be configured using the following environment variables:
 | `FORCE_UPDATE`    | `TRUE`, `FALSE`                           | `FALSE`                                    | Forces index update on container startup, regardless of UPDATE_STRATEGY                                                                                                                                                                                                |
 | `BASE_URL`        | Valid URL                                 | `https://download1.graphhopper.com/public` | Custom base URL for index data downloads. Should point to parent directory of index files.                                                                                                                                                                             |
 | `SKIP_MD5_CHECK`  | `TRUE`, `FALSE`                           | `FALSE`                                    | Optionally skip MD5 verification of downloaded index files                                                                                                                                                                                                             |
+| `FILE_URL`        | URL to a .tar.bz2 file                    | -                                          | Set custom URL for index file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2"). Needs to be tar.bz2 format. Make sure to set the UPDATE_STRATEGY to DISABLED when using this option.                          |
+| `PHOTON_PARAMS`   | Photon executable parameters              | -                                          | See `https://github.com/komoot/photon#running-photon.`                                                                                                                                                                                                                 |
 
 ### Example Docker Compose
 
@@ -74,8 +76,8 @@ PHOTON_API_HOST=192.168.10.10:2322
 PHOTON_API_USE_HTTPS=false
 ```
 
--   Do _not_ set PHOTON_API_USE_HTTPS to true unless your photon instance is available using HTTPS.
--   Only use the host address for your photon instance. Do not append `/api`
+- Do _not_ set PHOTON_API_USE_HTTPS to true unless your photon instance is available using HTTPS.
+- Only use the host address for your photon instance. Do not append `/api`
 
 ### Build and Run Locally
 
@@ -101,5 +103,5 @@ This project is licensed under the Apache License, Version 2.0.
 
 ## Acknowledgments
 
--   [Photon](https://github.com/komoot/photon)
--   [Dawarich](https://github.com/Freika/dawarich)
+- [Photon](https://github.com/komoot/photon)
+- [Dawarich](https://github.com/Freika/dawarich)
