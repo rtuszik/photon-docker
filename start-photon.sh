@@ -658,18 +658,20 @@ main() {
         exit 1
     fi
 
-    # Only run FORCE_UPDATE once during container startup
-    if [ "${FORCE_UPDATE}" = "TRUE" ]; then
+    # Store initial FORCE_UPDATE value
+    local initial_force_update="${FORCE_UPDATE}"
+    
+    # set FORCE_UPDATE to FALSE after reading
+    export FORCE_UPDATE="FALSE"
+    
+    if [ "$initial_force_update" = "TRUE" ]; then
         log_info "Performing forced update on startup"
         if ! force_update; then
             log_error "Forced update failed"
             exit 1
         fi
-        # Disable FORCE_UPDATE after first run
-        FORCE_UPDATE="FALSE"
-        log_info "FORCE_UPDATE disabled after initial run"
+        log_info "Force update completed"
     fi
-
     if ! start_photon; then
         log_error "Failed to start Photon service"
         exit 1
