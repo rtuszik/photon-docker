@@ -14,6 +14,8 @@ log_info "BASE_URL=$BASE_URL"
 log_info "FORCE_UPDATE=$FORCE_UPDATE"
 log_info "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
 log_info "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
+log_info "FILE_URL=${FILE_URL}"
+
 
 ES_UID="${ES_UID:-1000}"
 ES_GID="${ES_GID:-1000}"
