@@ -18,7 +18,7 @@ jobs:
 
         steps:
             - name: Configure rclone
-              shell: bash
+              shell: sh
               run: |
                   mkdir -p ~/.config/rclone
                   cat > ~/.config/rclone/rclone.conf << EOF
@@ -32,7 +32,7 @@ jobs:
                   EOF
 
             - name: Sync latest photon files
-              shell: bash
+              shell: sh
               run: |
                   echo "Syncing the latest database file..."
                   rclone copyurl --checksum --progress --auto-filename \
