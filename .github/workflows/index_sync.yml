@@ -1,0 +1,45 @@
+name: Sync GraphHopper Dumps to R2
+
+on:
+    schedule:
+        - cron: "5 4 * * *" # daily at 4:05
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}
+    cancel-in-progress: true
+
+jobs:
+    sync:
+        runs-on: ubuntu-latest
+
+        container:
+            image: rclone/rclone:master
+
+        steps:
+            - name: Configure rclone
+              shell: bash
+              run: |
+                  mkdir -p ~/.config/rclone
+                  cat > ~/.config/rclone/rclone.conf << EOF
+                  [r2]
+                  type = s3
+                  provider = Cloudflare
+                  endpoint = https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+                  access_key_id = ${{ secrets.R2_ACCESS_KEY_ID }}
+                  secret_access_key = ${{ secrets.R2_SECRET_ACCESS_KEY }}
+                  no_check_bucket = true
+                  EOF
+
+            - name: Sync latest photon files
+              shell: bash
+              run: |
+                  echo "Syncing the latest database file..."
+                  rclone copyurl --checksum --progress --auto-filename \
+                    "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2" \
+                    r2:photon-os/public/experimental/
+
+                  echo "Syncing the latest checksum file..."
+                  rclone copyurl --checksum --progress --auto-filename \
+                    "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2.md5" \
+                    r2:photon-os/public/experimental/
