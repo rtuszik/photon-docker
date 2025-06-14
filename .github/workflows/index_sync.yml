@@ -1,8 +1,6 @@
 name: Sync GraphHopper Dumps to R2
 
 on:
-    schedule:
-        - cron: "5 4 * * */2" # every 2nd day at 4:05
     workflow_dispatch:
 
 concurrency:
