@@ -11,7 +11,7 @@ services:
             # - LOG_LEVEL=DEBUG
             # - FORCE_UPDATE=TRUE
             # - COUNTRY_CODE=zw
-            # - BASE_URL=https://download1.graphhopper.com/public
+            # - BASE_URL=https://r2.koalasec.org/public
             # - SKIP_MD5_CHECK=TRUE
         volumes:
             - photon_data:/photon/photon_data
