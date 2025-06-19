@@ -83,6 +83,7 @@ If you are hosting a public mirror, please open an issue or pull request to have
 | ------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `https://r2.koalasec.org/public/experimental`           | [rtuszik](https://github.com/rtuszik)                  | ![KoalaSec](https://img.shields.io/website?url=https%3A%2F%2Fr2.koalasec.org%2Fpublic%2Fexperimental%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status)              |
 | `https://download1.graphhopper.com/public/experimental` | [GraphHopper](https://www.graphhopper.com/) (Official) | ![GraphHopper](https://img.shields.io/website?url=https%3A%2F%2Fdownload1.graphhopper.com%2Fpublic%2Fexperimental%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status) |
+| `https://r2.naru.dev/` | [naru](https://github.com/narucx)                  | ![Status](https://img.shields.io/website?url=https%3A%2F%2Fr2.naru.dev%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status)
 
 ### Use with Dawarich
 
