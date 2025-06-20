@@ -1,6 +1,8 @@
 FROM eclipse-temurin:21.0.5_11-jre-noble
 
 ARG PHOTON_VERSION
+ARG PUID=9011
+ARG PGID=9011
 
 RUN apt-get update \  
   && apt-get -y install --no-install-recommends \
@@ -9,9 +11,15 @@ RUN apt-get update \
   procps \
   coreutils \
   tree \
+  gosu \
   && rm -rf /var/lib/apt/lists/*
 
+RUN groupadd -g ${PGID} -o photon && \
+    useradd -u ${PUID} -g photon -o -s /bin/false -m -d /photon photon
+
 WORKDIR /photon
+
+RUN chown -R photon:photon /photon
 
 RUN mkdir -p /photon/photon_data
 
@@ -26,4 +34,3 @@ VOLUME /photon/photon_data
 EXPOSE 2322
 
 ENTRYPOINT ["/photon/start-photon.sh"]
-
