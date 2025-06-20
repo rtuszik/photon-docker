@@ -7,6 +7,8 @@ source "src/process.sh"
 
 # Log environment variables
 log_info "Environment variables:"
+log_info "PUID=${PUID:-9011}"
+log_info "PGID=${PGID:-9011}"
 log_info "UPDATE_STRATEGY=$UPDATE_STRATEGY"
 log_info "UPDATE_INTERVAL=$UPDATE_INTERVAL"
 log_info "LOG_LEVEL=$LOG_LEVEL"
@@ -16,10 +18,6 @@ log_info "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
 log_info "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
 log_info "FILE_URL=${FILE_URL}"
 
-
-ES_UID="${ES_UID:-1000}"
-ES_GID="${ES_GID:-1000}"
-
 # Define DATA_DIR from config
 DATA_DIR="$PHOTON_DIR"
 
@@ -27,6 +25,29 @@ DATA_DIR="$PHOTON_DIR"
 set -euo pipefail
 trap 'handle_error $? $LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]:-})' ERR
 
+setup_user() {
+    local target_puid="${PUID:-9011}"
+    local target_gid="${PGID:-9011}"
+
+    log_info "Ensuring user and group IDs are set correctly..."
+    log_info "Target PUID: ${target_puid}, Target PGID: ${target_gid}"
+
+    local current_gid
+    current_gid=$(getent group photon | cut -d: -f3)
+
+    if [ "$current_gid" != "$target_gid" ]; then
+        log_info "Updating photon group GID from ${current_gid} to ${target_gid}..."
+        groupmod -o -g "$target_gid" photon
+    fi
+
+    local current_puid
+    current_puid=$(getent passwd photon | cut -d: -f3)
+
+    if [ "$current_puid" != "$target_puid" ]; then
+        log_info "Updating photon user UID from ${current_puid} to ${target_puid}..."
+        usermod -o -u "$target_puid" photon
+    fi
+}
 
 handle_error() {
     local exit_code=$1
@@ -38,27 +59,18 @@ handle_error() {
     cleanup_and_exit
 }
 
-# Cleanup function
 cleanup_and_exit() {
     log_info "Cleaning up temporary files..."
-    
-    # Stop service if running
     stop_photon
-    
-    # Remove temporary files
     if [ -d "$TEMP_DIR" ]; then
         if ! rm -rf "${TEMP_DIR:?}"/*; then
             log_error "Failed to clean up temporary directory"
         fi
     fi
-    
-    # Remove PID file if it exists
     rm -f /photon/photon.pid
-    
     exit 1
 }
 
-# Check available disk space against remote file size
 check_disk_space() {
     local url=$1
     local available
@@ -120,31 +132,30 @@ verify_structure() {
 }
 
 set_permissions() {
-
     local dir=$1
-    log_info "Ensuring correct ownership and permissions for $dir"
-    log_debug "Current state for $dir: $(stat -c 'Perms: %a, Owner: %U (%u), Group: %G (%g), Name: %n' "$dir" 2>/dev/null || echo "Path $dir not found or stat error")"
+    log_info "Ensuring correct ownership and permissions for $dir..."
 
-    # Change ownership
-    # The -R flag makes it recursive.
-    if ! chown -R "$ES_UID:$ES_GID" "$dir"; then
-        log_info "WARNING: Failed to chown $dir to $ES_UID:$ES_GID. This might be due to host volume restrictions. Opensearch may encounter permission issues if not run as root or if host permissions are incorrect."
+    # Check current ownership against the target 'photon' user's UID/GID
+    local current_owner
+    current_owner=$(stat -c '%u:%g' "$dir" 2>/dev/null || echo "notfound")
+    local target_owner
+    target_owner="$(id -u photon):$(id -g photon)"
+
+    if [ "$current_owner" != "$target_owner" ]; then
+        log_info "Updating ownership of $dir to photon:photon (${target_owner})"
+        if ! chown -R photon:photon "$dir"; then
+            log_info "WARNING: Failed to chown $dir to photon:photon. This might be due to host volume restrictions. The application may encounter permission issues."
+        else
+            log_debug "Successfully changed ownership of $dir."
+        fi
     else
-        log_debug "Successfully changed ownership of $dir to $ES_UID:$ES_GID."
+        log_debug "Ownership of $dir is already correct."
     fi
 
-    # Change permissions
-    # 755 means: Owner (opensearch user): Read, Write, Execute (rwx)
-    #            Group (opensearch group): Read, Execute (r-x)
-    #            Others: Read, Execute (r-x)
-    
+    # Set permissions as before
     if ! chmod -R 755 "$dir"; then
         log_info "WARNING: Failed to chmod $dir to 755. This might be due to host volume restrictions."
-    else
-        log_debug "Successfully changed permissions of $dir to 755."
     fi
-
-    log_info "Post-permission state for $dir: $(stat -c 'Perms: %a, Owner: %U (%u), Group: %G (%g), Name: %n' "$dir" 2>/dev/null || echo "Path $dir not found or stat error after changes")"
 }
 
 
@@ -606,8 +617,12 @@ start_photon() {
         return 1
     fi
 
-    log_info "Starting Photon service"
-    java -jar photon.jar -data-dir /photon &
+    # Ensure permissions on the data directory before starting
+    set_permissions "$DATA_DIR"
+
+    log_info "Starting Photon service as user 'photon'..."
+    # Launch the process as the 'photon' user in the background
+    gosu photon java -jar photon.jar -data-dir /photon &
     local new_pid=$!
     echo $new_pid > /photon/photon.pid
     
@@ -654,6 +669,8 @@ setup_index() {
 }
 
 main() {
+    setup_user
+
     if ! setup_index; then
         exit 1
     fi
