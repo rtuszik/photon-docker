@@ -1,7 +1,10 @@
 [project]
 name = "photon-docker"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.0.0"
+description = "Unofficial docker image for the Photon Geocoder"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = []
+requires-python = ">=3.12"
+dependencies = [
+    "requests==2.32.4",
+    "tqdm==4.67.1",
+]
