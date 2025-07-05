@@ -138,6 +138,7 @@ set_permissions() {
     # Check current ownership against the target 'photon' user's UID/GID
     local current_owner
     current_owner=$(stat -c '%u:%g' "$dir" 2>/dev/null || echo "notfound")
+    log_debug "Current Owner is $current_owner"
     local target_owner
     target_owner="$(id -u photon):$(id -g photon)"
 
@@ -150,11 +151,6 @@ set_permissions() {
         fi
     else
         log_debug "Ownership of $dir is already correct."
-    fi
-
-    # Set permissions as before
-    if ! chmod -R 755 "$dir"; then
-        log_info "WARNING: Failed to chmod $dir to 755. This might be due to host volume restrictions."
     fi
 }
 
@@ -244,7 +240,7 @@ verify_checksum() {
     dir=$(dirname "$file")
     
     log_info "Verifying MD5 checksum"
-    if ! (cd "$dir" && md5sum -c <(cut -d' ' -f1 "$(basename "$md5_file")" > temp.md5 && echo "$(cat temp.md5)  $(basename "$file")" && rm temp.md5)); then
+    if ! gosu photon bash -c "cd '$dir' && md5sum -c <(echo \"\$(cut -d' ' -f1 '$(basename "$md5_file")')  $(basename "$file")\")"; then
         log_error "MD5 verification failed"
         return 1
     fi
@@ -260,11 +256,11 @@ extract_archive() {
     mkdir -p "$extract_dir"
     
     log_info "Extracting $archive to $extract_dir"
-    if ! pbzip2 -dc "$archive" | tar x -C "$extract_dir"; then
+    if ! pbzip2 -dc "$archive" | gosu photon tar x -C "$extract_dir"; then
         log_error "Failed to extract files"
         return 1
     fi
-    log_info: "Extraction completed successfully"
+    log_info "Extraction completed successfully"
     return 0
 }
 
@@ -272,7 +268,6 @@ stop_photon() {
     if [ -f /photon/photon.pid ]; then
         local pid
         pid=$(cat /photon/photon.pid)
-        
         if ps -p "$pid" > /dev/null; then
             log_info "Stopping Photon service (PID: $pid)"
             if ! kill -15 "$pid"; then
@@ -337,10 +332,7 @@ cleanup_stale_es() {
     # Remove old elasticsearch index 
     if [ -d "$ES_DATA_DIR" ]; then
         log_info "Removing old elasticsearch directory at $ES_DATA_DIR"
-        log_debug "Executing: rm -rf $ES_DATA_DIR"
-        if ! rm -rf "$ES_DATA_DIR"; then
-            log_error "Failed to remove old elasticsearch index"
-        fi
+        rm -rf "$ES_DATA_DIR" || log_error "Failed to remove old elasticsearch index"
     fi
 }
 
@@ -369,7 +361,7 @@ download_index() {
     
     mkdir -p "$TEMP_DIR"
     log_debug "Created temp directory: $TEMP_DIR"
-    
+    chown photon:photon "$TEMP_DIR" 
     # Check disk space before downloading
     log_debug "Checking disk space for download"
     if ! check_disk_space "$url"; then
@@ -377,19 +369,14 @@ download_index() {
         cleanup_temp
         return 1
     fi
+    local download_url
     if [[ -n "$FILE_URL" ]]; then
-        local download_url="$FILE_URL"
+        download_url="$FILE_URL"
         log_info "FILE_URL is set to: $FILE_URL"
     else
-        local download_url="${url}.tar.bz2"
+        download_url="${url}.tar.bz2"
     fi
-   
-    # Download files
-    log_info "Downloading index from ${download_url}"
-    log_debug "Executing: wget --progress=bar:force:noscroll:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${download_url}\""
-    
-    if ! wget --progress=bar:force:noscroll:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${download_url}" 2>&1; then
-        log_error "Failed to download index file from ${download_url}"
+    if ! download_file "${download_url}" "$TEMP_DIR/photon-db.tar.bz2"; then
         cleanup_temp
         return 1
     fi
@@ -413,11 +400,9 @@ download_index() {
         fi
         
         log_debug "MD5 download successful. MD5 content: $(cat "$TEMP_DIR/photon-db.md5" | head -1)"
-        
         # Verify checksum
         log_debug "Starting MD5 verification"
-        if ! (cd "$TEMP_DIR" && md5sum -c <(awk '{print $1"  photon-db.tar.bz2"}' photon-db.md5)); then
-            log_error "MD5 verification failed"
+        if ! verify_checksum "$TEMP_DIR/photon-db.tar.bz2" "$TEMP_DIR/photon-db.md5"; then
             cleanup_temp
             return 1
         fi
@@ -432,7 +417,7 @@ download_index() {
     
     log_info "Extracting archive to $TEMP_DIR"
     # Extract archive in place
-    if ! pbzip2 -dc "$TEMP_DIR/photon-db.tar.bz2" | tar x -C "$TEMP_DIR"; then
+    if ! extract_archive "$TEMP_DIR/photon-db.tar.bz2" "$TEMP_DIR"; then
         log_error "Failed to extract files"
         cleanup_temp
         return 1
