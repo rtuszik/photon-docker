@@ -19,7 +19,6 @@ RUN groupadd -g ${PGID} -o photon && \
 
 WORKDIR /photon
 
-RUN chown -R photon:photon /photon
 
 RUN mkdir -p /photon/photon_data
 
@@ -27,7 +26,9 @@ ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-
 
 COPY start-photon.sh ./start-photon.sh
 COPY src/ ./src/
-RUN chmod +x start-photon.sh src/*.sh
+RUN chmod +x start-photon.sh src/*.sh && \
+    chmod 644 /photon/photon.jar && \
+    chown -R photon:photon /photon
 
 
 VOLUME /photon/photon_data
