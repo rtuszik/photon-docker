@@ -11,6 +11,7 @@ TEMP_DIR="${PHOTON_DATA_DIR}/temp"
 PID_FILE="${PHOTON_DIR}/photon.pid"
 FILE_URL="$FILE_URL"
 PHOTON_PARAMS="${PHOTON_PARAMS}"
+JAVA_PARAMS="${JAVA_PARAMS}"
 
 
 # Environment variables with defaults
@@ -28,3 +29,6 @@ if [[ ! "${UPDATE_STRATEGY}" =~ ^(SEQUENTIAL|PARALLEL|DISABLED)$ ]]; then
     echo "Valid options are: SEQUENTIAL, PARALLEL, DISABLED"
     exit 1
 fi
+
+log_info "Ensuring correct permissions for /photon directory..."
+chown -R -v photon:photon /photon
