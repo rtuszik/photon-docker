@@ -1,5 +1,6 @@
 FROM eclipse-temurin:21.0.5_11-jre-noble
 
+ARG DEBIAN_FRONTEND=noninteractive
 ARG PHOTON_VERSION
 ARG PUID=9011
 ARG PGID=9011
