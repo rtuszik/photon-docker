@@ -8,6 +8,8 @@ PHOTON_PARAMS=os.getenv("PHOTON_PARAMS")
 JAVA_PARAMS=os.getenv("JAVA_PARAMS")
 LOG_LEVEL=os.getenv("LOG_LEVEL", "INFO")
 COUNTRY_CODE=os.getenv("COUNTRY_CODE").lower()
+UPDATE_INTERVAL=os.getenv("UPDATE_INTERVAL", "30d")
+BASE_URL=os.getenv("BASE_URL", "https://r2.koalasec.org/public/experimental")
 
 # APP CONFIG
 PHOTON_DIR = "/photon"
