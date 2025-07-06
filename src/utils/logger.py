@@ -1,5 +1,5 @@
 import logging
-import config
+from . import config
 import sys
 from typing import Optional
 

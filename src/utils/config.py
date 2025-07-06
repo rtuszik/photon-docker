@@ -3,7 +3,7 @@ import os
 # USER CONFIG
 UPDATE_STRATEGY = os.getenv("UPDATE_STRATEGY", "SEQUENTIAL")
 UPDATE_INTERVAL=os.getenv("UPDATE_INTERVAL", "30d")
-COUNTRY_CODE=os.getenv("COUNTRY_CODE").lower()
+COUNTRY_CODE=os.getenv("COUNTRY_CODE")
 FORCE_UPDATE = os.getenv("FORCE_UPDATE", 'False').lower() in ('true', '1', 't')
 FILE_URL=os.getenv("FILE_URL")
 PHOTON_PARAMS=os.getenv("PHOTON_PARAMS")
@@ -18,3 +18,4 @@ PHOTON_DATA_DIR = os.path.join(PHOTON_DIR, "photon_data")
 TEMP_DIR = os.path.join(PHOTON_DIR, "temp")
 OS_NODE_DIR = os.path.join(PHOTON_DATA_DIR, "node_1")
 PID_FILE = os.path.join(PHOTON_DIR, "photon.pid")
+

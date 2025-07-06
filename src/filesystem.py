@@ -1,8 +1,8 @@
 import subprocess
-from src import config
-from logger import get_logger
+from utils import config
+from utils.logger import get_logger
 import hashlib
-import os
+import shutil
 
 logging = get_logger()
 
@@ -17,10 +17,13 @@ def extract_index(index_file):
 
 
 def move_index():
-    # moves extracted node_1 dir to photon_data di
+    logging.info(f"Moving Index from {config.TEMP_DIR} to {config.PHOTON_DATA_DIR} ")
+    try:
+        shutil.move(config.TEMP_DIR, config.PHOTON_DATA_DIR)
+    except Exception:
+        logging.error("Meeep")
 
 
-    os.isdir(config.INDEX_DIR)
 
 
 def verify_checksum(md5_file, index_file):
@@ -34,7 +37,7 @@ def verify_checksum(md5_file, index_file):
         logging.error(f"Index file not found for checksum generation: {index_file}")
         raise
 
-    # Get the expected checksum from the .md5 file
+    # Get expected checksum from the .md5 file
     try:
         with open(md5_file, 'r') as f:
             md5_sum = f.read().split()[0].strip()
@@ -45,7 +48,7 @@ def verify_checksum(md5_file, index_file):
         logging.error(f"MD5 file is empty or malformed: {md5_file}")
         raise
 
-    # Compare the generated and expected checksums
+    # Compare generated and expected checksums
     if dl_sum == md5_sum:
         logging.info("Checksum verified successfully.")
         return True
