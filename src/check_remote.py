@@ -1,9 +1,11 @@
-import requests
+import datetime
 import os
+
+import requests
 from dateutil.parser import parse as parsedate
+
 from utils import config
 from utils.logger import get_logger
-import datetime
 
 logging = get_logger()
 

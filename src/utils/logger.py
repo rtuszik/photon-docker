@@ -1,9 +1,10 @@
 import logging
-from . import config
 import sys
 from typing import Optional
 
-# Constants with sane defaults
+from . import config
+
+# sane defaults
 DEFAULT_LOG_FILE = "app.log"
 DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10MB
 DEFAULT_BACKUP_COUNT = 5
