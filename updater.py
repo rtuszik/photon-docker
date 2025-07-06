@@ -2,7 +2,7 @@
 # it should by called on the specified schedule with cronjob
 # it will make use of the python-pidfile library to prevent multiple instances at the same time
 
-from src.logger import get_logger
+from src.utils.logger import get_logger
 from src import config
 from src.downloader import parallel_update, sequential_update
 from src.process import start_photon
