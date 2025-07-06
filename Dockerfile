@@ -13,6 +13,7 @@ RUN apt-get update \
   pbzip2 \
   gosu \
   python3.12 \
+  cron \
   && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g ${PGID} -o photon && \
