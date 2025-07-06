@@ -10,6 +10,7 @@ LOG_LEVEL=os.getenv("LOG_LEVEL", "INFO")
 COUNTRY_CODE=os.getenv("COUNTRY_CODE").lower()
 UPDATE_INTERVAL=os.getenv("UPDATE_INTERVAL", "30d")
 BASE_URL=os.getenv("BASE_URL", "https://r2.koalasec.org/public/experimental")
+SKIP_MD5_CHECK=os.getenv("SKIP_MD5_CHECK", "False").lower() in ('true', '1', 't')
 
 # APP CONFIG
 PHOTON_DIR = "/photon"
