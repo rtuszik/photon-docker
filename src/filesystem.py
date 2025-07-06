@@ -1,8 +1,9 @@
-import subprocess
-from utils import config
-from utils.logger import get_logger
 import hashlib
 import shutil
+import subprocess
+
+from utils import config
+from utils.logger import get_logger
 
 logging = get_logger()
 
@@ -37,7 +38,6 @@ def verify_checksum(md5_file, index_file):
         logging.error(f"Index file not found for checksum generation: {index_file}")
         raise
 
-    # Get expected checksum from the .md5 file
     try:
         with open(md5_file, 'r') as f:
             md5_sum = f.read().split()[0].strip()
@@ -48,7 +48,6 @@ def verify_checksum(md5_file, index_file):
         logging.error(f"MD5 file is empty or malformed: {md5_file}")
         raise
 
-    # Compare generated and expected checksums
     if dl_sum == md5_sum:
         logging.info("Checksum verified successfully.")
         return True
