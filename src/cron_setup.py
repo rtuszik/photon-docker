@@ -2,8 +2,8 @@ import re
 
 from crontab import CronTab
 
-from utils import config
-from utils.logger import get_logger
+from src.utils import config
+from src.utils.logger import get_logger
 
 logging = get_logger()
 

@@ -4,8 +4,8 @@ import os
 import requests
 from dateutil.parser import parse as parsedate
 
-from utils import config
-from utils.logger import get_logger
+from src.utils import config
+from src.utils.logger import get_logger
 
 logging = get_logger()
 
