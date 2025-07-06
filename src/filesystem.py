@@ -2,12 +2,12 @@ import hashlib
 import shutil
 import subprocess
 
-from utils import config
-from utils.logger import get_logger
+from src.utils import config
+from src.utils.logger import get_logger
 
 logging = get_logger()
 
-def extract_index(index_file):
+def extract_index(index_file: str):
     install_command = "lbzip2 dc " + index_file + " | tar -x -C " + config.TEMP_DIR
     try:
 
