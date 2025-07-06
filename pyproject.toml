@@ -7,5 +7,6 @@ requires-python = ">=3.12"
 dependencies = [
     "python-crontab==3.2.0",
     "requests==2.32.4",
+    "supervisor>=4.2.5",
     "tqdm==4.67.1",
 ]
