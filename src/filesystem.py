@@ -8,14 +8,15 @@ from src.utils.logger import get_logger
 logging = get_logger()
 
 def extract_index(index_file: str):
-    install_command = "lbzip2 dc " + index_file + " | tar -x -C " + config.TEMP_DIR
+    logging.info("Extracting Index")
+    install_command = f"lbzip2 -d -c {index_file} | tar x -C {config.TEMP_DIR}"
     try:
 
-        subprocess.run([install_command], shell=True, capture_output=True, text=True, check=True)
+        subprocess.run(install_command, shell=True, capture_output=True, text=True, check=True)
 
-    except Exception:
-        logging.error("Index extraction failed")
-
+    except Exception as e:
+        logging.error(f"Index extraction failed: {e}")
+        raise
 
 def move_index():
     logging.info(f"Moving Index from {config.TEMP_DIR} to {config.PHOTON_DATA_DIR} ")
@@ -23,9 +24,7 @@ def move_index():
         shutil.move(config.TEMP_DIR, config.PHOTON_DATA_DIR)
     except Exception:
         logging.error("Meeep")
-
-
-
+        raise
 
 def verify_checksum(md5_file, index_file):
     hash_md5 = hashlib.md5()

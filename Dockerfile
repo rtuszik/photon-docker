@@ -10,7 +10,7 @@ ARG PGID=9011
 
 RUN apt-get update \
   && apt-get -y install --no-install-recommends \
-  pbzip2 \
+  lbzip2 \
   gosu \
   python3.12 \
   cron \
@@ -44,5 +44,4 @@ RUN uv sync --locked
 VOLUME /photon/photon_data
 EXPOSE 2322
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]    
