@@ -29,10 +29,11 @@ ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker-entrypoint.sh /usr/local/bin/
 COPY src/ ./src/
-COPY main.py .
 COPY entrypoint.py .
+COPY updater.py .
 COPY pyproject.toml .
 COPY uv.lock .
+RUN uv sync --locked
 
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
     chmod 644 /photon/photon.jar && \
