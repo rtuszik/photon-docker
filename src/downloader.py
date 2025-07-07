@@ -5,7 +5,7 @@ import sys
 import requests
 from tqdm import tqdm
 
-from src.filesystem import extract_index, move_index, verify_checksum
+from src.filesystem import extract_index, move_index, verify_checksum, clear_temp_dir
 from src.supervisor import stop_photon
 from src.utils import config
 from src.utils.logger import get_logger
@@ -47,6 +47,7 @@ def parallel_update():
 
         logging.info("Moving Index")
         move_index()
+        clear_temp_dir()
 
         logging.info("Parallel update process completed successfully.")
 
@@ -92,6 +93,8 @@ def sequential_update():
 
         logging.info("Moving new index into place...")
         move_index()
+
+        clear_temp_dir()
 
         logging.info("Sequential download process completed successfully.")
 
