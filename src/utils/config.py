@@ -11,6 +11,7 @@ JAVA_PARAMS=os.getenv("JAVA_PARAMS")
 LOG_LEVEL=os.getenv("LOG_LEVEL", "INFO")
 BASE_URL=os.getenv("BASE_URL", "https://r2.koalasec.org/public/experimental")
 SKIP_MD5_CHECK=os.getenv("SKIP_MD5_CHECK", "False").lower() in ('true', '1', 't')
+APPRISE_URLS=os.getenv("APPRISE_URLS")
 
 # APP CONFIG
 PHOTON_DIR = "/photon"
