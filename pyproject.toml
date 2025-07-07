@@ -5,6 +5,7 @@ description = "Unofficial docker image for the Photon Geocoder"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "apprise>=1.9.3",
     "python-crontab==3.2.0",
     "requests==2.32.4",
     "supervisor>=4.2.5",
