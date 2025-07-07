@@ -7,7 +7,7 @@ from .logger import get_logger
 
 logging = get_logger()
 
-def send_notification(message: str, title: str = "Photon Notification"):
+def send_notification(message: str, title: str = "Photon Status"):
     apprise_urls = config.APPRISE_URLS
     if not apprise_urls:
         logging.info("No APPRISE_URLS set, skipping notification.")
