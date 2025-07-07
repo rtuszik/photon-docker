@@ -6,12 +6,14 @@ from src.utils.logger import get_logger
 from src.downloader import sequential_update, parallel_update
 from src.supervisor import start_photon
 from src.cron_setup import setup_cronjob
+from src.utils.notify import send_notification
 import os
 
 logging = get_logger()
 
 
 def main():
+    send_notification("Photon-Docker Initializing")
     logging.debug("Entrypoint Called")
     
     # Debug: List all config variables
