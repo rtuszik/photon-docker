@@ -24,8 +24,6 @@ RUN mkdir -p /photon/photon_data
 
 ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-opensearch-${PHOTON_VERSION}.jar /photon/photon.jar
 
-COPY docker-entrypoint.sh /usr/local/bin/
-COPY start-photon.sh /usr/local/bin/
 COPY src/ ./src/
 COPY entrypoint.py .
 COPY updater.py .
@@ -35,9 +33,7 @@ COPY uv.lock .
 RUN uv sync --locked
 
 
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
-    chmod +x /usr/local/bin/start-photon.sh && \
-    chmod 644 /photon/photon.jar && \
+RUN chmod 644 /photon/photon.jar && \
     chown -R photon:photon /photon
 
 RUN uv sync --locked
