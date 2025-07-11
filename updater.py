@@ -2,41 +2,40 @@ from src.utils.logger import get_logger
 from src.utils.notify import send_notification
 from src import config
 from src.downloader import parallel_update, sequential_update
-from src.process import start_photon
 from src.check_remote import check_mtime
 import sys
 
-logging = get_logger()
+logger = get_logger()
 
 def main():
-    update_successful = False
-    photon_started = False
+    """Main updater function - handles both parallel and sequential updates"""
+    logger.info("Starting update process...")
     
     try:
+        # Check if update is needed
         if not check_mtime():
-            logging.info("Index already up to date")
-            sys.exit(0)
+            logger.info("Index already up to date")
+            return
         
+        # Run the appropriate update strategy
         if config.UPDATE_STRATEGY == "PARALLEL":
+            logger.info("Running parallel update...")
             parallel_update()
-        else:
+        elif config.UPDATE_STRATEGY == "SEQUENTIAL":
+            logger.info("Running sequential update...")
             sequential_update()
-        update_successful = True
+        else:
+            logger.error(f"Unknown update strategy: {config.UPDATE_STRATEGY}")
+            sys.exit(1)
         
-        start_photon()
-        photon_started = True
-        
+        logger.info("Update completed successfully")
         send_notification("Photon Index Updated Successfully")
         
     except Exception as e:
-        # error message based on failures
-        if not update_successful:
-            error_msg = f"Index update failed: {str(e)}"
-        elif not photon_started:
-            error_msg = f"Index updated but Photon failed to start: {str(e)}"
-        else:
-            error_msg = f"Unexpected error: {str(e)}"
-            
-        logging.error(error_msg)
+        error_msg = f"Update failed: {str(e)}"
+        logger.error(error_msg)
         send_notification(f"Photon Update Failed - {error_msg}")
-        raise
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
