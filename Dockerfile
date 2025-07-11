@@ -13,8 +13,6 @@ RUN apt-get update \
   lbzip2 \
   gosu \
   python3.12 \
-  cron \
-  supervisor \
   && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g ${PGID} -o photon && \
@@ -26,12 +24,12 @@ RUN mkdir -p /photon/photon_data
 
 ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-opensearch-${PHOTON_VERSION}.jar /photon/photon.jar
 
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker-entrypoint.sh /usr/local/bin/
 COPY start-photon.sh /usr/local/bin/
 COPY src/ ./src/
 COPY entrypoint.py .
 COPY updater.py .
+COPY process_manager.py .
 COPY pyproject.toml .
 COPY uv.lock .
 RUN uv sync --locked
@@ -47,4 +45,4 @@ RUN uv sync --locked
 VOLUME /photon/photon_data
 EXPOSE 2322
 
-ENTRYPOINT ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]    
+CMD ["uv", "run", "process_manager.py"]
