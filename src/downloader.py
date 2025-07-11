@@ -6,7 +6,6 @@ import requests
 from tqdm import tqdm
 
 from src.filesystem import extract_index, move_index, verify_checksum, clear_temp_dir
-from src.supervisor import stop_photon
 from src.utils import config
 from src.utils.logger import get_logger
 
@@ -42,9 +41,6 @@ def parallel_update():
 
             logging.debug("Checksum verification successful.")
 
-        logging.info("Stopping Photon")
-        stop_photon()
-
         logging.info("Moving Index")
         move_index()
         clear_temp_dir()
@@ -60,10 +56,6 @@ def sequential_update():
     logging.info("Starting sequential download process...")
 
     try:
-        logging.info("Stopping Photon service before download...")
-        stop_photon()
-
-        # stop photon first
         logging.info("Deleting old index...")
 
 
