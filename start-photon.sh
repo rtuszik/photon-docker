@@ -7,6 +7,8 @@ source "src/process.sh"
 
 # Log environment variables
 log_info "Environment variables:"
+log_info "PUID=${PUID:-9011}"
+log_info "PGID=${PGID:-9011}"
 log_info "UPDATE_STRATEGY=$UPDATE_STRATEGY"
 log_info "UPDATE_INTERVAL=$UPDATE_INTERVAL"
 log_info "LOG_LEVEL=$LOG_LEVEL"
@@ -16,10 +18,6 @@ log_info "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
 log_info "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
 log_info "FILE_URL=${FILE_URL}"
 
-
-ES_UID="${ES_UID:-1000}"
-ES_GID="${ES_GID:-1000}"
-
 # Define DATA_DIR from config
 DATA_DIR="$PHOTON_DIR"
 
@@ -27,6 +25,29 @@ DATA_DIR="$PHOTON_DIR"
 set -euo pipefail
 trap 'handle_error $? $LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]:-})' ERR
 
+setup_user() {
+    local target_puid="${PUID:-9011}"
+    local target_gid="${PGID:-9011}"
+
+    log_info "Ensuring user and group IDs are set correctly..."
+    log_info "Target PUID: ${target_puid}, Target PGID: ${target_gid}"
+
+    local current_gid
+    current_gid=$(getent group photon | cut -d: -f3)
+
+    if [ "$current_gid" != "$target_gid" ]; then
+        log_info "Updating photon group GID from ${current_gid} to ${target_gid}..."
+        groupmod -o -g "$target_gid" photon
+    fi
+
+    local current_puid
+    current_puid=$(getent passwd photon | cut -d: -f3)
+
+    if [ "$current_puid" != "$target_puid" ]; then
+        log_info "Updating photon user UID from ${current_puid} to ${target_puid}..."
+        usermod -o -u "$target_puid" photon
+    fi
+}
 
 handle_error() {
     local exit_code=$1
@@ -38,27 +59,18 @@ handle_error() {
     cleanup_and_exit
 }
 
-# Cleanup function
 cleanup_and_exit() {
     log_info "Cleaning up temporary files..."
-    
-    # Stop service if running
     stop_photon
-    
-    # Remove temporary files
     if [ -d "$TEMP_DIR" ]; then
         if ! rm -rf "${TEMP_DIR:?}"/*; then
             log_error "Failed to clean up temporary directory"
         fi
     fi
-    
-    # Remove PID file if it exists
     rm -f /photon/photon.pid
-    
     exit 1
 }
 
-# Check available disk space against remote file size
 check_disk_space() {
     local url=$1
     local available
@@ -120,31 +132,26 @@ verify_structure() {
 }
 
 set_permissions() {
-
     local dir=$1
-    log_info "Ensuring correct ownership and permissions for $dir"
-    log_debug "Current state for $dir: $(stat -c 'Perms: %a, Owner: %U (%u), Group: %G (%g), Name: %n' "$dir" 2>/dev/null || echo "Path $dir not found or stat error")"
+    log_info "Ensuring correct ownership and permissions for $dir..."
 
-    # Change ownership
-    # The -R flag makes it recursive.
-    if ! chown -R "$ES_UID:$ES_GID" "$dir"; then
-        log_info "WARNING: Failed to chown $dir to $ES_UID:$ES_GID. This might be due to host volume restrictions. Opensearch may encounter permission issues if not run as root or if host permissions are incorrect."
+    # Check current ownership against the target 'photon' user's UID/GID
+    local current_owner
+    current_owner=$(stat -c '%u:%g' "$dir" 2>/dev/null || echo "notfound")
+    log_debug "Current Owner is $current_owner"
+    local target_owner
+    target_owner="$(id -u photon):$(id -g photon)"
+
+    if [ "$current_owner" != "$target_owner" ]; then
+        log_info "Updating ownership of $dir to photon:photon (${target_owner})"
+        if ! chown -R photon:photon "$dir"; then
+            log_info "WARNING: Failed to chown $dir to photon:photon. This might be due to host volume restrictions. The application may encounter permission issues."
+        else
+            log_debug "Successfully changed ownership of $dir."
+        fi
     else
-        log_debug "Successfully changed ownership of $dir to $ES_UID:$ES_GID."
+        log_debug "Ownership of $dir is already correct."
     fi
-
-    # Change permissions
-    # 755 means: Owner (opensearch user): Read, Write, Execute (rwx)
-    #            Group (opensearch group): Read, Execute (r-x)
-    #            Others: Read, Execute (r-x)
-    
-    if ! chmod -R 755 "$dir"; then
-        log_info "WARNING: Failed to chmod $dir to 755. This might be due to host volume restrictions."
-    else
-        log_debug "Successfully changed permissions of $dir to 755."
-    fi
-
-    log_info "Post-permission state for $dir: $(stat -c 'Perms: %a, Owner: %U (%u), Group: %G (%g), Name: %n' "$dir" 2>/dev/null || echo "Path $dir not found or stat error after changes")"
 }
 
 
@@ -233,7 +240,7 @@ verify_checksum() {
     dir=$(dirname "$file")
     
     log_info "Verifying MD5 checksum"
-    if ! (cd "$dir" && md5sum -c <(cut -d' ' -f1 "$(basename "$md5_file")" > temp.md5 && echo "$(cat temp.md5)  $(basename "$file")" && rm temp.md5)); then
+    if ! gosu photon bash -c "cd '$dir' && md5sum -c <(echo \"\$(cut -d' ' -f1 '$(basename "$md5_file")')  $(basename "$file")\")"; then
         log_error "MD5 verification failed"
         return 1
     fi
@@ -249,11 +256,11 @@ extract_archive() {
     mkdir -p "$extract_dir"
     
     log_info "Extracting $archive to $extract_dir"
-    if ! pbzip2 -dc "$archive" | tar x -C "$extract_dir"; then
+    if ! pbzip2 -dc "$archive" | gosu photon tar x -C "$extract_dir"; then
         log_error "Failed to extract files"
         return 1
     fi
-    log_info: "Extraction completed successfully"
+    log_info "Extraction completed successfully"
     return 0
 }
 
@@ -261,7 +268,6 @@ stop_photon() {
     if [ -f /photon/photon.pid ]; then
         local pid
         pid=$(cat /photon/photon.pid)
-        
         if ps -p "$pid" > /dev/null; then
             log_info "Stopping Photon service (PID: $pid)"
             if ! kill -15 "$pid"; then
@@ -326,10 +332,7 @@ cleanup_stale_es() {
     # Remove old elasticsearch index 
     if [ -d "$ES_DATA_DIR" ]; then
         log_info "Removing old elasticsearch directory at $ES_DATA_DIR"
-        log_debug "Executing: rm -rf $ES_DATA_DIR"
-        if ! rm -rf "$ES_DATA_DIR"; then
-            log_error "Failed to remove old elasticsearch index"
-        fi
+        rm -rf "$ES_DATA_DIR" || log_error "Failed to remove old elasticsearch index"
     fi
 }
 
@@ -358,7 +361,7 @@ download_index() {
     
     mkdir -p "$TEMP_DIR"
     log_debug "Created temp directory: $TEMP_DIR"
-    
+    chown photon:photon "$TEMP_DIR" 
     # Check disk space before downloading
     log_debug "Checking disk space for download"
     if ! check_disk_space "$url"; then
@@ -366,19 +369,14 @@ download_index() {
         cleanup_temp
         return 1
     fi
+    local download_url
     if [[ -n "$FILE_URL" ]]; then
-        local download_url="$FILE_URL"
+        download_url="$FILE_URL"
         log_info "FILE_URL is set to: $FILE_URL"
     else
-        local download_url="${url}.tar.bz2"
+        download_url="${url}.tar.bz2"
     fi
-   
-    # Download files
-    log_info "Downloading index from ${download_url}"
-    log_debug "Executing: wget --progress=bar:force:noscroll:giga -O \"$TEMP_DIR/photon-db.tar.bz2\" \"${download_url}\""
-    
-    if ! wget --progress=bar:force:noscroll:giga -O "$TEMP_DIR/photon-db.tar.bz2" "${download_url}" 2>&1; then
-        log_error "Failed to download index file from ${download_url}"
+    if ! download_file "${download_url}" "$TEMP_DIR/photon-db.tar.bz2"; then
         cleanup_temp
         return 1
     fi
@@ -402,11 +400,9 @@ download_index() {
         fi
         
         log_debug "MD5 download successful. MD5 content: $(cat "$TEMP_DIR/photon-db.md5" | head -1)"
-        
         # Verify checksum
         log_debug "Starting MD5 verification"
-        if ! (cd "$TEMP_DIR" && md5sum -c <(awk '{print $1"  photon-db.tar.bz2"}' photon-db.md5)); then
-            log_error "MD5 verification failed"
+        if ! verify_checksum "$TEMP_DIR/photon-db.tar.bz2" "$TEMP_DIR/photon-db.md5"; then
             cleanup_temp
             return 1
         fi
@@ -421,7 +417,7 @@ download_index() {
     
     log_info "Extracting archive to $TEMP_DIR"
     # Extract archive in place
-    if ! pbzip2 -dc "$TEMP_DIR/photon-db.tar.bz2" | tar x -C "$TEMP_DIR"; then
+    if ! extract_archive "$TEMP_DIR/photon-db.tar.bz2" "$TEMP_DIR"; then
         log_error "Failed to extract files"
         cleanup_temp
         return 1
@@ -606,8 +602,12 @@ start_photon() {
         return 1
     fi
 
-    log_info "Starting Photon service"
-    java -jar photon.jar -data-dir /photon &
+    # Ensure permissions on the data directory before starting
+    set_permissions "$DATA_DIR"
+
+    log_info "Starting Photon service as user 'photon'..."
+    # Launch the process as the 'photon' user in the background
+    gosu photon java -jar photon.jar -data-dir /photon &
     local new_pid=$!
     echo $new_pid > /photon/photon.pid
     
@@ -654,6 +654,8 @@ setup_index() {
 }
 
 main() {
+    setup_user
+
     if ! setup_index; then
         exit 1
     fi
