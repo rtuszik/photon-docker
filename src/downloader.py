@@ -5,24 +5,27 @@ import sys
 import requests
 from tqdm import tqdm
 
-from src.filesystem import extract_index, move_index, verify_checksum, clear_temp_dir
+from src.filesystem import clear_temp_dir, extract_index, move_index, verify_checksum
 from src.utils import config
 from src.utils.logger import get_logger
 
 logging = get_logger()
+
 
 def parallel_update():
     logging.info("Starting parallel update process...")
 
     try:
         if os.path.isdir(config.TEMP_DIR):
-            logging.debug(f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it.")
+            logging.debug(
+                f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it."
+            )
             try:
                 shutil.rmtree(config.TEMP_DIR)
                 logging.debug(f"Successfully removed directory: {config.TEMP_DIR}")
             except Exception as e:
                 logging.error(f"Failed to remove existing TEMP_DIR: {e}")
-                raise 
+                raise
 
         logging.debug(f"Creating temporary directory: {config.TEMP_DIR}")
         os.makedirs(config.TEMP_DIR, exist_ok=True)
@@ -50,7 +53,8 @@ def parallel_update():
     except Exception as e:
         logging.error(f"FATAL: Update process failed with an error: {e}")
         logging.error("Aborting script.")
-        sys.exit(1) 
+        sys.exit(1)
+
 
 def sequential_update():
     logging.info("Starting sequential download process...")
@@ -58,15 +62,16 @@ def sequential_update():
     try:
         logging.info("Deleting old index...")
 
-
         if os.path.isdir(config.TEMP_DIR):
-            logging.debug(f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it.")
+            logging.debug(
+                f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it."
+            )
             try:
                 shutil.rmtree(config.TEMP_DIR)
                 logging.debug(f"Successfully removed directory: {config.TEMP_DIR}")
             except Exception as e:
                 logging.error(f"Failed to remove existing TEMP_DIR: {e}")
-                raise 
+                raise
 
         logging.debug(f"Creating temporary directory: {config.TEMP_DIR}")
         os.makedirs(config.TEMP_DIR, exist_ok=True)
@@ -93,14 +98,16 @@ def sequential_update():
     except Exception as e:
         logging.critical(f"FATAL: Update process failed with an error: {e}")
         logging.critical("Aborting script.")
-        sys.exit(1) 
+        sys.exit(1)
+
 
 def download_index() -> str:
-    
     if config.COUNTRY_CODE:
         index_file = "photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2"
-        index_url = "/extracts/by-country-code/" + config.COUNTRY_CODE + "/" + index_file
-    else: 
+        index_url = (
+            "/extracts/by-country-code/" + config.COUNTRY_CODE + "/" + index_file
+        )
+    else:
         index_file = "photon-db-latest.tar.bz2"
         index_url = "/photon-db-latest.tar.bz2"
 
@@ -108,17 +115,17 @@ def download_index() -> str:
     download_url = config.BASE_URL + index_url
 
     output = os.path.join(config.TEMP_DIR, output_file)
-    
+
     download_file(download_url, output)
-    
+
     return output
 
-def download_md5():
 
+def download_md5():
     if config.COUNTRY_CODE:
         md5_file = "photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2.md5"
         md5_url = "/extracts/by-country-code/" + config.COUNTRY_CODE + "/" + md5_file
-    else: 
+    else:
         md5_file = "photon-db-latest.tar.bz2.md5"
         md5_url = "/photon-db-latest.tar.bz2.md5"
 
@@ -126,9 +133,9 @@ def download_md5():
 
     output_file = "photon-db-latest.tar.bz2.md5"
     output = os.path.join(config.TEMP_DIR, output_file)
-    
+
     download_file(download_url, output)
-    
+
     return output
 
 
@@ -137,21 +144,21 @@ def download_file(url, destination):
     try:
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
-            total_size = int(r.headers.get('content-length', 0))
-            
+            total_size = int(r.headers.get("content-length", 0))
+
             # Create progress bar only if we know the total size
             progress_bar = None
             if total_size > 0:
                 progress_bar = tqdm(
                     desc=f"Downloading {destination.name if hasattr(destination, 'name') else destination}",
                     total=total_size,
-                    unit='B',
+                    unit="B",
                     unit_scale=True,
                     unit_divisor=1024,
-                    leave=True
+                    leave=True,
                 )
-            
-            with open(destination, 'wb') as f:
+
+            with open(destination, "wb") as f:
                 downloaded = 0
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
@@ -159,13 +166,13 @@ def download_file(url, destination):
                         downloaded += size
                         if progress_bar:
                             progress_bar.update(size)
-                
+
                 if progress_bar:
                     progress_bar.close()
-                    
+
         logging.info(f"Downloaded {destination} successfully.")
         return True
-        
+
     except requests.exceptions.RequestException as e:
         logging.error(f"Download Failed: {e}")
         return False

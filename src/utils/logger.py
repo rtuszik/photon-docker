@@ -12,15 +12,15 @@ DEFAULT_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 _logger: Optional[logging.Logger] = None
 
-def setup_logging(
-) -> logging.Logger:
+
+def setup_logging() -> logging.Logger:
     global _logger
     if _logger is not None:
         return _logger
 
     logger = logging.getLogger("app")
     logger.setLevel(config.LOG_LEVEL)  # Capture all levels
-    
+
     # Create formatter
     formatter = logging.Formatter(DEFAULT_FORMAT)
 
@@ -39,10 +39,9 @@ def setup_logging(
     _logger = logger
     return logger
 
+
 def get_logger() -> logging.Logger:
     global _logger
     if _logger is None:
         _logger = setup_logging()
     return _logger
-
-
