@@ -30,6 +30,30 @@ enhancing data privacy and integration capabilities with services like [Dawarich
 
 ## Usage
 
+### Example Docker Compose
+
+```yaml
+services:
+    photon:
+        image: rtuszik/photon-docker:latest
+        environment:
+            - UPDATE_STRATEGY=PARALLEL
+            - UPDATE_INTERVAL=720h # Check for updates every 30 days
+            # - COUNTRY_CODE=zw  # Optional: country-specific index
+            # - APPRISE_URLS=pover://user@token  # Optional: notifications
+        volumes:
+            - photon_data:/photon/data
+        restart: unless-stopped
+        ports:
+            - "2322:2322"
+volumes:
+    photon_data:
+```
+
+```bash
+docker-compose up -d
+```
+
 ### Configuration Options
 
 The container can be configured using the following environment variables:
@@ -45,29 +69,9 @@ The container can be configured using the following environment variables:
 | `SKIP_MD5_CHECK`  | `TRUE`, `FALSE`                      | `FALSE`                                       | Optionally skip MD5 verification of downloaded index files.                                                                                                                                                                                                                                                                                                          |
 | `FILE_URL`        | URL to a .tar.bz2 file               | -                                             | Set a custom URL for the index file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2"). This must be a tar.bz2 format. Make sure to set the `UPDATE_STRATEGY` to `DISABLED` when using this option.                                                                                                           |
 | `PHOTON_PARAMS`   | Photon executable parameters         | -                                             | See `https://github.com/komoot/photon#running-photon.`                                                                                                                                                                                                                                                                                                               |
-
-### Example Docker Compose
-
-```yaml
-services:
-    photon:
-        image: rtuszik/photon-docker:latest
-        environment:
-            - UPDATE_STRATEGY=PARALLEL
-            - UPDATE_INTERVAL=720h # Check for updates every 30 days
-            # - COUNTRY_CODE=zw  # Optional: country-specific index
-        volumes:
-            - photon_data:/photon/photon_data
-        restart: unless-stopped
-        ports:
-            - "2322:2322"
-volumes:
-    photon_data:
-```
-
-```bash
-docker-compose up -d
-```
+| `APPRISE_URLS`    | Comma-separated Apprise URLs         | -                                             | Optional notification URLs for [Apprise](https://github.com/caronc/apprise) to send status updates (e.g., download completion, errors). Supports multiple services like Pushover, Slack, email, etc. Example: `pover://user@token,mailto://user:pass@gmail.com`                                                                                                      |
+| `PUID`            | User ID                              | 9011                                          | The User ID for the photon process. Set this to your host user's ID (`id -u`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                   |
+| `PGID`            | Group ID                             | 9011                                          | The Group ID for the photon process. Set this to your host group's ID (`id -g`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                 |
 
 ## Community Mirrors
 
@@ -81,9 +85,9 @@ If you are hosting a public mirror, please open an issue or pull request to have
 
 | URL                                                     | Maintained By                                          | Status                                                                                                                                                                         |
 | ------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `https://r2.koalasec.org/public/experimental`           | [rtuszik](https://github.com/rtuszik)                  | ![KoalaSec](https://img.shields.io/website?url=https%3A%2F%2Fr2.koalasec.org%2Fpublic%2Fexperimental%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status)              |
 | `https://download1.graphhopper.com/public/experimental` | [GraphHopper](https://www.graphhopper.com/) (Official) | ![GraphHopper](https://img.shields.io/website?url=https%3A%2F%2Fdownload1.graphhopper.com%2Fpublic%2Fexperimental%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status) |
-| `https://r2.naru.dev/` | [naru](https://github.com/narucx)                  | ![Status](https://img.shields.io/website?url=https%3A%2F%2Fr2.naru.dev%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status)
+| `https://r2.koalasec.org/public/experimental`           | [rtuszik](https://github.com/rtuszik)                  | ![KoalaSec](https://img.shields.io/website?url=https%3A%2F%2Fr2.koalasec.org%2Fpublic%2Fexperimental%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status)              |
+| `https://r2.naru.dev/`                                  | [naru](https://github.com/narucx)                      | ![Status](https://img.shields.io/website?url=https%3A%2F%2Fr2.naru.dev%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status)                                            |
 
 ### Use with Dawarich
 

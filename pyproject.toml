@@ -1,0 +1,14 @@
+[project]
+name = "photon-docker"
+version = "1.0.0-beta"
+description = "Unofficial docker image for the Photon Geocoder"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "apprise>=1.9.3",
+    "psutil>=5.9.0",
+    "python-dateutil>=2.9.0.post0",
+    "requests==2.32.4",
+    "schedule>=1.2.2",
+    "tqdm==4.67.1",
+]
