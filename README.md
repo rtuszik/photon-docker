@@ -42,7 +42,7 @@ services:
             # - COUNTRY_CODE=zw  # Optional: country-specific index
             # - APPRISE_URLS=pover://user@token  # Optional: notifications
         volumes:
-            - photon_data:/photon/photon_data
+            - photon_data:/photon/data
         restart: unless-stopped
         ports:
             - "2322:2322"
