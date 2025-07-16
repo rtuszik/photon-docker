@@ -30,15 +30,15 @@ COPY updater.py .
 COPY process_manager.py .
 COPY pyproject.toml .
 COPY uv.lock .
-RUN uv sync --locked
+RUN gosu photon uv sync --locked
 
 
 RUN chmod 644 /photon/photon.jar && \
     chown -R photon:photon /photon
 
-RUN uv sync --locked
+RUN gosu photon uv sync --locked
 
 VOLUME /photon/photon_data
 EXPOSE 2322
 
-CMD ["uv", "run", "process_manager.py"]
+CMD ["gosu", "photon", "uv", "run", "process_manager.py"]
