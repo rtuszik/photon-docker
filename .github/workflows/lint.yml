@@ -20,6 +20,9 @@ jobs:
               with:
                   fetch-depth: 0
 
+            - name: Ruff Check
+              uses: astral-sh/ruff-action@v3
+
             - name: Lint Code Base
               uses: github/super-linter/slim@v7
               env:
