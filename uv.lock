@@ -113,7 +113,7 @@ wheels = [
 
 [[package]]
 name = "photon-docker"
-version = "1.0.0"
+version = "1.0.0b0"
 source = { virtual = "." }
 dependencies = [
     { name = "apprise" },

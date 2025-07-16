@@ -15,7 +15,8 @@ APPRISE_URLS = os.getenv("APPRISE_URLS")
 
 # APP CONFIG
 PHOTON_DIR = "/photon"
-PHOTON_DATA_DIR = os.path.join(PHOTON_DIR, "photon_data")
-TEMP_DIR = os.path.join(PHOTON_DIR, "temp")
+DATA_DIR = "/photon/data"
+PHOTON_DATA_DIR = os.path.join(DATA_DIR, "photon_data")
+TEMP_DIR = os.path.join(DATA_DIR, "temp")
 OS_NODE_DIR = os.path.join(PHOTON_DATA_DIR, "node_1")
 PID_FILE = os.path.join(PHOTON_DIR, "photon.pid")
