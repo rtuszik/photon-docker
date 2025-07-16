@@ -9,7 +9,7 @@ services:
             # - BASE_URL=https://r2.koalasec.org/public
             # - COUNTRY_CODE=zw
         volumes:
-            - photon_data:/photon/photon_data
+            - photon_data:/photon/data
         restart: unless-stopped
         ports:
             - "2322:2322"
