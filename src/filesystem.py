@@ -19,7 +19,6 @@ def extract_index(index_file: str):
     logging.debug(f"Temp directory: {config.TEMP_DIR}")
     logging.debug(f"Temp directory exists: {os.path.exists(config.TEMP_DIR)}")
 
-    # Ensure temp directory exists
     if not os.path.exists(config.TEMP_DIR):
         logging.debug(f"Creating temp directory: {config.TEMP_DIR}")
         os.makedirs(config.TEMP_DIR, exist_ok=True)
@@ -39,14 +38,12 @@ def extract_index(index_file: str):
         if result.stderr:
             logging.debug(f"Extraction stderr: {result.stderr}")
 
-        # Check what was extracted
         logging.debug(f"Contents of {config.TEMP_DIR} after extraction:")
         try:
             for item in os.listdir(config.TEMP_DIR):
                 item_path = os.path.join(config.TEMP_DIR, item)
                 if os.path.isdir(item_path):
                     logging.debug(f"  DIR: {item}")
-                    # List contents of subdirectories
                     try:
                         sub_items = os.listdir(item_path)
                         logging.debug(f"    Contains {len(sub_items)} items")
@@ -77,8 +74,7 @@ def extract_index(index_file: str):
 
 
 def move_index():
-    """Atomically moves extracted index from temp to final location."""
-    logging.info(f"Moving Index from {config.TEMP_DIR} to {config.PHOTON_DATA_DIR}")
+    # logging.info(f"Moving Index from {config.TEMP_DIR} to {config.PHOTON_DATA_DIR}")
 
     logging.debug(f"Contents of source directory {config.TEMP_DIR}:")
     try:
@@ -107,15 +103,40 @@ def move_index():
             logging.debug(f"Could not list contents of {config.PHOTON_DATA_DIR}: {e}")
 
     temp_photon_dir = os.path.join(config.TEMP_DIR, "photon_data/node_1")
+    target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
 
     try:
-        logging.debug(
-            f"Attempting to move {config.TEMP_DIR} to {config.PHOTON_DATA_DIR}"
-        )
-        shutil.move(temp_photon_dir, config.PHOTON_DATA_DIR)
-        logging.debug(
-            f"Successfully moved {config.TEMP_DIR} to {config.PHOTON_DATA_DIR}"
-        )
+        logging.debug(f"Attempting to move {temp_photon_dir} to {target_node_dir}")
+        
+        if os.path.exists(target_node_dir):
+            backup_dir = target_node_dir + ".old"
+            
+            if os.path.exists(backup_dir):
+                logging.debug(f"Removing old backup directory: {backup_dir}")
+                shutil.rmtree(backup_dir)
+            
+            logging.debug(f"Moving current index to backup: {target_node_dir} -> {backup_dir}")
+            shutil.move(target_node_dir, backup_dir)
+            
+            try:
+                shutil.move(temp_photon_dir, target_node_dir)
+                logging.debug(f"Successfully moved new index to {target_node_dir}")
+                
+                logging.debug(f"Removing backup directory: {backup_dir}")
+                shutil.rmtree(backup_dir)
+                
+            except Exception as e:
+                logging.error(f"Failed to move new index: {e}")
+                logging.error("Attempting to restore backup...")
+                if os.path.exists(backup_dir):
+                    if os.path.exists(target_node_dir):
+                        shutil.rmtree(target_node_dir)
+                    shutil.move(backup_dir, target_node_dir)
+                raise
+        else:
+            os.makedirs(config.PHOTON_DATA_DIR, exist_ok=True)
+            shutil.move(temp_photon_dir, target_node_dir)
+            logging.debug(f"Successfully moved new index to {target_node_dir}")
 
         logging.debug(
             f"Contents of final destination {config.PHOTON_DATA_DIR} after move:"
@@ -134,13 +155,12 @@ def move_index():
 
     except Exception as e:
         logging.error(
-            f"Failed to move index from {config.TEMP_DIR} to {config.PHOTON_DATA_DIR}: {e}"
+            f"Failed to move index from {temp_photon_dir} to {target_node_dir}: {e}"
         )
         raise
 
 
 def verify_checksum(md5_file, index_file):
-    """Verifies downloaded file against MD5 hash, reading in chunks to handle large files."""
     hash_md5 = hashlib.md5()
     try:
         with open(index_file, "rb") as f:

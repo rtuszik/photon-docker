@@ -8,8 +8,7 @@ from src.utils.notify import send_notification
 
 logger = get_logger()
 
-
-def run_setup():
+def main():
     send_notification("Photon-Docker Initializing")
     logger.debug("Entrypoint setup called")
 
@@ -52,13 +51,6 @@ def run_setup():
         sequential_update()
     else:
         logger.info("Existing index found, skipping download")
-
-
-def main():
-    if len(sys.argv) > 1 and sys.argv[1] == "setup":
-        run_setup()
-    else:
-        run_setup()
 
 
 if __name__ == "__main__":

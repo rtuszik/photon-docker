@@ -41,7 +41,7 @@ def compare_mtime() -> bool:
     else:
         index_file = "/photon-db-latest.tar.bz2"
 
-    remote_url = os.path.join(config.BASE_URL, index_file)
+    remote_url = config.BASE_URL.rstrip('/') + index_file
 
     remote_dt = get_remote_time(remote_url)
 

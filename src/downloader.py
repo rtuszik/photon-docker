@@ -146,7 +146,6 @@ def download_file(url, destination):
             r.raise_for_status()
             total_size = int(r.headers.get("content-length", 0))
 
-            # Create progress bar only if we know the total size
             progress_bar = None
             if total_size > 0:
                 progress_bar = tqdm(

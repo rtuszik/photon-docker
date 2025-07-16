@@ -7,6 +7,8 @@ import sys
 import threading
 import time
 from enum import Enum
+import shlex
+import psutil
 
 import schedule
 
@@ -52,23 +54,82 @@ class PhotonManager:
         java_params = config.JAVA_PARAMS or ""
         photon_params = config.PHOTON_PARAMS or ""
 
-        cmd = f"java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Des.gateway.auto_import_dangling_indices=true -Des.cluster.routing.allocation.batch_mode=true -Dlog4j2.disable.jmx=true {java_params} -jar /photon/photon.jar {photon_params}"
+        cmd = [
+            "java",
+            "--add-modules", "jdk.incubator.vector",
+            "--enable-native-access=ALL-UNNAMED",
+            "-Des.gateway.auto_import_dangling_indices=true",
+            "-Des.cluster.routing.allocation.batch_mode=true",
+            "-Dlog4j2.disable.jmx=true"
+        ]
+        
+        if java_params:
+            cmd.extend(shlex.split(java_params))
+            
+        cmd.extend(["-jar", "/photon/photon.jar"])
+        
+        if photon_params:
+            cmd.extend(shlex.split(photon_params))
 
-        self.photon_process = subprocess.Popen(cmd, shell=True, cwd="/photon")
+        self.photon_process = subprocess.Popen(cmd, cwd="/photon", 
+                                                preexec_fn=os.setsid)
 
         logger.info(f"Photon started with PID: {self.photon_process.pid}")
 
     def stop_photon(self):
         if self.photon_process:
             logger.info("Stopping Photon...")
-            self.photon_process.terminate()
+            
             try:
+                os.killpg(os.getpgid(self.photon_process.pid), signal.SIGTERM)
                 self.photon_process.wait(timeout=30)
             except subprocess.TimeoutExpired:
-                logger.warning("Photon didn't stop gracefully, killing...")
-                self.photon_process.kill()
+                logger.warning("Photon didn't stop gracefully, force killing...")
+                # Force kill
+                try:
+                    os.killpg(os.getpgid(self.photon_process.pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass  #Process dead
                 self.photon_process.wait()
+            except ProcessLookupError:
+                # Process dead
+                pass
+                
             self.photon_process = None
+            
+            self._cleanup_orphaned_photon_processes()
+            
+            self._cleanup_lock_files()
+            
+            time.sleep(2)
+            
+    def _cleanup_orphaned_photon_processes(self):
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                if proc.info['name'] == 'java' and proc.info['cmdline']:
+                    if any('photon.jar' in arg for arg in proc.info['cmdline']):
+                        logger.warning(f"Found orphaned Photon process PID {proc.info['pid']}, terminating...")
+                        proc.terminate()
+                        try:
+                            proc.wait(timeout=5)
+                        except psutil.TimeoutExpired:
+                            proc.kill()
+        except Exception as e:
+            logger.debug(f"Error checking for orphaned processes: {e}")
+            
+    def _cleanup_lock_files(self):
+        lock_files = [
+            os.path.join(config.OS_NODE_DIR, "node.lock"),
+            os.path.join(config.OS_NODE_DIR, "data", "node.lock")
+        ]
+        
+        for lock_file in lock_files:
+            if os.path.exists(lock_file):
+                try:
+                    os.remove(lock_file)
+                    logger.debug(f"Removed lock file: {lock_file}")
+                except Exception as e:
+                    logger.debug(f"Could not remove lock file {lock_file}: {e}")
 
     def run_update(self):
         if config.UPDATE_STRATEGY == "DISABLED":
@@ -87,7 +148,6 @@ class PhotonManager:
             logger.info("Update completed successfully")
             if config.UPDATE_STRATEGY == "PARALLEL":
                 self.stop_photon()
-                time.sleep(10)
                 self.start_photon()
             elif config.UPDATE_STRATEGY == "SEQUENTIAL":
                 self.start_photon()
