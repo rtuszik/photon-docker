@@ -9,9 +9,10 @@ from src.utils.notify import send_notification
 logger = get_logger()
 
 def main():
-    send_notification("Photon-Docker Initializing")
-    logger.debug("Entrypoint setup called")
 
+    send_notification("Photon-Docker Initializing")
+
+    logger.debug("Entrypoint setup called")
     logger.debug("=== CONFIG VARIABLES ===")
     logger.debug(f"UPDATE_STRATEGY: {config.UPDATE_STRATEGY}")
     logger.debug(f"UPDATE_INTERVAL: {config.UPDATE_INTERVAL}")
@@ -23,11 +24,7 @@ def main():
     logger.debug(f"LOG_LEVEL: {config.LOG_LEVEL}")
     logger.debug(f"BASE_URL: {config.BASE_URL}")
     logger.debug(f"SKIP_MD5_CHECK: {config.SKIP_MD5_CHECK}")
-    logger.debug(f"PHOTON_DIR: {config.PHOTON_DIR}")
-    logger.debug(f"PHOTON_DATA_DIR: {config.PHOTON_DATA_DIR}")
-    logger.debug(f"TEMP_DIR: {config.TEMP_DIR}")
-    logger.debug(f"OS_NODE_DIR: {config.OS_NODE_DIR}")
-    logger.debug(f"PID_FILE: {config.PID_FILE}")
+
     logger.debug("=== END CONFIG VARIABLES ===")
 
     try:
