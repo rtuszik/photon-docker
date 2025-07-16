@@ -20,12 +20,13 @@ RUN groupadd -g ${PGID} -o photon && \
 
 WORKDIR /photon
 
-RUN mkdir -p /photon/photon_data
+RUN mkdir -p /photon/data/
 
 ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-opensearch-${PHOTON_VERSION}.jar /photon/photon.jar
 
 COPY src/ ./src/
 COPY entrypoint.py .
+COPY entrypoint.sh .
 COPY updater.py .
 COPY process_manager.py .
 COPY pyproject.toml .
@@ -38,7 +39,7 @@ RUN chmod 644 /photon/photon.jar && \
 
 RUN gosu photon uv sync --locked
 
-VOLUME /photon/photon_data
 EXPOSE 2322
 
-CMD ["gosu", "photon", "uv", "run", "process_manager.py"]
+ENTRYPOINT ["/bin/sh", "entrypoint.sh"]
+CMD ["uv", "run", "process_manager.py"]

@@ -6,6 +6,7 @@ import requests
 from tqdm import tqdm
 
 from src.filesystem import clear_temp_dir, extract_index, move_index, verify_checksum
+from src.check_remote import get_local_time
 from src.utils import config
 from src.utils.logger import get_logger
 
@@ -118,6 +119,9 @@ def download_index() -> str:
 
     download_file(download_url, output)
 
+    local_timestamp = get_local_time(config.OS_NODE_DIR)
+
+    logging.debug(f"New index timestamp: {local_timestamp}")
     return output
 
 
