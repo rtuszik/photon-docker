@@ -35,7 +35,6 @@ stop_photon() {
 }
 
 start_photon() {
-    # Check if already running
     if [ -f "$PID_FILE" ]; then
         local pid
         pid=$(cat "$PID_FILE")
@@ -48,8 +47,14 @@ start_photon() {
         fi
     fi
 
-    log_info "Starting Photon service"
-    gosu photon java ${JAVA_PARAMS} -jar "$PHOTON_JAR" -data-dir "$PHOTON_DIR" ${PHOTON_PARAMS} &
+    if [ -n "${JAVA_PARAMS:-}" ]; then
+        local clean_params="${JAVA_PARAMS#\"}"
+        clean_params="${clean_params%\"}"
+        read -a java_args <<< "$clean_params"
+        gosu photon java "${java_args[@]}" -jar "$PHOTON_JAR" -data-dir "$PHOTON_DIR" ${PHOTON_PARAMS} &
+    else
+        gosu photon java -jar "$PHOTON_JAR" -data-dir "$PHOTON_DIR" ${PHOTON_PARAMS} &
+    fi
     local new_pid=$!
     echo $new_pid > "$PID_FILE"
     
