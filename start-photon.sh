@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# Source modules
 source "src/logging.sh"
 source "src/config.sh"
 source "src/process.sh"
 
-# Log environment variables
 log_info "Environment variables:"
 log_info "PUID=${PUID:-9011}"
 log_info "PGID=${PGID:-9011}"
@@ -18,10 +16,8 @@ log_info "SKIP_MD5_CHECK=$SKIP_MD5_CHECK"
 log_info "COUNTRY_CODE=${COUNTRY_CODE:-not set}"
 log_info "FILE_URL=${FILE_URL}"
 
-# Define DATA_DIR from config
 DATA_DIR="$PHOTON_DIR"
 
-# Error handling
 set -euo pipefail
 trap 'handle_error $? $LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]:-})' ERR
 
@@ -79,7 +75,6 @@ check_disk_space() {
     log_debug "Checking disk space for URL: $full_url"
     log_debug "URL components - Protocol: ${full_url%%://*}, Host: ${full_url#*://}, Path: ${full_url#*://*/}"
     
-    # Get remote file size using wget spider
     log_debug "Executing wget spider command: wget --spider --server-response \"$full_url\""
     local wget_output
     wget_output=$(wget --spider --server-response "$full_url" 2>&1)
@@ -102,7 +97,6 @@ check_disk_space() {
     
     log_debug "Remote file size detected: $remote_size bytes"
     
-    # Check available space in photon_data directory
     log_debug "Creating data directory structure at $DATA_DIR/photon_data"
     mkdir -p "$DATA_DIR/photon_data"
     log_debug "Directory created. Contents: $(ls -l $DATA_DIR/photon_data 2>/dev/null || echo '<none>')"
@@ -117,7 +111,6 @@ check_disk_space() {
     log_info "Sufficient disk space available. Required: ${remote_size}B, Available: ${available}B"
 }
 
-# Verify directory structure and index
 verify_structure() {
     local dir=$1
     log_debug "Verifying directory structure at: $dir/photon_data"
@@ -135,7 +128,6 @@ set_permissions() {
     local dir=$1
     log_info "Ensuring correct ownership and permissions for $dir..."
 
-    # Check current ownership against the target 'photon' user's UID/GID
     local current_owner
     current_owner=$(stat -c '%u:%g' "$dir" 2>/dev/null || echo "notfound")
     log_debug "Current Owner is $current_owner"
@@ -155,7 +147,6 @@ set_permissions() {
 }
 
 
-# Check if remote index is newer than local
 check_remote_index() {
     local url=$1
     local full_url="${url}.tar.bz2"
@@ -163,7 +154,6 @@ check_remote_index() {
     log_debug "Checking if remote index is newer than local"
     log_debug "Remote URL: $full_url"
 
-    # If FORCE_UPDATE is TRUE, skip timestamp check
     if [ "${FORCE_UPDATE}" = "TRUE" ]; then
         log_info "Force update requested, skipping timestamp check"
         return 0
@@ -172,7 +162,6 @@ check_remote_index() {
     local remote_time
     local wget_output
 
-    # Get remote file timestamp using HEAD request
     log_debug "Executing: wget --spider -S \"$full_url\""
     if ! wget_output=$(wget --spider -S "$full_url" 2>&1); then
         log_error "Failed to check remote index timestamp"
@@ -191,17 +180,14 @@ check_remote_index() {
     
     log_debug "Remote timestamp: $remote_time"
     
-    # Convert remote time to epoch
     remote_epoch=$(date -d "$remote_time" +%s 2>/dev/null)
     
-    # Get local index timestamp if it exists
     if [ -d "$INDEX_DIR" ]; then
         local_epoch=$(stat -c %Y "$INDEX_DIR" 2>/dev/null)
         
         log_debug "Remote index timestamp: $remote_time (${remote_epoch})"
         log_debug "Local index timestamp: $(date -d "@$local_epoch" 2>/dev/null) (${local_epoch})"
         
-        # Compare timestamps with 1 day tolerance
         local time_diff=$((remote_epoch - local_epoch))
         if [ "${time_diff#-}" -lt 86400 ]; then
             log_info "Local index is up to date (within 1 day tolerance)"
@@ -219,7 +205,6 @@ check_remote_index() {
     fi
 }
 
-# Core utility functions
 download_file() {
     local url=$1
     local output_file=$2
@@ -264,41 +249,10 @@ extract_archive() {
     return 0
 }
 
-stop_photon() {
-    if [ -f /photon/photon.pid ]; then
-        local pid
-        pid=$(cat /photon/photon.pid)
-        if ps -p "$pid" > /dev/null; then
-            log_info "Stopping Photon service (PID: $pid)"
-            if ! kill -15 "$pid"; then
-                log_error "Failed to stop Photon service gracefully, attempting force kill"
-                kill -9 "$pid" || true
-            fi
-            
-            # Wait for process to stop
-            local count=0
-            while ps -p "$pid" > /dev/null && [ $count -lt 10 ]; do
-                sleep 1
-                ((count++))
-            done
-            
-            if ps -p "$pid" > /dev/null; then
-                log_error "Failed to stop Photon service"
-                return 1
-            fi
-        else
-            log_info "Photon service not running"
-        fi
-        rm -f /photon/photon.pid
-    fi
-    return 0
-}
-
 move_index() {
     local source_dir=$1
     local target_dir=$2
     
-    # Find opensearch directory recursively
     log_info "Searching for opensearch directory in: $source_dir"
     local es_dir
     es_dir=$(find "$source_dir" -type d -name "node_1" | head -n 1)
@@ -329,16 +283,13 @@ cleanup_temp() {
 }
 
 cleanup_stale_es() {
-    # Remove old elasticsearch index 
     if [ -d "$ES_DATA_DIR" ]; then
         log_info "Removing old elasticsearch directory at $ES_DATA_DIR"
         rm -rf "$ES_DATA_DIR" || log_error "Failed to remove old elasticsearch index"
     fi
 }
 
-# Prepare download URL based on country code or custom base URL
 prepare_download_url() {
-    # Ensure BASE_URL doesn't have trailing slash
     local base_url="${BASE_URL%/}"
     local result_url
     
@@ -351,7 +302,6 @@ prepare_download_url() {
     echo "$result_url"
 }
 
-# Download and verify index
 download_index() {
     local url
     url=$(prepare_download_url)
@@ -362,7 +312,6 @@ download_index() {
     mkdir -p "$TEMP_DIR"
     log_debug "Created temp directory: $TEMP_DIR"
     chown photon:photon "$TEMP_DIR" 
-    # Check disk space before downloading
     log_debug "Checking disk space for download"
     if ! check_disk_space "$url"; then
         log_error "Disk space check failed"
@@ -400,7 +349,6 @@ download_index() {
         fi
         
         log_debug "MD5 download successful. MD5 content: $(cat "$TEMP_DIR/photon-db.md5" | head -1)"
-        # Verify checksum
         log_debug "Starting MD5 verification"
         if ! verify_checksum "$TEMP_DIR/photon-db.tar.bz2" "$TEMP_DIR/photon-db.md5"; then
             cleanup_temp
@@ -409,14 +357,12 @@ download_index() {
         log_info "MD5 verification successful"
         log_debug "MD5 verification completed"
     
-        # Extract archive
         log_info "Extracting archive, this may take some time..."
     else
         log_info "Skipping MD5 verification as requested"
     fi
     
     log_info "Extracting archive to $TEMP_DIR"
-    # Extract archive in place
     if ! extract_archive "$TEMP_DIR/photon-db.tar.bz2" "$TEMP_DIR"; then
         log_error "Failed to extract files"
         cleanup_temp
@@ -427,18 +373,15 @@ download_index() {
     return 0
 }
 
-# Strategy-specific update functions
 parallel_update() {
     log_info "Starting parallel update process"
     
-    # Download and prepare new index while current one is running
     log_debug "Downloading new index while current service is running"
     if ! download_index; then
         log_error "Failed to download index"
         return 1
     fi
     
-    # Verify the downloaded index
     log_info "Verifying downloaded index structure"
     if ! verify_structure "$TEMP_DIR"; then
         log_error "Downloaded index verification failed"
@@ -447,7 +390,6 @@ parallel_update() {
     fi
 
     
-    # Stop service and swap indexes
     log_info "Stopping Photon service before swapping indexes"
     if ! stop_photon; then
         log_error "Failed to stop Photon service cleanly"
@@ -455,10 +397,8 @@ parallel_update() {
         return 1
     fi
     
-    # Wait a moment for process to fully stop
     sleep 5
     
-    # Backup and swap
     if [ -d "$INDEX_DIR" ]; then
         log_debug "Backing up current index to $INDEX_DIR.old"
         if ! mv "$INDEX_DIR" "$INDEX_DIR.old"; then
@@ -480,9 +420,8 @@ parallel_update() {
         return 1
     fi
     
-    set_permissions "$INDEX_DIR" # Set permissions on the final index directory
+    set_permissions "$INDEX_DIR" 
 
-    # Clean up
     log_debug "Removing old index backup"
 
 
@@ -506,10 +445,8 @@ sequential_update() {
         return 1
     fi
     
-    # Wait a moment for process to fully stop
     sleep 2
     
-    # Remove existing index
     if [ -d "$INDEX_DIR" ]; then
         log_info "Removing existing opensearch directory at $INDEX_DIR"
         log_debug "Executing: rm -rf $INDEX_DIR"
@@ -534,10 +471,10 @@ sequential_update() {
         return 1
     fi
     
-    set_permissions "$INDEX_DIR" # Set permissions on the final index directory
+    set_permissions "$INDEX_DIR" 
 
     log_info "Verifying new index structure"
-    if ! verify_structure "$DATA_DIR"; then # verify_structure "$DATA_DIR" checks $INDEX_DIR
+    if ! verify_structure "$DATA_DIR"; then 
         log_error "Failed to verify new index structure"
         cleanup_temp
         return 1
@@ -581,40 +518,6 @@ force_update() {
     esac
 }
 
-start_photon() {
-    # Check if already running
-    if [ -f /photon/photon.pid ]; then
-        local pid
-        pid=$(cat /photon/photon.pid)
-        if ps -p "$pid" > /dev/null; then
-            log_info "Photon service already running with PID: $pid"
-            return 0
-        else
-            log_info "Removing stale PID file"
-            rm -f /photon/photon.pid
-        fi
-    fi
-
-    if [ -d "$INDEX_DIR" ]; then
-        set_permissions "$INDEX_DIR" # Ensure permissions before start
-    else
-        log_error "Cannot start Photon: Index directory $INDEX_DIR does not exist."
-        return 1
-    fi
-
-    # Ensure permissions on the data directory before starting
-    set_permissions "$DATA_DIR"
-
-    log_info "Starting Photon service as user 'photon'..."
-    # Launch the process as the 'photon' user in the background
-    gosu photon java -jar photon.jar -data-dir /photon &
-    local new_pid=$!
-    echo $new_pid > /photon/photon.pid
-    
-    log_info "Photon service started successfully with PID: $new_pid"
-    return 0
-}
-
 interval_to_seconds() {
     local interval=$1
     local value=${interval%[smhd]}
@@ -633,9 +536,9 @@ setup_index() {
     mkdir -p "$DATA_DIR" "$TEMP_DIR"
     
     if [ -d "$INDEX_DIR" ]; then
-        if verify_structure "$DATA_DIR"; then # verify_structure "$DATA_DIR" checks $INDEX_DIR
+        if verify_structure "$DATA_DIR"; then 
             log_info "Found existing valid opensearch index"
-            set_permissions "$INDEX_DIR" # Ensure permissions on existing valid index
+            set_permissions "$INDEX_DIR" 
             return 0
         else
             log_error "Found invalid index structure, downloading fresh index"
@@ -660,10 +563,8 @@ main() {
         exit 1
     fi
 
-    # Store initial FORCE_UPDATE value
     local initial_force_update="${FORCE_UPDATE}"
     
-    # set FORCE_UPDATE to FALSE after reading
     export FORCE_UPDATE="FALSE"
     
     if [ "$initial_force_update" = "TRUE" ]; then
@@ -701,7 +602,6 @@ main() {
             if check_remote_index "$url"; then
                 log_info "Performing scheduled index update"
                 update_index
-                # Restart service after update
                 if ! start_photon; then
                     log_error "Failed to restart Photon service after update"
                     exit 1
@@ -712,7 +612,6 @@ main() {
         log_info "Update strategy is disabled, skipping update loop"
     fi
 
-    # Wait for Photon process to finish
     wait
 }
 
