@@ -2,6 +2,7 @@ import datetime
 import os
 
 import requests
+from requests.exceptions import RequestException
 from dateutil.parser import parse as parsedate
 
 from src.utils import config
@@ -10,6 +11,29 @@ from src.utils.logger import get_logger
 logging = get_logger()
 
 
+def get_remote_file_size(url: str) -> int:
+    try:
+        response = requests.head(url, allow_redirects=True)
+        response.raise_for_status()
+        
+        content_length = response.headers.get('content-length')
+        if content_length:
+            return int(content_length)
+        
+        response = requests.get(url, headers={'Range': 'bytes=0-0'}, stream=True)
+        response.raise_for_status()
+        
+        content_range = response.headers.get('content-range')
+        if content_range and '/' in content_range:
+            total_size = content_range.split('/')[-1]
+            if total_size.isdigit():
+                return int(total_size)
+                
+    except Exception as e:
+        logging.warning(f"Could not determine remote file size for {url}: {e}")
+        
+    return 0
+
 def get_remote_time(remote_url: str):
     try:
         r = requests.head(remote_url, timeout=10)
@@ -17,7 +41,7 @@ def get_remote_time(remote_url: str):
         urltime = r.headers.get("last-modified")
         if urltime:
             return parsedate(urltime)
-    except requests.exceptions.RequestException as e:
+    except RequestException as e:
         logging.error(f"Error fetching remote URL: {e}")
     return None
 
