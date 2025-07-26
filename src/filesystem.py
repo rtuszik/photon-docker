@@ -23,6 +23,7 @@ def extract_index(index_file: str):
         logging.debug(f"Creating temp directory: {config.TEMP_DIR}")
         os.makedirs(config.TEMP_DIR, exist_ok=True)
 
+    # using shell=true for piping, could construct pipe directly in the future...
     install_command = f"lbzip2 -d -c {index_file} | tar x -C {config.TEMP_DIR}"
     logging.debug(f"Extraction command: {install_command}")
 
@@ -74,7 +75,6 @@ def extract_index(index_file: str):
 
 
 def move_index():
-    # logging.info(f"Moving Index from {config.TEMP_DIR} to {config.PHOTON_DATA_DIR}")
 
     logging.debug(f"Contents of source directory {config.TEMP_DIR}:")
     try:
