@@ -1,10 +1,10 @@
 import sys
 import os
-from src.utils import config
-from src.utils.validate_config import validate_config
-from src.utils.logger import get_logger
-from src.downloader import sequential_update, parallel_update
-from src.utils.notify import send_notification
+from .utils import config
+from .utils.validate_config import validate_config
+from .utils.logger import get_logger
+from .downloader import sequential_update, parallel_update
+from .utils.notify import send_notification
 
 logger = get_logger()
 

@@ -12,8 +12,8 @@ import psutil
 
 import schedule
 
-from src.utils import config
-from src.utils.logger import get_logger
+from .utils import config
+from .utils.logger import get_logger
 
 logger = get_logger()
 
@@ -41,7 +41,7 @@ class PhotonManager:
 
     def run_initial_setup(self):
         logger.info("Running initial setup...")
-        result = subprocess.run(["uv", "run", "entrypoint.py", "setup"], cwd="/photon")
+        result = subprocess.run(["uv", "run", "-m", "src.entrypoint", "setup"], cwd="/photon")
 
         if result.returncode != 0:
             logger.error("Setup failed!")
@@ -142,7 +142,7 @@ class PhotonManager:
         if config.UPDATE_STRATEGY == "SEQUENTIAL":
             self.stop_photon()
 
-        result = subprocess.run(["uv", "run", "updater.py"], cwd="/photon")
+        result = subprocess.run(["uv", "run", "-m", "src.updater"], cwd="/photon")
 
         if result.returncode == 0:
             logger.info("Update completed successfully")

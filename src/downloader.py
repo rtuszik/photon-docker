@@ -144,7 +144,7 @@ def download_md5():
 
 
 def download_file(url, destination):
-    # destination.parent.mkdir(parents=True, exist_ok=True)
+    
     try:
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
