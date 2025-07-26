@@ -16,6 +16,7 @@ import schedule
 
 from .utils import config
 from .utils.logger import get_logger
+from .filesystem import cleanup_backup_after_verification
 
 logger = get_logger()
 
@@ -204,11 +205,15 @@ class PhotonManager:
                 self.stop_photon()
                 if self.start_photon():
                     logger.info("Update completed successfully - Photon healthy")
+                    target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
+                    cleanup_backup_after_verification(target_node_dir)
                 else:
                     logger.error("Update failed - Photon health check failed after restart")
             elif config.UPDATE_STRATEGY == "SEQUENTIAL":
                 if self.start_photon():
                     logger.info("Update completed successfully - Photon healthy")
+                    target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
+                    cleanup_backup_after_verification(target_node_dir)
                 else:
                     logger.error("Update failed - Photon health check failed after restart")
         else:
