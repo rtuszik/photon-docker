@@ -57,7 +57,7 @@ def compare_mtime() -> bool:
         local_timestamp, tz=datetime.timezone.utc
     )
 
-    grace_period = datetime.timedelta(hours=24)
+    grace_period = datetime.timedelta(hours=144)
 
     logging.debug(f"Remote index time: {remote_dt}")
     logging.debug(f"Local index time:  {local_dt}")
