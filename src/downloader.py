@@ -13,6 +13,114 @@ from src.utils.logger import get_logger
 logging = get_logger()
 
 
+def get_available_space(path: str) -> int:
+    try:
+        statvfs = os.statvfs(path)
+        return statvfs.f_frsize * statvfs.f_bavail
+    except (OSError, AttributeError):
+        return 0
+
+
+def get_directory_size(path: str) -> int:
+    if not os.path.exists(path):
+        return 0
+    
+    total_size = 0
+    try:
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                file_path = os.path.join(dirpath, filename)
+                try:
+                    total_size += os.path.getsize(file_path)
+                except (OSError, FileNotFoundError):
+                    continue
+    except (OSError, PermissionError):
+        pass
+    
+    return total_size
+
+
+def check_disk_space_requirements(download_size: int, is_parallel: bool = True) -> bool:
+    temp_available = get_available_space(config.TEMP_DIR if os.path.exists(config.TEMP_DIR) else config.DATA_DIR)
+    data_available = get_available_space(config.PHOTON_DATA_DIR if os.path.exists(config.PHOTON_DATA_DIR) else config.DATA_DIR)
+    
+    compressed_size = download_size
+    extracted_size = int(download_size * 1.65)
+    
+    if is_parallel:
+        temp_needed = compressed_size + extracted_size
+        data_needed = extracted_size
+        total_needed = int(download_size * 1.7)
+        
+        logging.info("Parallel update space requirements:")
+        logging.info(f"  Download size: {compressed_size / (1024**3):.2f} GB")
+        logging.info(f"  Estimated extracted size: {extracted_size / (1024**3):.2f} GB")
+        logging.info(f"  Total space needed: {total_needed / (1024**3):.2f} GB")
+        logging.info(f"  Temp space available: {temp_available / (1024**3):.2f} GB")
+        logging.info(f"  Data space available: {data_available / (1024**3):.2f} GB")
+        
+        if temp_available < temp_needed:
+            logging.error(f"Insufficient temp space: need {temp_needed / (1024**3):.2f} GB, have {temp_available / (1024**3):.2f} GB")
+            return False
+            
+        if data_available < data_needed:
+            logging.error(f"Insufficient data space: need {data_needed / (1024**3):.2f} GB, have {data_available / (1024**3):.2f} GB")
+            return False
+            
+    else:
+        temp_needed = compressed_size + extracted_size
+        
+        logging.info("Sequential update space requirements:")
+        logging.info(f"  Download size: {compressed_size / (1024**3):.2f} GB")
+        logging.info(f"  Estimated extracted size: {extracted_size / (1024**3):.2f} GB")
+        logging.info(f"  Temp space needed: {temp_needed / (1024**3):.2f} GB")
+        logging.info(f"  Temp space available: {temp_available / (1024**3):.2f} GB")
+        
+        if temp_available < temp_needed:
+            logging.error(f"Insufficient temp space: need {temp_needed / (1024**3):.2f} GB, have {temp_available / (1024**3):.2f} GB")
+            return False
+    
+    logging.info("Sufficient disk space available for update")
+    return True
+
+
+def get_remote_file_size(url: str) -> int:
+    try:
+        response = requests.head(url, allow_redirects=True)
+        response.raise_for_status()
+        
+        content_length = response.headers.get('content-length')
+        if content_length:
+            return int(content_length)
+        
+        response = requests.get(url, headers={'Range': 'bytes=0-0'}, stream=True)
+        response.raise_for_status()
+        
+        content_range = response.headers.get('content-range')
+        if content_range and '/' in content_range:
+            total_size = content_range.split('/')[-1]
+            if total_size.isdigit():
+                return int(total_size)
+                
+    except Exception as e:
+        logging.warning(f"Could not determine remote file size for {url}: {e}")
+        
+    return 0
+
+
+def get_download_url() -> str:
+    if config.COUNTRY_CODE:
+        index_file = "photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2"
+        index_url = (
+            "/extracts/by-country-code/" + config.COUNTRY_CODE + "/" + index_file
+        )
+    else:
+        index_file = "photon-db-latest.tar.bz2"
+        index_url = "/photon-db-latest.tar.bz2"
+
+    return config.BASE_URL + index_url
+
+
 def parallel_update():
     logging.info("Starting parallel update process...")
 
@@ -30,6 +138,16 @@ def parallel_update():
 
         logging.debug(f"Creating temporary directory: {config.TEMP_DIR}")
         os.makedirs(config.TEMP_DIR, exist_ok=True)
+
+        download_url = get_download_url()
+        file_size = get_remote_file_size(download_url)
+        
+        if file_size > 0:
+            if not check_disk_space_requirements(file_size, is_parallel=True):
+                logging.error("Insufficient disk space for parallel update")
+                sys.exit(1)
+        else:
+            logging.warning("Could not determine download size, proceeding without space check")
 
         logging.info("Downloading index")
 
@@ -76,6 +194,16 @@ def sequential_update():
 
         logging.debug(f"Creating temporary directory: {config.TEMP_DIR}")
         os.makedirs(config.TEMP_DIR, exist_ok=True)
+
+        download_url = get_download_url()
+        file_size = get_remote_file_size(download_url)
+        
+        if file_size > 0:
+            if not check_disk_space_requirements(file_size, is_parallel=False):
+                logging.error("Insufficient disk space for sequential update")
+                sys.exit(1)
+        else:
+            logging.warning("Could not determine download size, proceeding without space check")
 
         logging.info("Downloading new index and MD5 checksum...")
         index_file = download_index()
