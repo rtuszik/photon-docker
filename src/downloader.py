@@ -4,10 +4,11 @@ import shutil
 import sys
 
 import requests
+from requests.exceptions import RequestException
 from tqdm import tqdm
 
 from src.filesystem import clear_temp_dir, extract_index, move_index, verify_checksum
-from src.check_remote import get_local_time
+from src.check_remote import get_local_time, get_remote_file_size
 from src.utils import config
 from src.utils.logger import get_logger
 
@@ -83,31 +84,6 @@ def check_disk_space_requirements(download_size: int, is_parallel: bool = True) 
     
     logging.info("Sufficient disk space available for update")
     return True
-
-
-def get_remote_file_size(url: str) -> int:
-    try:
-        response = requests.head(url, allow_redirects=True)
-        response.raise_for_status()
-        
-        content_length = response.headers.get('content-length')
-        if content_length:
-            return int(content_length)
-        
-        response = requests.get(url, headers={'Range': 'bytes=0-0'}, stream=True)
-        response.raise_for_status()
-        
-        content_range = response.headers.get('content-range')
-        if content_range and '/' in content_range:
-            total_size = content_range.split('/')[-1]
-            if total_size.isdigit():
-                return int(total_size)
-                
-    except Exception as e:
-        logging.warning(f"Could not determine remote file size for {url}: {e}")
-        
-    return 0
-
 
 def get_download_state_file(destination: str) -> str:
     return destination + ".download_state"
@@ -411,7 +387,7 @@ def download_file(url, destination, max_retries=3):
                 logging.info(f"Downloaded {destination} successfully.")
                 return True
 
-        except requests.exceptions.RequestException as e:
+        except RequestException as e:
             logging.error(f"Download attempt {attempt + 1} failed: {e}")
             if attempt < max_retries - 1:
                 logging.info(f"Retrying download (attempt {attempt + 2}/{max_retries})...")

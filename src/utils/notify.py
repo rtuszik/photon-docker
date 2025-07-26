@@ -20,7 +20,7 @@ def send_notification(message: str, title: str = "Photon Status"):
         if url.strip():
             apobj.add(url.strip())
 
-    if not apobj.servers:
+    if len(apobj) == 0:
         logging.warning(
             "No valid Apprise URLs were found after processing the APPRISE_URLS variable."
         )
