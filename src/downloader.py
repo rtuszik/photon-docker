@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import sys
@@ -106,6 +107,69 @@ def get_remote_file_size(url: str) -> int:
         logging.warning(f"Could not determine remote file size for {url}: {e}")
         
     return 0
+
+
+def get_download_state_file(destination: str) -> str:
+    return destination + ".download_state"
+
+
+def save_download_state(destination: str, url: str, downloaded_bytes: int, total_size: int):
+    state_file = get_download_state_file(destination)
+    state = {
+        "url": url,
+        "destination": destination,
+        "downloaded_bytes": downloaded_bytes,
+        "total_size": total_size,
+        "file_size": os.path.getsize(destination) if os.path.exists(destination) else 0
+    }
+    try:
+        with open(state_file, 'w') as f:
+            json.dump(state, f)
+    except Exception as e:
+        logging.warning(f"Failed to save download state: {e}")
+
+
+def load_download_state(destination: str) -> dict:
+    state_file = get_download_state_file(destination)
+    if not os.path.exists(state_file):
+        return {}
+    
+    try:
+        with open(state_file, 'r') as f:
+            state = json.load(f)
+            
+        if os.path.exists(destination):
+            actual_size = os.path.getsize(destination)
+            if state.get("file_size", 0) == actual_size:
+                return state
+            else:
+                logging.warning("File size mismatch, starting fresh download")
+                cleanup_download_state(destination)
+        
+    except Exception as e:
+        logging.warning(f"Failed to load download state: {e}")
+        cleanup_download_state(destination)
+    
+    return {}
+
+
+def cleanup_download_state(destination: str):
+    state_file = get_download_state_file(destination)
+    try:
+        if os.path.exists(state_file):
+            os.remove(state_file)
+    except Exception as e:
+        logging.warning(f"Failed to cleanup download state: {e}")
+
+
+def supports_range_requests(url: str) -> bool:
+    try:
+        response = requests.head(url, allow_redirects=True)
+        response.raise_for_status()
+        return response.headers.get('accept-ranges', '').lower() == 'bytes'
+    except Exception as e:
+        logging.warning(f"Could not determine range support for {url}: {e}")
+        return False
 
 
 def get_download_url() -> str:
@@ -271,39 +335,92 @@ def download_md5():
     return output
 
 
-def download_file(url, destination):
+def download_file(url, destination, max_retries=3):
+    state = load_download_state(destination)
+    resume_byte_pos = 0
+    mode = "wb"
     
-    try:
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            total_size = int(r.headers.get("content-length", 0))
+    if state and state.get("url") == url:
+        resume_byte_pos = state.get("downloaded_bytes", 0)
+        if resume_byte_pos > 0 and os.path.exists(destination):
+            mode = "ab"
+            logging.info(f"Resuming download from byte {resume_byte_pos}")
+    
+    for attempt in range(max_retries):
+        try:
+            headers = {}
+            if resume_byte_pos > 0 and supports_range_requests(url):
+                headers['Range'] = f'bytes={resume_byte_pos}-'
+            
+            with requests.get(url, stream=True, headers=headers) as r:
+                r.raise_for_status()
+                
+                if headers and r.status_code == 206:
+                    content_range = r.headers.get('content-range', '')
+                    if content_range:
+                        total_size = int(content_range.split('/')[-1])
+                    else:
+                        total_size = resume_byte_pos + int(r.headers.get("content-length", 0))
+                else:
+                    total_size = int(r.headers.get("content-length", 0))
+                    if resume_byte_pos > 0:
+                        logging.warning("Server doesn't support range requests, restarting download")
+                        resume_byte_pos = 0
+                        mode = "wb"
+                        if os.path.exists(destination):
+                            os.remove(destination)
 
-            progress_bar = None
-            if total_size > 0:
-                progress_bar = tqdm(
-                    desc=f"Downloading {destination.name if hasattr(destination, 'name') else destination}",
-                    total=total_size,
-                    unit="B",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                    leave=True,
-                )
+                progress_bar = None
+                if total_size > 0:
+                    progress_bar = tqdm(
+                        desc=f"Downloading {os.path.basename(destination)}",
+                        total=total_size,
+                        initial=resume_byte_pos,
+                        unit="B",
+                        unit_scale=True,
+                        unit_divisor=1024,
+                        leave=True,
+                    )
 
-            with open(destination, "wb") as f:
-                downloaded = 0
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk:
-                        size = f.write(chunk)
-                        downloaded += size
-                        if progress_bar:
-                            progress_bar.update(size)
+                downloaded = resume_byte_pos
+                chunk_size = 8192
+                save_interval = 1024 * 1024  # Save state every 1MB
+                last_save = downloaded
 
-                if progress_bar:
-                    progress_bar.close()
+                with open(destination, mode) as f:
+                    for chunk in r.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            size = f.write(chunk)
+                            downloaded += size
+                            if progress_bar:
+                                progress_bar.update(size)
+                            
+                            if downloaded - last_save >= save_interval:
+                                save_download_state(destination, url, downloaded, total_size)
+                                last_save = downloaded
 
-        logging.info(f"Downloaded {destination} successfully.")
-        return True
+                    if progress_bar:
+                        progress_bar.close()
 
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Download Failed: {e}")
-        return False
+                save_download_state(destination, url, downloaded, total_size)
+                
+                if total_size > 0 and downloaded < total_size:
+                    raise Exception(f"Download incomplete: {downloaded}/{total_size} bytes")
+
+                cleanup_download_state(destination)
+                logging.info(f"Downloaded {destination} successfully.")
+                return True
+
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Download attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                logging.info(f"Retrying download (attempt {attempt + 2}/{max_retries})...")
+                continue
+            else:
+                logging.error(f"Download failed after {max_retries} attempts")
+                return False
+        except Exception as e:
+            logging.error(f"Download failed: {e}")
+            return False
+
+    return False
