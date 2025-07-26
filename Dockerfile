@@ -1,7 +1,7 @@
 FROM eclipse-temurin:21.0.5_11-jre-noble
 
 # install astral uv
-COPY --from=ghcr.io/astral-sh/uv:0.7.19 /uv /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG PHOTON_VERSION
@@ -16,7 +16,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g ${PGID} -o photon && \
-    useradd -u ${PUID} -g photon -o -s /bin/false -m -d /photon photon
+    useradd -l -u ${PUID} -g photon -o -s /bin/false -m -d /photon photon
 
 WORKDIR /photon
 
@@ -25,10 +25,7 @@ RUN mkdir -p /photon/data/
 ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-opensearch-${PHOTON_VERSION}.jar /photon/photon.jar
 
 COPY src/ ./src/
-COPY entrypoint.py .
 COPY entrypoint.sh .
-COPY updater.py .
-COPY process_manager.py .
 COPY pyproject.toml .
 COPY uv.lock .
 RUN gosu photon uv sync --locked
@@ -42,4 +39,4 @@ RUN gosu photon uv sync --locked
 EXPOSE 2322
 
 ENTRYPOINT ["/bin/sh", "entrypoint.sh"]
-CMD ["uv", "run", "process_manager.py"]
+CMD ["uv", "run", "-m", "src.process_manager"]
