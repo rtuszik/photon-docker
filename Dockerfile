@@ -13,6 +13,7 @@ RUN apt-get update \
   lbzip2 \
   gosu \
   python3.12 \
+  curl \
   && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g ${PGID} -o photon && \
@@ -37,6 +38,9 @@ RUN chmod 644 /photon/photon.jar && \
 RUN gosu photon uv sync --locked
 
 EXPOSE 2322
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=240s --retries=3 \
+  CMD curl -f http://localhost:2322/status || exit 1
 
 ENTRYPOINT ["/bin/sh", "entrypoint.sh"]
 CMD ["uv", "run", "-m", "src.process_manager"]
