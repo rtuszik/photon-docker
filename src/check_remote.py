@@ -15,24 +15,25 @@ def get_remote_file_size(url: str) -> int:
     try:
         response = requests.head(url, allow_redirects=True)
         response.raise_for_status()
-        
-        content_length = response.headers.get('content-length')
+
+        content_length = response.headers.get("content-length")
         if content_length:
             return int(content_length)
-        
-        response = requests.get(url, headers={'Range': 'bytes=0-0'}, stream=True)
+
+        response = requests.get(url, headers={"Range": "bytes=0-0"}, stream=True)
         response.raise_for_status()
-        
-        content_range = response.headers.get('content-range')
-        if content_range and '/' in content_range:
-            total_size = content_range.split('/')[-1]
+
+        content_range = response.headers.get("content-range")
+        if content_range and "/" in content_range:
+            total_size = content_range.split("/")[-1]
             if total_size.isdigit():
                 return int(total_size)
-                
+
     except Exception as e:
         logging.warning(f"Could not determine remote file size for {url}: {e}")
-        
+
     return 0
+
 
 def get_remote_time(remote_url: str):
     try:
@@ -65,7 +66,7 @@ def compare_mtime() -> bool:
     else:
         index_file = "/photon-db-latest.tar.bz2"
 
-    remote_url = config.BASE_URL.rstrip('/') + index_file
+    remote_url = config.BASE_URL.rstrip("/") + index_file
 
     remote_dt = get_remote_time(remote_url)
 
