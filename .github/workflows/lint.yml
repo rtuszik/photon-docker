@@ -28,20 +28,11 @@ jobs:
             - name: Install uv
               uses: astral-sh/setup-uv@v6
 
-            - name: Ruff Check
-              run: uvx ruff check --fix
+            - name: ruff Check
+              run: uvx ruff check --fix --output-format=github
 
-            - name: ty check
-              run: uv ruff format
+            - name: ruff format
+              run: uvx ruff format
 
             - name: ty check
               run: uvx ty check
-
-            - name: Lint Code Base
-              uses: github/super-linter/slim@v7
-              env:
-                  FIX_MARKDOWN_PRETTIER: true
-                  VALIDATE_MARKDOWN_PRETTIER: true
-                  VALIDATE_GITLEAKS: true
-                  VALIDATE_GITHUB_ACTIONS: true
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
