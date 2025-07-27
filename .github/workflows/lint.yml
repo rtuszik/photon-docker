@@ -34,10 +34,10 @@ jobs:
               run: uv add ruff ty
 
             - name: ruff Check
-              run: uv ruff check --fix --output-format=github
+              run: uv run ruff check --fix --output-format=github
 
             - name: ruff format
-              run: uv ruff format
+              run: uv run ruff format
 
             - name: ty check
-              run: uv ty check
+              run: uv run ty check
