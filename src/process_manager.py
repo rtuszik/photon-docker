@@ -206,6 +206,13 @@ class PhotonManager:
         logger.info(f"Running {config.UPDATE_STRATEGY.lower()} update...")
         update_start = time.time()
 
+        from src.check_remote import compare_mtime
+        if not compare_mtime():
+            update_duration = time.time() - update_start
+            logger.info(f"Index already up to date - no restart needed ({update_duration:.1f}s)")
+            self.state = AppState.RUNNING
+            return
+
         if config.UPDATE_STRATEGY == "SEQUENTIAL":
             self.stop_photon()
 

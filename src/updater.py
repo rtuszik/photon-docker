@@ -1,6 +1,5 @@
 import sys
 
-from .check_remote import compare_mtime
 from .downloader import parallel_update, sequential_update
 from .utils import config
 from .utils.logger import get_logger
@@ -14,10 +13,6 @@ def main():
     logger.info("Starting update process...")
 
     try:
-        if not compare_mtime():
-            logger.info("Index already up to date")
-            return
-
         if config.UPDATE_STRATEGY == "PARALLEL":
             logger.info("Running parallel update...")
             parallel_update()
