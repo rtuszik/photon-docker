@@ -23,7 +23,7 @@ def extract_index(index_file: str):
         logging.debug(f"Creating temp directory: {config.TEMP_DIR}")
         os.makedirs(config.TEMP_DIR, exist_ok=True)
 
-    # using shell=true for piping, could construct pipe directly in the future...
+    
     install_command = f"lbzip2 -d -c {index_file} | tar x -C {config.TEMP_DIR}"
     logging.debug(f"Extraction command: {install_command}")
 
@@ -48,7 +48,7 @@ def extract_index(index_file: str):
                     try:
                         sub_items = os.listdir(item_path)
                         logging.debug(f"    Contains {len(sub_items)} items")
-                        for sub_item in sub_items[:5]:  # Show first 5 items
+                        for sub_item in sub_items[:5]:  
                             logging.debug(f"      {sub_item}")
                         if len(sub_items) > 5:
                             logging.debug(
@@ -75,94 +75,62 @@ def extract_index(index_file: str):
 
 
 def move_index():
-    logging.debug(f"Contents of source directory {config.TEMP_DIR}:")
-    try:
-        for item in os.listdir(config.TEMP_DIR):
-            item_path = os.path.join(config.TEMP_DIR, item)
-            if os.path.isdir(item_path):
-                logging.debug(f"  DIR: {item}")
-            else:
-                logging.debug(f"  FILE: {item}")
-    except Exception as e:
-        logging.debug(f"Could not list contents of {config.TEMP_DIR}: {e}")
-
-    logging.debug(
-        f"Destination directory {config.PHOTON_DATA_DIR} exists: {os.path.exists(config.PHOTON_DATA_DIR)}"
-    )
-    if os.path.exists(config.PHOTON_DATA_DIR):
-        logging.debug(f"Contents of destination directory {config.PHOTON_DATA_DIR}:")
-        try:
-            for item in os.listdir(config.PHOTON_DATA_DIR):
-                item_path = os.path.join(config.PHOTON_DATA_DIR, item)
-                if os.path.isdir(item_path):
-                    logging.debug(f"  DIR: {item}")
-                else:
-                    logging.debug(f"  FILE: {item}")
-        except Exception as e:
-            logging.debug(f"Could not list contents of {config.PHOTON_DATA_DIR}: {e}")
-
     temp_photon_dir = os.path.join(config.TEMP_DIR, "photon_data/node_1")
     target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
 
+    logging.info(f"Moving index from {temp_photon_dir} to {target_node_dir}")
     return move_index_atomic(temp_photon_dir, target_node_dir)
 
 
 def move_index_atomic(source_dir: str, target_dir: str) -> bool:
     try:
         logging.info("Starting atomic index move operation")
-        
+
         os.makedirs(os.path.dirname(target_dir), exist_ok=True)
-        
+
         staging_dir = target_dir + ".staging"
         backup_dir = target_dir + ".backup"
-        
+
         cleanup_staging_and_temp_backup(staging_dir, backup_dir)
-        
-        logging.debug(f"Moving new index to staging: {source_dir} -> {staging_dir}")
+
         shutil.move(source_dir, staging_dir)
-        
+
         if os.path.exists(target_dir):
-            logging.debug(f"Creating backup of current index: {target_dir} -> {backup_dir}")
             os.rename(target_dir, backup_dir)
-        
-        logging.debug(f"Atomic swap: {staging_dir} -> {target_dir}")
+
         os.rename(staging_dir, target_dir)
-        
         logging.info("Atomic index move completed successfully")
-        
-        if os.path.exists(backup_dir):
-            logging.debug("Backup preserved for verification")
-        
+
         return True
-        
+
     except Exception as e:
         logging.error(f"Atomic move failed: {e}")
         rollback_atomic_move(source_dir, target_dir, staging_dir, backup_dir)
         raise
 
 
-def rollback_atomic_move(original_source: str, target_dir: str, staging_dir: str, backup_dir: str):
+def rollback_atomic_move(
+    original_source: str, target_dir: str, staging_dir: str, backup_dir: str
+):
     logging.error("Rolling back atomic move operation")
-    
+
     try:
         if os.path.exists(target_dir) and not os.path.exists(backup_dir):
             logging.debug("New index was successfully moved, keeping it")
             return
-        
+
         if os.path.exists(target_dir):
-            logging.debug(f"Removing partially moved target: {target_dir}")
             shutil.rmtree(target_dir)
-        
+
         if os.path.exists(backup_dir):
-            logging.debug(f"Restoring backup: {backup_dir} -> {target_dir}")
+            logging.info("Restoring backup after failed atomic move")
             os.rename(backup_dir, target_dir)
-        
+
         if os.path.exists(staging_dir):
-            logging.debug(f"Moving staging back to source location: {staging_dir} -> {original_source}")
             shutil.move(staging_dir, original_source)
-        
+
         logging.info("Rollback completed successfully")
-        
+
     except Exception as rollback_error:
         logging.critical(f"Rollback failed: {rollback_error}")
         logging.critical("Manual intervention may be required")
@@ -171,7 +139,6 @@ def rollback_atomic_move(original_source: str, target_dir: str, staging_dir: str
 def cleanup_staging_and_temp_backup(staging_dir: str, backup_dir: str):
     for dir_path in [staging_dir, backup_dir]:
         if os.path.exists(dir_path):
-            logging.debug(f"Cleaning up existing directory: {dir_path}")
             try:
                 shutil.rmtree(dir_path)
             except Exception as e:
