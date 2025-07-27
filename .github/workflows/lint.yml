@@ -29,9 +29,10 @@ jobs:
               uses: astral-sh/setup-uv@v6
 
             - name: Ruff Check
-              run: uvx ruff check --fix 
+              run: uvx ruff check --fix
+
+            - name: ty check
               run: uv ruff format
-              
 
             - name: ty check
               run: uvx ty check
