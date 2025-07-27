@@ -96,7 +96,12 @@ def get_logger(
     logger = logging.getLogger(f"app.{name}")
     if context:
         for handler in logger.handlers:
-            handler.addFilter(ContextFilter(context))
+            has_context_filter = any(
+                isinstance(f, ContextFilter) and f.context == context
+                for f in handler.filters
+            )
+            if not has_context_filter:
+                handler.addFilter(ContextFilter(context))
     return logger
 
 

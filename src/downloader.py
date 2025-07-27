@@ -165,6 +165,9 @@ def supports_range_requests(url: str) -> bool:
 
 
 def get_download_url() -> str:
+    if config.FILE_URL:
+        return config.FILE_URL
+    
     if config.COUNTRY_CODE:
         index_file = "photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2"
         index_url = (
@@ -291,21 +294,13 @@ def sequential_update():
 
 
 def download_index() -> str:
-    if config.COUNTRY_CODE:
-        index_file = "photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2"
-        index_url = (
-            "/extracts/by-country-code/" + config.COUNTRY_CODE + "/" + index_file
-        )
-    else:
-        index_file = "photon-db-latest.tar.bz2"
-        index_url = "/photon-db-latest.tar.bz2"
-
     output_file = "photon-db-latest.tar.bz2"
-    download_url = config.BASE_URL + index_url
+    download_url = get_download_url()
 
     output = os.path.join(config.TEMP_DIR, output_file)
 
-    download_file(download_url, output)
+    if not download_file(download_url, output):
+        raise Exception(f"Failed to download index from {download_url}")
 
     local_timestamp = get_local_time(config.OS_NODE_DIR)
 
@@ -326,7 +321,8 @@ def download_md5():
     output_file = "photon-db-latest.tar.bz2.md5"
     output = os.path.join(config.TEMP_DIR, output_file)
 
-    download_file(download_url, output)
+    if not download_file(download_url, output):
+        raise Exception(f"Failed to download MD5 checksum from {download_url}")
 
     return output
 
