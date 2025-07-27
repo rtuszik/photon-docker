@@ -35,8 +35,6 @@ RUN gosu photon uv sync --locked
 RUN chmod 644 /photon/photon.jar && \
     chown -R photon:photon /photon
 
-RUN gosu photon uv sync --locked
-
 EXPOSE 2322
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=240s --retries=3 \
