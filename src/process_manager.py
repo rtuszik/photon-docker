@@ -23,7 +23,7 @@ logger = get_logger()
 
 def check_photon_health(timeout=30, max_retries=10) -> bool:
     url = "http://localhost:2322/status"
-    
+
     for attempt in range(max_retries):
         try:
             response = requests.get(url, timeout=timeout)
@@ -31,13 +31,15 @@ def check_photon_health(timeout=30, max_retries=10) -> bool:
                 logger.info("Photon health check passed")
                 return True
             else:
-                logger.warning(f"Photon health check failed with status {response.status_code}")
+                logger.warning(
+                    f"Photon health check failed with status {response.status_code}"
+                )
         except RequestException as e:
             logger.debug(f"Health check attempt {attempt + 1} failed: {e}")
-        
+
         if attempt < max_retries - 1:
             time.sleep(3)
-    
+
     logger.error(f"Photon health check failed after {max_retries} attempts")
     return False
 
@@ -45,14 +47,14 @@ def check_photon_health(timeout=30, max_retries=10) -> bool:
 def wait_for_photon_ready(timeout=120) -> bool:
     start_time = time.time()
     logger.info("Waiting for Photon to become ready...")
-    
+
     while time.time() - start_time < timeout:
         if check_photon_health(timeout=5, max_retries=1):
             elapsed = time.time() - start_time
             logger.info(f"Photon ready after {elapsed:.1f} seconds")
             return True
         time.sleep(5)
-    
+
     logger.error(f"Photon failed to become ready within {timeout} seconds")
     return False
 
@@ -80,7 +82,9 @@ class PhotonManager:
 
     def run_initial_setup(self):
         logger.info("Running initial setup...")
-        result = subprocess.run(["uv", "run", "-m", "src.entrypoint", "setup"], cwd="/photon")
+        result = subprocess.run(
+            ["uv", "run", "-m", "src.entrypoint", "setup"], cwd="/photon"
+        )
 
         if result.returncode != 0:
             logger.error("Setup failed!")
@@ -88,7 +92,9 @@ class PhotonManager:
 
     def start_photon(self, max_startup_retries=3):
         for attempt in range(max_startup_retries):
-            logger.info(f"Starting Photon (attempt {attempt + 1}/{max_startup_retries})...")
+            logger.info(
+                f"Starting Photon (attempt {attempt + 1}/{max_startup_retries})..."
+            )
             self.state = AppState.RUNNING
 
             java_params = config.JAVA_PARAMS or ""
@@ -96,23 +102,25 @@ class PhotonManager:
 
             cmd = [
                 "java",
-                "--add-modules", "jdk.incubator.vector",
+                "--add-modules",
+                "jdk.incubator.vector",
                 "--enable-native-access=ALL-UNNAMED",
                 "-Des.gateway.auto_import_dangling_indices=true",
                 "-Des.cluster.routing.allocation.batch_mode=true",
-                "-Dlog4j2.disable.jmx=true"
+                "-Dlog4j2.disable.jmx=true",
             ]
-            
+
             if java_params:
                 cmd.extend(shlex.split(java_params))
-                
-            cmd.extend(["-jar", "/photon/photon.jar", "-data-dir", config.DATA_DIR ])
-            
+
+            cmd.extend(["-jar", "/photon/photon.jar", "-data-dir", config.DATA_DIR])
+
             if photon_params:
                 cmd.extend(shlex.split(photon_params))
 
-            self.photon_process = subprocess.Popen(cmd, cwd="/photon", 
-                                                    preexec_fn=os.setsid)
+            self.photon_process = subprocess.Popen(
+                cmd, cwd="/photon", preexec_fn=os.setsid
+            )
 
             logger.info(f"Photon started with PID: {self.photon_process.pid}")
 
@@ -122,18 +130,20 @@ class PhotonManager:
             else:
                 logger.error(f"Photon health check failed on attempt {attempt + 1}")
                 self.stop_photon()
-                
+
                 if attempt < max_startup_retries - 1:
                     logger.info("Retrying Photon startup...")
                     time.sleep(5)
-        
-        logger.error(f"Photon failed to start successfully after {max_startup_retries} attempts")
+
+        logger.error(
+            f"Photon failed to start successfully after {max_startup_retries} attempts"
+        )
         return False
 
     def stop_photon(self):
         if self.photon_process:
             logger.info("Stopping Photon...")
-            
+
             try:
                 os.killpg(os.getpgid(self.photon_process.pid), signal.SIGTERM)
                 self.photon_process.wait(timeout=30)
@@ -143,26 +153,28 @@ class PhotonManager:
                 try:
                     os.killpg(os.getpgid(self.photon_process.pid), signal.SIGKILL)
                 except ProcessLookupError:
-                    pass  #Process dead
+                    pass  # Process dead
                 self.photon_process.wait()
             except ProcessLookupError:
                 # Process dead
                 pass
-                
+
             self.photon_process = None
-            
+
             self._cleanup_orphaned_photon_processes()
-            
+
             self._cleanup_lock_files()
-            
+
             time.sleep(2)
-            
+
     def _cleanup_orphaned_photon_processes(self):
         try:
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                if proc.info['name'] == 'java' and proc.info['cmdline']:
-                    if any('photon.jar' in arg for arg in proc.info['cmdline']):
-                        logger.warning(f"Found orphaned Photon process PID {proc.info['pid']}, terminating...")
+            for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+                if proc.info["name"] == "java" and proc.info["cmdline"]:
+                    if any("photon.jar" in arg for arg in proc.info["cmdline"]):
+                        logger.warning(
+                            f"Found orphaned Photon process PID {proc.info['pid']}, terminating..."
+                        )
                         proc.terminate()
                         try:
                             proc.wait(timeout=5)
@@ -170,13 +182,13 @@ class PhotonManager:
                             proc.kill()
         except Exception as e:
             logger.debug(f"Error checking for orphaned processes: {e}")
-            
+
     def _cleanup_lock_files(self):
         lock_files = [
             os.path.join(config.OS_NODE_DIR, "node.lock"),
-            os.path.join(config.OS_NODE_DIR, "data", "node.lock")
+            os.path.join(config.OS_NODE_DIR, "data", "node.lock"),
         ]
-        
+
         for lock_file in lock_files:
             if os.path.exists(lock_file):
                 try:
@@ -192,6 +204,7 @@ class PhotonManager:
 
         self.state = AppState.UPDATING
         logger.info(f"Running {config.UPDATE_STRATEGY.lower()} update...")
+        update_start = time.time()
 
         if config.UPDATE_STRATEGY == "SEQUENTIAL":
             self.stop_photon()
@@ -204,20 +217,25 @@ class PhotonManager:
             if config.UPDATE_STRATEGY == "PARALLEL":
                 self.stop_photon()
                 if self.start_photon():
-                    logger.info("Update completed successfully - Photon healthy")
+                    update_duration = time.time() - update_start
+                    logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
                     target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
                     cleanup_backup_after_verification(target_node_dir)
                 else:
-                    logger.error("Update failed - Photon health check failed after restart")
+                    update_duration = time.time() - update_start
+                    logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
             elif config.UPDATE_STRATEGY == "SEQUENTIAL":
                 if self.start_photon():
-                    logger.info("Update completed successfully - Photon healthy")
+                    update_duration = time.time() - update_start
+                    logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
                     target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
                     cleanup_backup_after_verification(target_node_dir)
                 else:
-                    logger.error("Update failed - Photon health check failed after restart")
+                    update_duration = time.time() - update_start
+                    logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
         else:
-            logger.error("Update process failed!")
+            update_duration = time.time() - update_start
+            logger.error(f"Update process failed with code {result.returncode} ({update_duration:.1f}s)")
             if config.UPDATE_STRATEGY == "SEQUENTIAL" and not self.photon_process:
                 logger.info("Attempting to restart Photon after failed update")
                 if not self.start_photon():

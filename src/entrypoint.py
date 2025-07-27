@@ -8,8 +8,8 @@ from .utils.notify import send_notification
 
 logger = get_logger()
 
-def main():
 
+def main():
     send_notification("Photon-Docker Initializing")
 
     logger.debug("Entrypoint setup called")
