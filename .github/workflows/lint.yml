@@ -1,43 +1,41 @@
-name: Lint-Format-Check
+name: checks
+
 on:
     pull_request:
     workflow_dispatch:
 
-permissions: {}
-
 jobs:
-    lint:
+    test:
         runs-on: ubuntu-latest
 
-        permissions:
-            contents: read
-            packages: read
-            statuses: write
-
         steps:
-            - name: Checkout Code
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
+            - uses: actions/checkout@v4
 
             - name: "Set up Python"
               uses: actions/setup-python@v5
               with:
-                  python-version-file: ".python-version"
+                  python-version-file: "pyproject.toml"
+                  version: 0.8.*
 
             - name: Install uv
               uses: astral-sh/setup-uv@v6
+              with:
+                  enable-cache: true
 
-            - name: install project
+            - name: Set up Python
+              run: uv python install
+
+            - name: Install dependencies
               run: uv sync --locked
-            - name:
-              run: uv add ruff ty
 
-            - name: ruff Check
-              run: uv run ruff check --fix --output-format=github
+            - name: Run linting
+              run: |
+                  uv run ruff check --fix
+                  uv run ruff format
 
-            - name: ruff format
-              run: uv run ruff format
-
-            - name: ty check
+            - name: Run type checking
               run: uv run ty check
+
+            - name: Run vulture
+              run: uv run vulture --exclude ".venv" .
+
