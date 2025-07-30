@@ -409,13 +409,17 @@ def download_file(url, destination, max_retries=3):
                     )
 
                 cleanup_download_state(destination)
-                
+
                 # Add simple metrics logging
                 if total_size > 0:
-                    speed_mbps = (total_size * 8) / ((time.time() - start_time) * 1_000_000)
+                    speed_mbps = (total_size * 8) / (
+                        (time.time() - start_time) * 1_000_000
+                    )
                     size_gb = total_size / (1024**3)
                     duration = time.time() - start_time
-                    logging.info(f"Download completed: {size_gb:.2f}GB in {duration:.1f}s ({speed_mbps:.1f} Mbps)")
+                    logging.info(
+                        f"Download completed: {size_gb:.2f}GB in {duration:.1f}s ({speed_mbps:.1f} Mbps)"
+                    )
                 else:
                     logging.info(f"Downloaded {destination} successfully.")
                 return True

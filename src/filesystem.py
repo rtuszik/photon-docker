@@ -23,7 +23,6 @@ def extract_index(index_file: str):
         logging.debug(f"Creating temp directory: {config.TEMP_DIR}")
         os.makedirs(config.TEMP_DIR, exist_ok=True)
 
-    
     install_command = f"lbzip2 -d -c {index_file} | tar x -C {config.TEMP_DIR}"
     logging.debug(f"Extraction command: {install_command}")
 
@@ -48,7 +47,7 @@ def extract_index(index_file: str):
                     try:
                         sub_items = os.listdir(item_path)
                         logging.debug(f"    Contains {len(sub_items)} items")
-                        for sub_item in sub_items[:5]:  
+                        for sub_item in sub_items[:5]:
                             logging.debug(f"      {sub_item}")
                         if len(sub_items) > 5:
                             logging.debug(
