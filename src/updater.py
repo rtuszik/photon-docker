@@ -2,7 +2,7 @@ import sys
 
 from .downloader import parallel_update, sequential_update
 from .utils import config
-from .utils.logger import get_logger
+from .utils.logger import get_logger, setup_logging
 from .utils.notify import send_notification
 
 logger = get_logger()
@@ -34,4 +34,5 @@ def main():
 
 
 if __name__ == "__main__":
+    setup_logging()
     main()
