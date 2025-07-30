@@ -167,7 +167,7 @@ def supports_range_requests(url: str) -> bool:
 def get_download_url() -> str:
     if config.FILE_URL:
         return config.FILE_URL
-
+    
     if config.COUNTRY_CODE:
         index_file = "photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2"
         index_url = (
