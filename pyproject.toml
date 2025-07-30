@@ -12,3 +12,10 @@ dependencies = [
     "schedule>=1.2.2",
     "tqdm==4.67.1",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.7",
+    "ty>=0.0.1a16",
+    "vulture>=2.14",
+]
