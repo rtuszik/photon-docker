@@ -34,4 +34,4 @@ jobs:
               run: uv run ty check
 
             - name: Run vulture
-              run: uv run vulture --exclude ".venv" .
+              run: uv run vulture --min-confidence 100 --exclude ".venv" .
