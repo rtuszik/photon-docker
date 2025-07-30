@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 
 import os
+import shlex
 import signal
 import subprocess
 import sys
 import threading
 import time
 from enum import Enum
-import shlex
+
 import psutil
-
 import requests
-from requests.exceptions import RequestException
 import schedule
+from requests.exceptions import RequestException
 
-from .utils import config
-from .utils.logger import get_logger
 from .filesystem import cleanup_backup_after_verification
+from .utils import config
+from .utils.logger import get_logger, setup_logging
 
 logger = get_logger()
 
@@ -75,7 +75,7 @@ class PhotonManager:
         signal.signal(signal.SIGTERM, self.handle_shutdown)
         signal.signal(signal.SIGINT, self.handle_shutdown)
 
-    def handle_shutdown(self, signum, frame):
+    def handle_shutdown(self, signum):
         logger.info(f"Received shutdown signal {signum}")
         self.should_exit = True
         self.shutdown()
@@ -207,9 +207,12 @@ class PhotonManager:
         update_start = time.time()
 
         from src.check_remote import compare_mtime
+
         if not compare_mtime():
             update_duration = time.time() - update_start
-            logger.info(f"Index already up to date - no restart needed ({update_duration:.1f}s)")
+            logger.info(
+                f"Index already up to date - no restart needed ({update_duration:.1f}s)"
+            )
             self.state = AppState.RUNNING
             return
 
@@ -220,29 +223,39 @@ class PhotonManager:
 
         if result.returncode == 0:
             logger.info("Update process completed, verifying Photon health...")
-            
+
             if config.UPDATE_STRATEGY == "PARALLEL":
                 self.stop_photon()
                 if self.start_photon():
                     update_duration = time.time() - update_start
-                    logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
+                    logger.info(
+                        f"Update completed successfully - Photon healthy ({update_duration:.1f}s)"
+                    )
                     target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
                     cleanup_backup_after_verification(target_node_dir)
                 else:
                     update_duration = time.time() - update_start
-                    logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
+                    logger.error(
+                        f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)"
+                    )
             elif config.UPDATE_STRATEGY == "SEQUENTIAL":
                 if self.start_photon():
                     update_duration = time.time() - update_start
-                    logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
+                    logger.info(
+                        f"Update completed successfully - Photon healthy ({update_duration:.1f}s)"
+                    )
                     target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
                     cleanup_backup_after_verification(target_node_dir)
                 else:
                     update_duration = time.time() - update_start
-                    logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
+                    logger.error(
+                        f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)"
+                    )
         else:
             update_duration = time.time() - update_start
-            logger.error(f"Update process failed with code {result.returncode} ({update_duration:.1f}s)")
+            logger.error(
+                f"Update process failed with code {result.returncode} ({update_duration:.1f}s)"
+            )
             if config.UPDATE_STRATEGY == "SEQUENTIAL" and not self.photon_process:
                 logger.info("Attempting to restart Photon after failed update")
                 if not self.start_photon():
@@ -317,5 +330,6 @@ class PhotonManager:
 
 
 if __name__ == "__main__":
+    setup_logging()
     manager = PhotonManager()
     manager.run()

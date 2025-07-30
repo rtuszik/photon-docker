@@ -2,7 +2,7 @@ import sys
 import os
 from .utils import config
 from .utils.validate_config import validate_config
-from .utils.logger import get_logger
+from .utils.logger import get_logger, setup_logging
 from .downloader import sequential_update, parallel_update
 from .utils.notify import send_notification
 
@@ -51,4 +51,5 @@ def main():
 
 
 if __name__ == "__main__":
+    setup_logging()
     main()
