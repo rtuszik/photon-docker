@@ -8,8 +8,8 @@ import requests
 from requests.exceptions import RequestException
 from tqdm import tqdm
 
-from src.filesystem import clear_temp_dir, extract_index, move_index, verify_checksum
 from src.check_remote import get_local_time, get_remote_file_size
+from src.filesystem import clear_temp_dir, extract_index, move_index, verify_checksum
 from src.utils import config
 from src.utils.logger import get_logger
 
@@ -327,7 +327,8 @@ def download_md5():
     return output
 
 
-def download_file(url, destination, max_retries=3):
+def _prepare_download(url, destination):
+    """Prepare download parameters including resume position."""
     state = load_download_state(destination)
     resume_byte_pos = 0
     mode = "wb"
@@ -338,91 +339,138 @@ def download_file(url, destination, max_retries=3):
             mode = "ab"
             logging.info(f"Resuming download from byte {resume_byte_pos}")
 
-    start_time = time.time()
-    for attempt in range(max_retries):
-        try:
-            headers = {}
-            if resume_byte_pos > 0 and supports_range_requests(url):
-                headers["Range"] = f"bytes={resume_byte_pos}-"
+    return resume_byte_pos, mode
 
-            with requests.get(url, stream=True, headers=headers) as r:
-                r.raise_for_status()
 
-                if headers and r.status_code == 206:
-                    content_range = r.headers.get("content-range", "")
-                    if content_range:
-                        total_size = int(content_range.split("/")[-1])
-                    else:
-                        total_size = resume_byte_pos + int(
-                            r.headers.get("content-length", 0)
-                        )
-                else:
-                    total_size = int(r.headers.get("content-length", 0))
-                    if resume_byte_pos > 0:
-                        logging.warning(
-                            "Server doesn't support range requests, restarting download"
-                        )
-                        resume_byte_pos = 0
-                        mode = "wb"
-                        if os.path.exists(destination):
-                            os.remove(destination)
+def _get_download_headers(resume_byte_pos, url):
+    if resume_byte_pos > 0 and supports_range_requests(url):
+        return {"Range": f"bytes={resume_byte_pos}-"}
+    return {}
 
-                progress_bar = None
-                if total_size > 0:
-                    progress_bar = tqdm(
-                        desc=f"Downloading {os.path.basename(destination)}",
-                        total=total_size,
-                        initial=resume_byte_pos,
-                        unit="B",
-                        unit_scale=True,
-                        unit_divisor=1024,
-                        leave=True,
-                    )
 
-                downloaded = resume_byte_pos
-                chunk_size = 8192
-                save_interval = 1024 * 1024  # Save state every 1MB
+def _calculate_total_size(response, headers, resume_byte_pos):
+    if headers and response.status_code == 206:
+        content_range = response.headers.get("content-range", "")
+        if content_range:
+            return int(content_range.split("/")[-1])
+        return resume_byte_pos + int(response.headers.get("content-length", 0))
+    return int(response.headers.get("content-length", 0))
+
+
+def _handle_no_range_support(resume_byte_pos, destination):
+    if resume_byte_pos > 0:
+        logging.warning("Server doesn't support range requests, restarting download")
+        if os.path.exists(destination):
+            os.remove(destination)
+        return 0, "wb"
+    return resume_byte_pos, None
+
+
+def _create_progress_bar(total_size, resume_byte_pos, destination):
+    if total_size > 0:
+        return tqdm(
+            desc=f"Downloading {os.path.basename(destination)}",
+            total=total_size,
+            initial=resume_byte_pos,
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+            leave=True,
+        )
+    return None
+
+
+def _download_content(
+    response, destination, mode, url, total_size, resume_byte_pos, progress_bar
+):
+    downloaded = resume_byte_pos
+    chunk_size = 8192
+    save_interval = 1024 * 1024
+    last_save = downloaded
+
+    with open(destination, mode) as f:
+        for chunk in response.iter_content(chunk_size=chunk_size):
+            if not chunk:
+                continue
+
+            size = f.write(chunk)
+            downloaded += size
+
+            if progress_bar:
+                progress_bar.update(size)
+
+            if downloaded - last_save >= save_interval:
+                save_download_state(destination, url, downloaded, total_size)
                 last_save = downloaded
 
-                with open(destination, mode) as f:
-                    for chunk in r.iter_content(chunk_size=chunk_size):
-                        if chunk:
-                            size = f.write(chunk)
-                            downloaded += size
-                            if progress_bar:
-                                progress_bar.update(size)
+    return downloaded
 
-                            if downloaded - last_save >= save_interval:
-                                save_download_state(
-                                    destination, url, downloaded, total_size
-                                )
-                                last_save = downloaded
 
-                    if progress_bar:
-                        progress_bar.close()
+def _log_download_metrics(total_size, start_time, destination):
+    if total_size > 0:
+        speed_mbps = (total_size * 8) / ((time.time() - start_time) * 1_000_000)
+        size_gb = total_size / (1024**3)
+        duration = time.time() - start_time
+        logging.info(
+            f"Download completed: {size_gb:.2f}GB in {duration:.1f}s ({speed_mbps:.1f} Mbps)"
+        )
+    else:
+        logging.info(f"Downloaded {destination} successfully.")
 
-                save_download_state(destination, url, downloaded, total_size)
 
-                if total_size > 0 and downloaded < total_size:
-                    raise Exception(
-                        f"Download incomplete: {downloaded}/{total_size} bytes"
-                    )
+def _perform_download(url, destination, resume_byte_pos, mode, start_time):
+    headers = _get_download_headers(resume_byte_pos, url)
 
-                cleanup_download_state(destination)
+    with requests.get(url, stream=True, headers=headers) as response:
+        response.raise_for_status()
 
-                # Add simple metrics logging
-                if total_size > 0:
-                    speed_mbps = (total_size * 8) / (
-                        (time.time() - start_time) * 1_000_000
-                    )
-                    size_gb = total_size / (1024**3)
-                    duration = time.time() - start_time
-                    logging.info(
-                        f"Download completed: {size_gb:.2f}GB in {duration:.1f}s ({speed_mbps:.1f} Mbps)"
-                    )
-                else:
-                    logging.info(f"Downloaded {destination} successfully.")
-                return True
+        total_size = _calculate_total_size(response, headers, resume_byte_pos)
+
+        if not headers and response.status_code != 206:
+            new_pos, new_mode = _handle_no_range_support(resume_byte_pos, destination)
+            if new_mode:
+                resume_byte_pos = new_pos
+                mode = new_mode
+
+        progress_bar = _create_progress_bar(total_size, resume_byte_pos, destination)
+
+        try:
+            downloaded = _download_content(
+                response,
+                destination,
+                mode,
+                url,
+                total_size,
+                resume_byte_pos,
+                progress_bar,
+            )
+
+            if progress_bar:
+                progress_bar.close()
+
+            save_download_state(destination, url, downloaded, total_size)
+
+            if total_size > 0 and downloaded < total_size:
+                raise Exception(f"Download incomplete: {downloaded}/{total_size} bytes")
+
+            cleanup_download_state(destination)
+            _log_download_metrics(total_size, start_time, destination)
+            return True
+
+        finally:
+            if progress_bar:
+                progress_bar.close()
+
+
+def download_file(url, destination, max_retries=3):
+    resume_byte_pos, mode = _prepare_download(url, destination)
+    start_time = time.time()
+
+    for attempt in range(max_retries):
+        try:
+            return _perform_download(
+                url, destination, resume_byte_pos, mode, start_time
+            )
 
         except RequestException as e:
             logging.error(f"Download attempt {attempt + 1} failed: {e}")
@@ -431,9 +479,9 @@ def download_file(url, destination, max_retries=3):
                     f"Retrying download (attempt {attempt + 2}/{max_retries})..."
                 )
                 continue
-            else:
-                logging.error(f"Download failed after {max_retries} attempts")
-                return False
+            logging.error(f"Download failed after {max_retries} attempts")
+            return False
+
         except Exception as e:
             logging.error(f"Download failed: {e}")
             return False

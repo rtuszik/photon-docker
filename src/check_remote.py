@@ -2,8 +2,8 @@ import datetime
 import os
 
 import requests
-from requests.exceptions import RequestException
 from dateutil.parser import parse as parsedate
+from requests.exceptions import RequestException
 
 from src.utils import config
 from src.utils.logger import get_logger
