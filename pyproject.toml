@@ -5,18 +5,54 @@ description = "Unofficial docker image for the Photon Geocoder"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "apprise>=1.9.3",
-    "psutil>=5.9.0",
-    "python-dateutil>=2.9.0.post0",
-    "requests==2.32.4",
-    "schedule>=1.2.2",
-    "tqdm==4.67.1",
+  "apprise>=1.9.3",
+  "psutil>=5.9.0",
+  "python-dateutil>=2.9.0.post0",
+  "requests==2.32.4",
+  "schedule>=1.2.2",
+  "tqdm==4.67.1",
 ]
 
 [dependency-groups]
-dev = [
-    "ruff>=0.12.7",
-    "ty>=0.0.1a16",
-    "vulture>=2.14",
+dev = ["ruff>=0.12.7", "ty>=0.0.1a16", "vulture>=2.14"]
+
+
+[tool.ruff]
+indent-width = 4
+
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "ANN",  # flake8-annotations
+  "COM",  # flake8-commas
+  "C90",  # mccabe complexity
+  "DJ",   # django
+  "EXE",  # flake8-executable
+  "PTH",  # flake8-pathlib
+  "T10",  # debugger
+  "TID",  # flake8-tidy-imports
+  "D100",
+  "D103",
+  "D101",
+  "D107", # missing docstring in public module
+  "D213",
+  "D203",
+  "D400",
+  "D415",
+  "G004",
 ]
 
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
