@@ -19,29 +19,42 @@ dev = ["ruff>=0.12.7", "ty>=0.0.1a16", "vulture>=2.14"]
 
 [tool.ruff]
 indent-width = 4
+line-length = 120
 
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-  "ANN",  # flake8-annotations
-  "COM",  # flake8-commas
-  "C90",  # mccabe complexity
-  "DJ",   # django
-  "EXE",  # flake8-executable
-  "PTH",  # flake8-pathlib
-  "T10",  # debugger
-  "TID",  # flake8-tidy-imports
+  "ANN",     # flake8-annotations
+  "COM",     # flake8-commas
+  "C90",     # mccabe complexity
+  "DJ",      # django
+  "EXE",     # flake8-executable
+  "BLE",     # blind except
+  "PTH",     # flake8-pathlib
+  "T10",     # debugger
+  "TID",     # flake8-tidy-imports
   "D100",
-  "D103",
   "D101",
-  "D107", # missing docstring in public module
-  "D102", # missing docstring in public class
+  "D102",
+  "D103",
+  "D104",
+  "D105",
+  "D106",
+  "D107",
+  "D101",
+  "D107",    # missing docstring in public module
+  "D102",    # missing docstring in public class
+  "D104",    # missing docstring in public package
   "D213",
   "D203",
   "D400",
   "D415",
   "G004",
+  "PLR2004",
+  "E501",    # line too long
+  "TRY",
+  "SIM105",  # faster without contextlib
 ]
 
 fixable = ["ALL"]
@@ -56,4 +69,3 @@ indent-style = "space"
 line-ending = "auto"
 
 docstring-code-format = false
-docstring-code-line-length = "dynamic"
