@@ -1,10 +1,11 @@
-import sys
 import os
+import sys
+
+from .downloader import InsufficientSpaceError, parallel_update, sequential_update
 from .utils import config
-from .utils.validate_config import validate_config
 from .utils.logger import get_logger, setup_logging
-from .downloader import sequential_update, parallel_update
 from .utils.notify import send_notification
+from .utils.validate_config import validate_config
 
 logger = get_logger()
 
@@ -40,12 +41,21 @@ def main():
                 parallel_update()
             else:
                 sequential_update()
+        except InsufficientSpaceError as e:
+            logger.error(f"Cannot proceed with force update: {e}")
+            send_notification(f"Photon-Docker force update failed: {e}")
+            sys.exit(75)
         except Exception:
             logger.error("Force update failed")
             raise
     elif not os.path.isdir(config.OS_NODE_DIR):
         logger.info("Starting initial download")
-        sequential_update()
+        try:
+            sequential_update()
+        except InsufficientSpaceError as e:
+            logger.error(f"Cannot proceed: {e}")
+            send_notification(f"Photon-Docker cannot start: {e}")
+            sys.exit(75)
     else:
         logger.info("Existing index found, skipping download")
 
