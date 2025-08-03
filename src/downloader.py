@@ -49,13 +49,9 @@ def get_directory_size(path: str) -> int:
 
 
 def check_disk_space_requirements(download_size: int, is_parallel: bool = True) -> bool:
-    temp_available = get_available_space(
-        config.TEMP_DIR if os.path.exists(config.TEMP_DIR) else config.DATA_DIR
-    )
+    temp_available = get_available_space(config.TEMP_DIR if os.path.exists(config.TEMP_DIR) else config.DATA_DIR)
     data_available = get_available_space(
-        config.PHOTON_DATA_DIR
-        if os.path.exists(config.PHOTON_DATA_DIR)
-        else config.DATA_DIR
+        config.PHOTON_DATA_DIR if os.path.exists(config.PHOTON_DATA_DIR) else config.DATA_DIR
     )
 
     compressed_size = download_size
@@ -93,9 +89,7 @@ def check_disk_space_requirements(download_size: int, is_parallel: bool = True) 
         logging.info(f"  Download size: {compressed_size / (1024**3):.2f} GB")
         logging.info(f"  Estimated extracted size: {extracted_size / (1024**3):.2f} GB")
         logging.info(f"  Minimum temp space needed: {temp_needed / (1024**3):.2f} GB")
-        logging.info(
-            f"  Peak temp space (during extraction): {temp_needed_peak / (1024**3):.2f} GB"
-        )
+        logging.info(f"  Peak temp space (during extraction): {temp_needed_peak / (1024**3):.2f} GB")
         logging.info(f"  Temp space available: {temp_available / (1024**3):.2f} GB")
 
         if temp_available < temp_needed:
@@ -120,9 +114,7 @@ def get_download_state_file(destination: str) -> str:
     return destination + ".download_state"
 
 
-def save_download_state(
-    destination: str, url: str, downloaded_bytes: int, total_size: int
-):
+def save_download_state(destination: str, url: str, downloaded_bytes: int, total_size: int):
     state_file = get_download_state_file(destination)
     state = {
         "url": url,
@@ -172,7 +164,7 @@ def cleanup_download_state(destination: str):
 
 def supports_range_requests(url: str) -> bool:
     try:
-        response = requests.head(url, allow_redirects=True)
+        response = requests.head(url, allow_redirects=True, timeout=5)
         response.raise_for_status()
         return response.headers.get("accept-ranges", "").lower() == "bytes"
     except Exception as e:
@@ -186,9 +178,7 @@ def get_download_url() -> str:
 
     if config.COUNTRY_CODE:
         index_file = "photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2"
-        index_url = (
-            "/extracts/by-country-code/" + config.COUNTRY_CODE + "/" + index_file
-        )
+        index_url = "/extracts/by-country-code/" + config.COUNTRY_CODE + "/" + index_file
     else:
         index_file = "photon-db-latest.tar.bz2"
         index_url = "/photon-db-latest.tar.bz2"
@@ -201,9 +191,7 @@ def parallel_update():
 
     try:
         if os.path.isdir(config.TEMP_DIR):
-            logging.debug(
-                f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it."
-            )
+            logging.debug(f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it.")
             try:
                 shutil.rmtree(config.TEMP_DIR)
                 logging.debug(f"Successfully removed directory: {config.TEMP_DIR}")
@@ -220,13 +208,9 @@ def parallel_update():
         if file_size > 0:
             if not check_disk_space_requirements(file_size, is_parallel=True):
                 logging.error("Insufficient disk space for parallel update")
-                raise InsufficientSpaceError(
-                    "Insufficient disk space for parallel update"
-                )
+                raise InsufficientSpaceError("Insufficient disk space for parallel update")
         else:
-            logging.warning(
-                "Could not determine download size, proceeding without space check"
-            )
+            logging.warning("Could not determine download size, proceeding without space check")
 
         logging.info("Downloading index")
 
@@ -261,9 +245,7 @@ def sequential_update():
         logging.info("Deleting old index...")
 
         if os.path.isdir(config.TEMP_DIR):
-            logging.debug(
-                f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it."
-            )
+            logging.debug(f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it.")
             try:
                 shutil.rmtree(config.TEMP_DIR)
                 logging.debug(f"Successfully removed directory: {config.TEMP_DIR}")
@@ -280,13 +262,9 @@ def sequential_update():
         if file_size > 0:
             if not check_disk_space_requirements(file_size, is_parallel=False):
                 logging.error("Insufficient disk space for sequential update")
-                raise InsufficientSpaceError(
-                    "Insufficient disk space for sequential update"
-                )
+                raise InsufficientSpaceError("Insufficient disk space for sequential update")
         else:
-            logging.warning(
-                "Could not determine download size, proceeding without space check"
-            )
+            logging.warning("Could not determine download size, proceeding without space check")
 
         logging.info("Downloading new index and MD5 checksum...")
         index_file = download_index()
@@ -411,9 +389,7 @@ def _create_progress_bar(total_size, resume_byte_pos, destination):
     return None
 
 
-def _download_content(
-    response, destination, mode, url, total_size, resume_byte_pos, progress_bar
-):
+def _download_content(response, destination, mode, url, total_size, resume_byte_pos, progress_bar):
     downloaded = resume_byte_pos
     chunk_size = 8192
     save_interval = 1024 * 1024
@@ -438,21 +414,9 @@ def _download_content(
                 percent = (downloaded / total_size) * 100
                 interval_bytes = downloaded - last_log_bytes
                 interval_time = current_time - last_log
-                speed_mbps = (
-                    (interval_bytes * 8) / (interval_time * 1_000_000)
-                    if interval_time > 0
-                    else 0
-                )
-                eta = (
-                    ((total_size - downloaded) / (interval_bytes / interval_time))
-                    if interval_bytes > 0
-                    else 0
-                )
-                eta_str = (
-                    f"{int(eta // 3600)}h {int((eta % 3600) // 60)}m"
-                    if eta > 0
-                    else "calculating..."
-                )
+                speed_mbps = (interval_bytes * 8) / (interval_time * 1_000_000) if interval_time > 0 else 0
+                eta = ((total_size - downloaded) / (interval_bytes / interval_time)) if interval_bytes > 0 else 0
+                eta_str = f"{int(eta // 3600)}h {int((eta % 3600) // 60)}m" if eta > 0 else "calculating..."
 
                 logging.info(
                     f"Download progress: {percent:.1f}% ({downloaded / (1024**3):.2f}GB / {total_size / (1024**3):.2f}GB) - {speed_mbps:.1f} Mbps - ETA: {eta_str}"
@@ -489,15 +453,13 @@ def _log_download_metrics(total_size, start_time, destination):
 def _perform_download(url, destination, resume_byte_pos, mode, start_time):
     headers = _get_download_headers(resume_byte_pos, url)
 
-    with requests.get(url, stream=True, headers=headers) as response:
+    with requests.get(url, stream=True, headers=headers, timeout=20) as response:
         response.raise_for_status()
 
         total_size = _calculate_total_size(response, headers, resume_byte_pos)
 
         if total_size > 0:
-            logging.info(
-                f"Starting download of {total_size / (1024**3):.2f}GB to {os.path.basename(destination)}"
-            )
+            logging.info(f"Starting download of {total_size / (1024**3):.2f}GB to {os.path.basename(destination)}")
 
         if not headers and response.status_code != 206:
             new_pos, new_mode = _handle_no_range_support(resume_byte_pos, destination)
@@ -541,22 +503,18 @@ def download_file(url, destination, max_retries=3):
 
     for attempt in range(max_retries):
         try:
-            return _perform_download(
-                url, destination, resume_byte_pos, mode, start_time
-            )
+            return _perform_download(url, destination, resume_byte_pos, mode, start_time)
 
         except RequestException as e:
-            logging.error(f"Download attempt {attempt + 1} failed: {e}")
+            logging.warning(f"Download attempt {attempt + 1} failed: {e}")
             if attempt < max_retries - 1:
-                logging.info(
-                    f"Retrying download (attempt {attempt + 2}/{max_retries})..."
-                )
+                logging.info(f"Retrying download (attempt {attempt + 2}/{max_retries})...")
                 continue
             logging.exception(f"Download failed after {max_retries} attempts")
             return False
 
-        except Exception as e:
-            logging.exception(f"Download failed: {e}")
+        except Exception:
+            logging.exception("Download failed")
             return False
 
     return False
