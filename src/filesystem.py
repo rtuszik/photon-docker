@@ -13,9 +13,7 @@ def extract_index(index_file: str):
     logging.info("Extracting Index")
     logging.debug(f"Index file: {index_file}")
     logging.debug(f"Index file exists: {os.path.exists(index_file)}")
-    logging.debug(
-        f"Index file size: {os.path.getsize(index_file) if os.path.exists(index_file) else 'N/A'}"
-    )
+    logging.debug(f"Index file size: {os.path.getsize(index_file) if os.path.exists(index_file) else 'N/A'}")
     logging.debug(f"Temp directory: {config.TEMP_DIR}")
     logging.debug(f"Temp directory exists: {os.path.exists(config.TEMP_DIR)}")
 
@@ -28,9 +26,7 @@ def extract_index(index_file: str):
 
     try:
         logging.debug("Starting extraction process...")
-        result = subprocess.run(
-            install_command, shell=True, capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(install_command, shell=True, capture_output=True, text=True, check=True)
         logging.debug("Extraction process completed successfully")
 
         if result.stdout:
@@ -50,15 +46,11 @@ def extract_index(index_file: str):
                         for sub_item in sub_items[:5]:
                             logging.debug(f"      {sub_item}")
                         if len(sub_items) > 5:
-                            logging.debug(
-                                f"      ... and {len(sub_items) - 5} more items"
-                            )
+                            logging.debug(f"      ... and {len(sub_items) - 5} more items")
                     except Exception as e:
                         logging.debug(f"    Could not list subdirectory contents: {e}")
                 else:
-                    logging.debug(
-                        f"  FILE: {item} ({os.path.getsize(item_path)} bytes)"
-                    )
+                    logging.debug(f"  FILE: {item} ({os.path.getsize(item_path)} bytes)")
         except Exception as e:
             logging.debug(f"Could not list contents of {config.TEMP_DIR}: {e}")
 
@@ -108,9 +100,7 @@ def move_index_atomic(source_dir: str, target_dir: str) -> bool:
         raise
 
 
-def rollback_atomic_move(
-    original_source: str, target_dir: str, staging_dir: str, backup_dir: str
-):
+def rollback_atomic_move(original_source: str, target_dir: str, staging_dir: str, backup_dir: str):
     logging.error("Rolling back atomic move operation")
 
     try:
@@ -181,9 +171,7 @@ def verify_checksum(md5_file, index_file):
         logging.info("Checksum verified successfully.")
         return True
 
-    raise Exception(
-        f"Checksum mismatch for {index_file}. Expected: {md5_sum}, Got: {dl_sum}"
-    )
+    raise Exception(f"Checksum mismatch for {index_file}. Expected: {md5_sum}, Got: {dl_sum}")
 
 
 def clear_temp_dir():
