@@ -1,37 +1,104 @@
 name: checks
-
 on:
     pull_request:
     workflow_dispatch:
 
 jobs:
-    test:
+    setup:
         runs-on: ubuntu-latest
-
         steps:
             - uses: actions/checkout@v4
-
             - name: "Set up Python"
               uses: actions/setup-python@v5
               with:
                   python-version-file: "pyproject.toml"
-
             - name: Install uv
               uses: astral-sh/setup-uv@v6
               with:
                   enable-cache: true
                   version: 0.8.*
-
             - name: Install dependencies
               run: uv sync --locked
+            - name: Cache dependencies
+              uses: actions/cache/save@v4
+              with:
+                  path: |
+                      .venv
+                      ~/.cache/uv
+                  key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
 
+    lint:
+        runs-on: ubuntu-latest
+        needs: setup
+        steps:
+            - uses: actions/checkout@v4
+            - name: "Set up Python"
+              uses: actions/setup-python@v5
+              with:
+                  python-version-file: "pyproject.toml"
+            - name: Install uv
+              uses: astral-sh/setup-uv@v6
+              with:
+                  enable-cache: true
+                  version: 0.8.*
+            - name: Restore dependencies
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      .venv
+                      ~/.cache/uv
+                  key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+                  fail-on-cache-miss: true
             - name: Run linting
               run: |
                   uv run ruff check --fix
                   uv run ruff format
 
+    typecheck:
+        runs-on: ubuntu-latest
+        needs: setup
+        steps:
+            - uses: actions/checkout@v4
+            - name: "Set up Python"
+              uses: actions/setup-python@v5
+              with:
+                  python-version-file: "pyproject.toml"
+            - name: Install uv
+              uses: astral-sh/setup-uv@v6
+              with:
+                  enable-cache: true
+                  version: 0.8.*
+            - name: Restore dependencies
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      .venv
+                      ~/.cache/uv
+                  key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+                  fail-on-cache-miss: true
             - name: Run type checking
               run: uv run ty check
-
+    vulture:
+        runs-on: ubuntu-latest
+        needs: setup
+        steps:
+            - uses: actions/checkout@v4
+            - name: "Set up Python"
+              uses: actions/setup-python@v5
+              with:
+                  python-version-file: "pyproject.toml"
+            - name: Install uv
+              uses: astral-sh/setup-uv@v6
+              with:
+                  enable-cache: true
+                  version: 0.8.*
+            - name: Restore dependencies
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      .venv
+                      ~/.cache/uv
+                  key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+                  fail-on-cache-miss: true
             - name: Run vulture
               run: uv run vulture --min-confidence 100 --exclude ".venv" .
