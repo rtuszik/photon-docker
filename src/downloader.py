@@ -144,16 +144,15 @@ def load_download_state(destination: str) -> dict:
         return {}
 
     try:
-        with open(state_file, "r") as f:
+        with open(state_file) as f:
             state = json.load(f)
 
         if os.path.exists(destination):
             actual_size = os.path.getsize(destination)
             if state.get("file_size", 0) == actual_size:
                 return state
-            else:
-                logging.warning("File size mismatch, starting fresh download")
-                cleanup_download_state(destination)
+            logging.warning("File size mismatch, starting fresh download")
+            cleanup_download_state(destination)
 
     except Exception as e:
         logging.warning(f"Failed to load download state: {e}")
@@ -395,15 +394,20 @@ def _handle_no_range_support(resume_byte_pos, destination):
 
 def _create_progress_bar(total_size, resume_byte_pos, destination):
     if total_size > 0:
-        return tqdm(
-            desc=f"Downloading {os.path.basename(destination)}",
-            total=total_size,
-            initial=resume_byte_pos,
-            unit="B",
-            unit_scale=True,
-            unit_divisor=1024,
-            leave=True,
-        )
+        try:
+            return tqdm(
+                desc=f"Downloading {os.path.basename(destination)}",
+                total=total_size,
+                initial=resume_byte_pos,
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+                leave=True,
+                disable=None,
+                file=sys.stderr,
+            )
+        except Exception:
+            return None
     return None
 
 
@@ -414,6 +418,9 @@ def _download_content(
     chunk_size = 8192
     save_interval = 1024 * 1024
     last_save = downloaded
+    last_log = time.time()
+    log_interval = 10
+    last_log_bytes = downloaded
 
     with open(destination, mode) as f:
         for chunk in response.iter_content(chunk_size=chunk_size):
@@ -425,6 +432,33 @@ def _download_content(
 
             if progress_bar:
                 progress_bar.update(size)
+
+            current_time = time.time()
+            if current_time - last_log >= log_interval and total_size > 0:
+                percent = (downloaded / total_size) * 100
+                interval_bytes = downloaded - last_log_bytes
+                interval_time = current_time - last_log
+                speed_mbps = (
+                    (interval_bytes * 8) / (interval_time * 1_000_000)
+                    if interval_time > 0
+                    else 0
+                )
+                eta = (
+                    ((total_size - downloaded) / (interval_bytes / interval_time))
+                    if interval_bytes > 0
+                    else 0
+                )
+                eta_str = (
+                    f"{int(eta // 3600)}h {int((eta % 3600) // 60)}m"
+                    if eta > 0
+                    else "calculating..."
+                )
+
+                logging.info(
+                    f"Download progress: {percent:.1f}% ({downloaded / (1024**3):.2f}GB / {total_size / (1024**3):.2f}GB) - {speed_mbps:.1f} Mbps - ETA: {eta_str}"
+                )
+                last_log = current_time
+                last_log_bytes = downloaded
 
             if downloaded - last_save >= save_interval:
                 save_download_state(destination, url, downloaded, total_size)
@@ -438,9 +472,16 @@ def _log_download_metrics(total_size, start_time, destination):
         speed_mbps = (total_size * 8) / ((time.time() - start_time) * 1_000_000)
         size_gb = total_size / (1024**3)
         duration = time.time() - start_time
-        logging.info(
-            f"Download completed: {size_gb:.2f}GB in {duration:.1f}s ({speed_mbps:.1f} Mbps)"
-        )
+        duration_minutes = duration / 60
+        if duration_minutes > 120:
+            duration_hours = duration_minutes / 60
+            logging.info(
+                f"Download completed: {size_gb:.2f}GB in {duration:.1f}s ({duration_minutes:.1f}m, {duration_hours:.1f}h) at {speed_mbps:.1f} Mbps"
+            )
+        else:
+            logging.info(
+                f"Download completed: {size_gb:.2f}GB in {duration:.1f}s ({duration_minutes:.1f}m) at {speed_mbps:.1f} Mbps"
+            )
     else:
         logging.info(f"Downloaded {destination} successfully.")
 
@@ -452,6 +493,11 @@ def _perform_download(url, destination, resume_byte_pos, mode, start_time):
         response.raise_for_status()
 
         total_size = _calculate_total_size(response, headers, resume_byte_pos)
+
+        if total_size > 0:
+            logging.info(
+                f"Starting download of {total_size / (1024**3):.2f}GB to {os.path.basename(destination)}"
+            )
 
         if not headers and response.status_code != 206:
             new_pos, new_mode = _handle_no_range_support(resume_byte_pos, destination)
@@ -506,11 +552,11 @@ def download_file(url, destination, max_retries=3):
                     f"Retrying download (attempt {attempt + 2}/{max_retries})..."
                 )
                 continue
-            logging.error(f"Download failed after {max_retries} attempts")
+            logging.exception(f"Download failed after {max_retries} attempts")
             return False
 
         except Exception as e:
-            logging.error(f"Download failed: {e}")
+            logging.exception(f"Download failed: {e}")
             return False
 
     return False

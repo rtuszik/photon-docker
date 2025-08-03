@@ -68,14 +68,14 @@ def extract_index(index_file: str):
         logging.error(f"Stdout: {e.stdout}")
         logging.error(f"Stderr: {e.stderr}")
         raise
-    except Exception as e:
-        logging.error(f"Index extraction failed: {e}")
+    except Exception:
+        logging.exception("Index extraction failed")
         raise
 
 
 def move_index():
-    temp_photon_dir = os.path.join(config.TEMP_DIR, "photon_data/node_1")
-    target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
+    temp_photon_dir = os.path.join(config.TEMP_DIR, "photon_data")
+    target_node_dir = os.path.join(config.PHOTON_DATA_DIR)
 
     logging.info(f"Moving index from {temp_photon_dir} to {target_node_dir}")
     return move_index_atomic(temp_photon_dir, target_node_dir)
@@ -132,7 +132,6 @@ def rollback_atomic_move(
 
     except Exception as rollback_error:
         logging.critical(f"Rollback failed: {rollback_error}")
-        logging.critical("Manual intervention may be required")
 
 
 def cleanup_staging_and_temp_backup(staging_dir: str, backup_dir: str):
@@ -169,7 +168,7 @@ def verify_checksum(md5_file, index_file):
         raise
 
     try:
-        with open(md5_file, "r") as f:
+        with open(md5_file) as f:
             md5_sum = f.read().split()[0].strip()
     except FileNotFoundError:
         logging.error(f"MD5 file not found: {md5_file}")
@@ -204,4 +203,4 @@ def clear_temp_dir():
     try:
         shutil.rmtree(config.TEMP_DIR)
     except Exception:
-        logging.error("Failed to Remove TEMP_DIR")
+        logging.exception("Failed to Remove TEMP_DIR")
