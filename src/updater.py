@@ -9,7 +9,6 @@ logger = get_logger()
 
 
 def main():
-    """Main updater function - handles both parallel and sequential updates"""
     logger.info("Starting update process...")
 
     try:
@@ -27,8 +26,8 @@ def main():
         send_notification("Photon Index Updated Successfully")
 
     except Exception as e:
-        error_msg = f"Update failed: {str(e)}"
-        logger.error(error_msg)
+        error_msg = f"Update failed: {e!s}"
+        logger.exception(error_msg)
         send_notification(f"Photon Update Failed - {error_msg}")
         sys.exit(1)
 

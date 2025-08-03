@@ -30,10 +30,9 @@ def check_photon_health(timeout=30, max_retries=10) -> bool:
             if response.status_code == 200:
                 logger.info("Photon health check passed")
                 return True
-            else:
-                logger.warning(
-                    f"Photon health check failed with status {response.status_code}"
-                )
+            logger.warning(
+                f"Photon health check failed with status {response.status_code}"
+            )
         except RequestException as e:
             logger.debug(f"Health check attempt {attempt + 1} failed: {e}")
 
@@ -83,7 +82,7 @@ class PhotonManager:
     def run_initial_setup(self):
         logger.info("Running initial setup...")
         result = subprocess.run(
-            ["uv", "run", "-m", "src.entrypoint", "setup"], cwd="/photon"
+            ["uv", "run", "-m", "src.entrypoint", "setup"], check=False, cwd="/photon"
         )
 
         if result.returncode != 0:
@@ -127,13 +126,12 @@ class PhotonManager:
             if wait_for_photon_ready():
                 logger.info("Photon startup successful")
                 return True
-            else:
-                logger.error(f"Photon health check failed on attempt {attempt + 1}")
-                self.stop_photon()
+            logger.error(f"Photon health check failed on attempt {attempt + 1}")
+            self.stop_photon()
 
-                if attempt < max_startup_retries - 1:
-                    logger.info("Retrying Photon startup...")
-                    time.sleep(5)
+            if attempt < max_startup_retries - 1:
+                logger.info("Retrying Photon startup...")
+                time.sleep(5)
 
         logger.error(
             f"Photon failed to start successfully after {max_startup_retries} attempts"
@@ -219,7 +217,9 @@ class PhotonManager:
         if config.UPDATE_STRATEGY == "SEQUENTIAL":
             self.stop_photon()
 
-        result = subprocess.run(["uv", "run", "-m", "src.updater"], cwd="/photon")
+        result = subprocess.run(
+            ["uv", "run", "-m", "src.updater"], check=False, cwd="/photon"
+        )
 
         if result.returncode == 0:
             logger.info("Update process completed, verifying Photon health...")
