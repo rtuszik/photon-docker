@@ -13,14 +13,16 @@ logging = get_logger()
 
 def get_remote_file_size(url: str) -> int:
     try:
-        response = requests.head(url, allow_redirects=True)
+        response = requests.head(url, allow_redirects=True, timeout=15)
         response.raise_for_status()
 
         content_length = response.headers.get("content-length")
         if content_length:
             return int(content_length)
 
-        response = requests.get(url, headers={"Range": "bytes=0-0"}, stream=True)
+        response = requests.get(
+            url, headers={"Range": "bytes=0-0"}, stream=True, timeout=15
+        )
         response.raise_for_status()
 
         content_range = response.headers.get("content-range")
@@ -43,7 +45,7 @@ def get_remote_time(remote_url: str):
         if urltime:
             return parsedate(urltime)
     except RequestException as e:
-        logging.error(f"Error fetching remote URL: {e}")
+        logging.exception(f"Error fetching remote URL: {e}")
     return None
 
 
@@ -78,9 +80,7 @@ def compare_mtime() -> bool:
 
     local_timestamp = get_local_time(config.OS_NODE_DIR)
 
-    local_dt = datetime.datetime.fromtimestamp(
-        local_timestamp, tz=datetime.timezone.utc
-    )
+    local_dt = datetime.datetime.fromtimestamp(local_timestamp, tz=datetime.UTC)
 
     grace_period = datetime.timedelta(hours=144)
 
