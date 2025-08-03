@@ -13,6 +13,11 @@ from src.filesystem import clear_temp_dir, extract_index, move_index, verify_che
 from src.utils import config
 from src.utils.logger import get_logger
 
+
+class InsufficientSpaceError(Exception):
+    pass
+
+
 logging = get_logger()
 
 
@@ -54,7 +59,7 @@ def check_disk_space_requirements(download_size: int, is_parallel: bool = True) 
     )
 
     compressed_size = download_size
-    extracted_size = int(download_size * 1.65)
+    extracted_size = int(download_size * 1.63)
 
     if is_parallel:
         temp_needed = compressed_size + extracted_size
@@ -81,19 +86,31 @@ def check_disk_space_requirements(download_size: int, is_parallel: bool = True) 
             return False
 
     else:
-        temp_needed = compressed_size + extracted_size
+        temp_needed = max(compressed_size, extracted_size)
+        temp_needed_peak = compressed_size + extracted_size
 
         logging.info("Sequential update space requirements:")
         logging.info(f"  Download size: {compressed_size / (1024**3):.2f} GB")
         logging.info(f"  Estimated extracted size: {extracted_size / (1024**3):.2f} GB")
-        logging.info(f"  Temp space needed: {temp_needed / (1024**3):.2f} GB")
+        logging.info(f"  Minimum temp space needed: {temp_needed / (1024**3):.2f} GB")
+        logging.info(
+            f"  Peak temp space (during extraction): {temp_needed_peak / (1024**3):.2f} GB"
+        )
         logging.info(f"  Temp space available: {temp_available / (1024**3):.2f} GB")
 
         if temp_available < temp_needed:
             logging.error(
-                f"Insufficient temp space: need {temp_needed / (1024**3):.2f} GB, have {temp_available / (1024**3):.2f} GB"
+                f"Insufficient temp space: need at least {temp_needed / (1024**3):.2f} GB, have {temp_available / (1024**3):.2f} GB"
             )
             return False
+
+        if temp_available < temp_needed_peak:
+            logging.warning(
+                f"Available space ({temp_available / (1024**3):.2f} GB) is less than peak requirement ({temp_needed_peak / (1024**3):.2f} GB)"
+            )
+            logging.warning(
+                "The update will proceed with space optimization (removing compressed file after verification)"
+            )
 
     logging.info("Sufficient disk space available for update")
     return True
@@ -204,7 +221,9 @@ def parallel_update():
         if file_size > 0:
             if not check_disk_space_requirements(file_size, is_parallel=True):
                 logging.error("Insufficient disk space for parallel update")
-                sys.exit(1)
+                raise InsufficientSpaceError(
+                    "Insufficient disk space for parallel update"
+                )
         else:
             logging.warning(
                 "Could not determine download size, proceeding without space check"
@@ -262,7 +281,9 @@ def sequential_update():
         if file_size > 0:
             if not check_disk_space_requirements(file_size, is_parallel=False):
                 logging.error("Insufficient disk space for sequential update")
-                sys.exit(1)
+                raise InsufficientSpaceError(
+                    "Insufficient disk space for sequential update"
+                )
         else:
             logging.warning(
                 "Could not determine download size, proceeding without space check"
@@ -270,15 +291,21 @@ def sequential_update():
 
         logging.info("Downloading new index and MD5 checksum...")
         index_file = download_index()
-        extract_index(index_file)
 
         if not config.SKIP_MD5_CHECK:
             md5_file = download_md5()
-
             logging.info("Verifying checksum...")
             verify_checksum(md5_file, index_file)
-
             logging.debug("Checksum verification successful.")
+
+        extract_index(index_file)
+
+        logging.info("Removing compressed file to save space...")
+        try:
+            os.remove(index_file)
+            logging.debug(f"Removed compressed file: {index_file}")
+        except Exception as e:
+            logging.warning(f"Failed to remove compressed file: {e}")
 
         logging.info("Moving new index into place...")
         move_index()
