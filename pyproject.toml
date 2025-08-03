@@ -36,6 +36,7 @@ ignore = [
   "D103",
   "D101",
   "D107", # missing docstring in public module
+  "D102", # missing docstring in public class
   "D213",
   "D203",
   "D400",
