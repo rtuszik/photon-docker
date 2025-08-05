@@ -14,19 +14,20 @@ def main():
     send_notification("Photon-Docker Initializing")
 
     logger.debug("Entrypoint setup called")
-    logger.debug("=== CONFIG VARIABLES ===")
-    logger.debug(f"UPDATE_STRATEGY: {config.UPDATE_STRATEGY}")
-    logger.debug(f"UPDATE_INTERVAL: {config.UPDATE_INTERVAL}")
-    logger.debug(f"COUNTRY_CODE: {config.COUNTRY_CODE}")
-    logger.debug(f"FORCE_UPDATE: {config.FORCE_UPDATE}")
+    logger.info("=== CONFIG VARIABLES ===")
+    logger.info(f"UPDATE_STRATEGY: {config.UPDATE_STRATEGY}")
+    logger.info(f"UPDATE_INTERVAL: {config.UPDATE_INTERVAL}")
+    logger.info(f"COUNTRY_CODE: {config.COUNTRY_CODE}")
+    logger.info(f"FORCE_UPDATE: {config.FORCE_UPDATE}")
+    # TODO ## some people may use HTTP Basic Auth in URL. Only debug log for now, possbily think of solution later. Same goes for BASE_URL, though less likely
     logger.debug(f"FILE_URL: {config.FILE_URL}")
-    logger.debug(f"PHOTON_PARAMS: {config.PHOTON_PARAMS}")
-    logger.debug(f"JAVA_PARAMS: {config.JAVA_PARAMS}")
-    logger.debug(f"LOG_LEVEL: {config.LOG_LEVEL}")
-    logger.debug(f"BASE_URL: {config.BASE_URL}")
-    logger.debug(f"SKIP_MD5_CHECK: {config.SKIP_MD5_CHECK}")
+    logger.info(f"PHOTON_PARAMS: {config.PHOTON_PARAMS}")
+    logger.info(f"JAVA_PARAMS: {config.JAVA_PARAMS}")
+    logger.info(f"LOG_LEVEL: {config.LOG_LEVEL}")
+    logger.info(f"BASE_URL: {config.BASE_URL}")
+    logger.info(f"SKIP_MD5_CHECK: {config.SKIP_MD5_CHECK}")
 
-    logger.debug("=== END CONFIG VARIABLES ===")
+    logger.info("=== END CONFIG VARIABLES ===")
 
     try:
         validate_config()
@@ -49,7 +50,8 @@ def main():
             logger.error("Force update failed")
             raise
     elif not os.path.isdir(config.OS_NODE_DIR):
-        logger.info("Starting initial download")
+        logger.info("Starting initial download using sequential strategy")
+        logger.info("Note: Initial download will use sequential strategy regardless of config setting")
         try:
             sequential_update()
         except InsufficientSpaceError as e:
