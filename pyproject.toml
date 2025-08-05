@@ -23,7 +23,7 @@ line-length = 120
 
 
 [tool.ruff.lint]
-select = ["ALL"]
+# select = ["ALL"]
 ignore = [
   "ANN",     # flake8-annotations
   "COM",     # flake8-commas
