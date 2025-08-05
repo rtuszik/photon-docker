@@ -150,7 +150,7 @@ class PhotonManager:
 
             self.photon_process = None
 
-            self._cleanup_orphaned_photon_processes()
+            self.cleanup_orphaned_photon_processes()
 
             self._cleanup_lock_files()
 
