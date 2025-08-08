@@ -22,9 +22,7 @@ def validate_config():
         )
 
     if error_messages:
-        full_error_message = "Configuration validation failed:\n" + "\n".join(
-            error_messages
-        )
+        full_error_message = "Configuration validation failed:\n" + "\n".join(error_messages)
         raise ValueError(full_error_message)
 
     logging.info("Environment variables are valid.")
