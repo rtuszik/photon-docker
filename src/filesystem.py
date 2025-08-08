@@ -2,6 +2,7 @@ import hashlib
 import os
 import shutil
 import subprocess
+from pathlib import Path
 
 from src.utils import config
 from src.utils.logger import get_logger
@@ -70,7 +71,12 @@ def move_index():
     target_node_dir = os.path.join(config.PHOTON_DATA_DIR)
 
     logging.info(f"Moving index from {temp_photon_dir} to {target_node_dir}")
-    return move_index_atomic(temp_photon_dir, target_node_dir)
+    result = move_index_atomic(temp_photon_dir, target_node_dir)
+
+    if result:
+        update_timestamp_marker()
+
+    return result
 
 
 def move_index_atomic(source_dir: str, target_dir: str) -> bool:
@@ -192,3 +198,12 @@ def clear_temp_dir():
         shutil.rmtree(config.TEMP_DIR)
     except Exception:
         logging.exception("Failed to Remove TEMP_DIR")
+
+
+def update_timestamp_marker():
+    marker_file = os.path.join(config.DATA_DIR, ".photon-index-updated")
+    try:
+        Path(marker_file).touch()
+        logging.info(f"Updated timestamp marker: {marker_file}")
+    except Exception as e:
+        logging.warning(f"Failed to update timestamp marker: {e}")

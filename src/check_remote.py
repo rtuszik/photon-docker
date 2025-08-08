@@ -20,9 +20,7 @@ def get_remote_file_size(url: str) -> int:
         if content_length:
             return int(content_length)
 
-        response = requests.get(
-            url, headers={"Range": "bytes=0-0"}, stream=True, timeout=15
-        )
+        response = requests.get(url, headers={"Range": "bytes=0-0"}, stream=True, timeout=15)
         response.raise_for_status()
 
         content_range = response.headers.get("content-range")
@@ -50,6 +48,10 @@ def get_remote_time(remote_url: str):
 
 
 def get_local_time(local_path: str):
+    marker_file = os.path.join(config.DATA_DIR, ".photon-index-updated")
+    if os.path.exists(marker_file):
+        return os.path.getmtime(marker_file)
+
     if not os.path.exists(local_path):
         return 0.0
     return os.path.getmtime(local_path)
@@ -58,11 +60,7 @@ def get_local_time(local_path: str):
 def compare_mtime() -> bool:
     if config.COUNTRY_CODE:
         index_file = (
-            "/extracts/by-country-code/"
-            + config.COUNTRY_CODE
-            + "/photon-db-"
-            + config.COUNTRY_CODE
-            + "-latest.tar.bz2"
+            "/extracts/by-country-code/" + config.COUNTRY_CODE + "/photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2"
         )
 
     else:
@@ -73,9 +71,7 @@ def compare_mtime() -> bool:
     remote_dt = get_remote_time(remote_url)
 
     if remote_dt is None:
-        logging.warning(
-            "Could not determine remote time. Assuming no update is needed."
-        )
+        logging.warning("Could not determine remote time. Assuming no update is needed.")
         return False
 
     local_timestamp = get_local_time(config.OS_NODE_DIR)
