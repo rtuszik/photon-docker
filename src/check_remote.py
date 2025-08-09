@@ -74,13 +74,19 @@ def compare_mtime() -> bool:
         logging.warning("Could not determine remote time. Assuming no update is needed.")
         return False
 
+    marker_file = os.path.join(config.DATA_DIR, ".photon-index-updated")
+    using_marker_file = os.path.exists(marker_file)
+
     local_timestamp = get_local_time(config.OS_NODE_DIR)
-
     local_dt = datetime.datetime.fromtimestamp(local_timestamp, tz=datetime.UTC)
-
-    grace_period = datetime.timedelta(hours=144)
 
     logging.debug(f"Remote index time: {remote_dt}")
     logging.debug(f"Local index time:  {local_dt}")
 
-    return remote_dt > (local_dt + grace_period)
+    if using_marker_file:
+        logging.debug("Using marker file timestamp - comparing directly without grace period")
+        return remote_dt > local_dt
+    else:
+        logging.debug("Using directory timestamp - applying 144-hour grace period")
+        grace_period = datetime.timedelta(hours=144)
+        return remote_dt > (local_dt + grace_period)
