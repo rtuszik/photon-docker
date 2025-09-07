@@ -10,7 +10,7 @@ services:
             - UPDATE_INTERVAL=3m
             # - LOG_LEVEL=DEBUG
             # - FORCE_UPDATE=TRUE
-            # - COUNTRY_CODE=zw
+            # - REGION=andorra
             # - BASE_URL=https://r2.koalasec.org/public
             # - SKIP_MD5_CHECK=TRUE
         volumes:

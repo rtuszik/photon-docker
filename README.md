@@ -39,7 +39,7 @@ services:
         environment:
             - UPDATE_STRATEGY=PARALLEL
             - UPDATE_INTERVAL=720h # Check for updates every 30 days
-            # - COUNTRY_CODE=zw  # Optional: country-specific index
+            # - REGION=andorra # Optional: specific region (continent, country, or planet)
             # - APPRISE_URLS=pover://user@token  # Optional: notifications
         volumes:
             - photon_data:/photon/data
@@ -58,20 +58,90 @@ docker-compose up -d
 
 The container can be configured using the following environment variables:
 
-| Variable          | Parameters                           | Default                                       | Description                                                                                                                                                                                                                                                                                                                                                          |
-| ----------------- | ------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UPDATE_STRATEGY` | `PARALLEL`, `SEQUENTIAL`, `DISABLED` | `SEQUENTIAL`                                  | Controls how index updates are handled. `PARALLEL` downloads the new index in the background then swaps with minimal downtime (requires 2x space). `SEQUENTIAL` stops Photon, deletes the existing index, downloads the new one, then restarts. `DISABLED` prevents automatic updates. Most users do not need frequent updates; consider setting this to `DISABLED`. |
-| `UPDATE_INTERVAL` | Time string (e.g., "720h", "30d")    | `30d`                                         | How often to check for updates. To reduce server load, it is recommended to set this to a long interval (e.g., `720h` for 30 days) or disable updates altogether if you do not need the latest data.                                                                                                                                                                 |
-| `COUNTRY_CODE`    | Two-letter country code              | -                                             | Optional country code for a smaller index ([available codes](https://download1.graphhopper.com/public/extracts/by-country-code/)). Only one country code is supported at a time.                                                                                                                                                                                     |
-| `LOG_LEVEL`       | `DEBUG`, `INFO`, `ERROR`             | `INFO`                                        | Controls logging verbosity.                                                                                                                                                                                                                                                                                                                                          |
-| `FORCE_UPDATE`    | `TRUE`, `FALSE`                      | `FALSE`                                       | Forces an index update on container startup, regardless of `UPDATE_STRATEGY`.                                                                                                                                                                                                                                                                                        |
-| `BASE_URL`        | Valid URL                            | `https://r2.koalasec.org/public/experimental` | Custom base URL for index data downloads. Should point to the parent directory of index files. The default has been changed to a community mirror to reduce load on the GraphHopper servers.                                                                                                                                                                         |
-| `SKIP_MD5_CHECK`  | `TRUE`, `FALSE`                      | `FALSE`                                       | Optionally skip MD5 verification of downloaded index files.                                                                                                                                                                                                                                                                                                          |
-| `FILE_URL`        | URL to a .tar.bz2 file               | -                                             | Set a custom URL for the index file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2"). This must be a tar.bz2 format. Make sure to set the `UPDATE_STRATEGY` to `DISABLED` when using this option.                                                                                                           |
-| `PHOTON_PARAMS`   | Photon executable parameters         | -                                             | See `https://github.com/komoot/photon#running-photon.`                                                                                                                                                                                                                                                                                                               |
-| `APPRISE_URLS`    | Comma-separated Apprise URLs         | -                                             | Optional notification URLs for [Apprise](https://github.com/caronc/apprise) to send status updates (e.g., download completion, errors). Supports multiple services like Pushover, Slack, email, etc. Example: `pover://user@token,mailto://user:pass@gmail.com`                                                                                                      |
-| `PUID`            | User ID                              | 9011                                          | The User ID for the photon process. Set this to your host user's ID (`id -u`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                   |
-| `PGID`            | Group ID                             | 9011                                          | The Group ID for the photon process. Set this to your host group's ID (`id -g`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                 |
+| Variable          | Parameters                             | Default                          | Description                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------- | -------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UPDATE_STRATEGY` | `PARALLEL`, `SEQUENTIAL`, `DISABLED`   | `SEQUENTIAL`                     | Controls how index updates are handled. `PARALLEL` downloads the new index in the background then swaps with minimal downtime (requires 2x space). `SEQUENTIAL` stops Photon, deletes the existing index, downloads the new one, then restarts. `DISABLED` prevents automatic updates. Most users do not need frequent updates; consider setting this to `DISABLED`. |
+| `UPDATE_INTERVAL` | Time string (e.g., "720h", "30d")      | `30d`                            | How often to check for updates. To reduce server load, it is recommended to set this to a long interval (e.g., `720h` for 30 days) or disable updates altogether if you do not need the latest data.                                                                                                                                                                 |
+| `REGION`          | Region name, country code, or `planet` | -                                | Optional region for a specific dataset. Can be a continent (`europe`, `asia`), individual country/region (`germany`, `usa`, `japan`), country code (`de`, `us`, `jp`), or `planet` for worldwide data. See [Available Regions](#available-regions) section for details.                                                                                              |
+| `LOG_LEVEL`       | `DEBUG`, `INFO`, `ERROR`               | `INFO`                           | Controls logging verbosity.                                                                                                                                                                                                                                                                                                                                          |
+| `FORCE_UPDATE`    | `TRUE`, `FALSE`                        | `FALSE`                          | Forces an index update on container startup, regardless of `UPDATE_STRATEGY`.                                                                                                                                                                                                                                                                                        |
+| `BASE_URL`        | Valid URL                              | `https://r2.koalasec.org/public` | Custom base URL for index data downloads. Should point to the parent directory of index files. The default has been changed to a community mirror to reduce load on the GraphHopper servers.                                                                                                                                                                         |
+| `SKIP_MD5_CHECK`  | `TRUE`, `FALSE`                        | `FALSE`                          | Optionally skip MD5 verification of downloaded index files.                                                                                                                                                                                                                                                                                                          |
+| `FILE_URL`        | URL to a .tar.bz2 file                 | -                                | Set a custom URL for the index file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2"). This must be a tar.bz2 format. Make sure to set the `UPDATE_STRATEGY` to `DISABLED` when using this option.                                                                                                           |
+| `PHOTON_PARAMS`   | Photon executable parameters           | -                                | See `https://github.com/komoot/photon#running-photon.`                                                                                                                                                                                                                                                                                                               |
+| `APPRISE_URLS`    | Comma-separated Apprise URLs           | -                                | Optional notification URLs for [Apprise](https://github.com/caronc/apprise) to send status updates (e.g., download completion, errors). Supports multiple services like Pushover, Slack, email, etc. Example: `pover://user@token,mailto://user:pass@gmail.com`                                                                                                      |
+| `PUID`            | User ID                                | 9011                             | The User ID for the photon process. Set this to your host user's ID (`id -u`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                   |
+| `PGID`            | Group ID                               | 9011                             | The Group ID for the photon process. Set this to your host group's ID (`id -g`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                 |
+
+## Available Regions
+
+The new regional system supports three types of downloads:
+
+### 1. Planet-wide Data
+
+- **Region**: `planet`
+- **Size**: ~116GB
+- **Coverage**: Worldwide
+
+### 2. Continental Data
+
+- **africa** (~2.8GB)
+- **asia** (~13.5GB)
+- **australia-oceania** (~2.9GB)
+- **europe** (~60.7GB)
+- **north-america** (~29.5GB)
+- **south-america** (~13.8GB)
+
+### 3. Individual Countries/Regions
+
+Only **16 regions** have individual database downloads available:
+
+#### Asia (2 regions)
+
+- **india** (also: `in`)
+- **japan** (also: `jp`)
+
+#### Europe (10 regions)
+
+- **andorra** (also: `ad`)
+- **austria** (also: `at`)
+- **denmark** (also: `dk`)
+- **france-monacco** (also: `fr`, `france`, `monaco`)
+- **germany** (also: `de`, `deutschland`)
+- **luxemburg** (also: `lu`, `luxembourg`)
+- **netherlands** (also: `nl`, `holland`, `the netherlands`)
+- **russia** (also: `ru`)
+- **slovakia** (also: `sk`)
+- **spain** (also: `es`, `españa`, `espana`)
+
+#### North America (3 regions)
+
+- **canada** (also: `ca`)
+- **mexico** (also: `mx`)
+- **usa** (also: `us`, `united states`, `united states of america`)
+
+#### South America (1 region)
+
+- **argentina** (also: `ar`)
+
+### Usage Examples
+
+```yaml
+# Continental download
+- REGION=europe
+
+# Individual country by name
+- REGION=andorra
+
+# Individual country by code
+- REGION=de
+
+# Planet-wide data
+- REGION=planet
+# No REGION specified = planet-wide data
+```
+
+**Note**: For regions not available individually (like Zimbabwe), you must use the appropriate continental download (e.g., `africa` for Zimbabwe).
 
 ## Community Mirrors
 
@@ -83,11 +153,11 @@ this Docker image now defaults to using community-hosted mirrors.
 
 If you are hosting a public mirror, please open an issue or pull request to have it added to this list.
 
-| URL                                                     | Maintained By                                          | Status                                                                                                                                                                         |
-| ------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `https://download1.graphhopper.com/public/experimental` | [GraphHopper](https://www.graphhopper.com/) (Official) | ![GraphHopper](https://img.shields.io/website?url=https%3A%2F%2Fdownload1.graphhopper.com%2Fpublic%2Fexperimental%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status) |
-| `https://r2.koalasec.org/public/experimental`           | [rtuszik](https://github.com/rtuszik)                  | ![KoalaSec](https://img.shields.io/website?url=https%3A%2F%2Fr2.koalasec.org%2Fpublic%2Fexperimental%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status)              |
-| `https://r2.naru.dev/`                                  | [naru](https://github.com/narucx)                      | ![Status](https://img.shields.io/website?url=https%3A%2F%2Fr2.naru.dev%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status)                                            |
+| URL                                         | Maintained By                                          | Status                                                                                                                                                                       |
+| ------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://download1.graphhopper.com/public/` | [GraphHopper](https://www.graphhopper.com/) (Official) | ![GraphHopper](https://img.shields.io/website?url=https%3A%2F%2Fdownload1.graphhopper.com%2Fpublic%2Fphoton-db-planet-0.7OS-latest.tar.bz2&style=for-the-badge&label=Status) |
+| `https://r2.koalasec.org/public/`           | [rtuszik](https://github.com/rtuszik)                  | ![KoalaSec](https://img.shields.io/website?url=https%3A%2F%2Fr2.koalasec.org%2Fpublic%2Fphoton-db-planet-0.7OS-latest.tar.bz2&style=for-the-badge&label=Status)              |
+| `https://r2.naru.dev/`                      | [naru](https://github.com/narucx)                      | ![Status](https://img.shields.io/website?url=https%3A%2F%2Fr2.naru.dev%2Fphoton-db-latest.tar.bz2&style=for-the-badge&label=Status)                                          |
 
 ### Use with Dawarich
 

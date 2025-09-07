@@ -3,13 +3,13 @@ import os
 # USER CONFIG
 UPDATE_STRATEGY = os.getenv("UPDATE_STRATEGY", "SEQUENTIAL")
 UPDATE_INTERVAL = os.getenv("UPDATE_INTERVAL", "30d")
-COUNTRY_CODE = os.getenv("COUNTRY_CODE")
+REGION = os.getenv("REGION")
 FORCE_UPDATE = os.getenv("FORCE_UPDATE", "False").lower() in ("true", "1", "t")
 FILE_URL = os.getenv("FILE_URL")
 PHOTON_PARAMS = os.getenv("PHOTON_PARAMS")
 JAVA_PARAMS = os.getenv("JAVA_PARAMS")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-BASE_URL = os.getenv("BASE_URL", "https://r2.koalasec.org/public/experimental")
+BASE_URL = os.getenv("BASE_URL", "https://r2.koalasec.org/public")
 SKIP_MD5_CHECK = os.getenv("SKIP_MD5_CHECK", "False").lower() in ("true", "1", "t")
 APPRISE_URLS = os.getenv("APPRISE_URLS")
 
