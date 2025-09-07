@@ -12,6 +12,7 @@ from src.check_remote import get_local_time, get_remote_file_size
 from src.filesystem import clear_temp_dir, extract_index, move_index, verify_checksum
 from src.utils import config
 from src.utils.logger import get_logger
+from src.utils.regions import get_region_info, normalize_region
 
 
 class InsufficientSpaceError(Exception):
@@ -166,12 +167,25 @@ def get_download_url() -> str:
     if config.FILE_URL:
         return config.FILE_URL
 
-    if config.COUNTRY_CODE:
-        index_file = "photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2"
-        index_url = "/extracts/by-country-code/" + config.COUNTRY_CODE + "/" + index_file
+    if config.REGION:
+        normalized = normalize_region(config.REGION)
+        region_info = get_region_info(config.REGION)
+        if not region_info:
+            raise ValueError(f"Unknown region: {config.REGION}")
+
+        region_type = region_info["type"]
+
+        if region_type == "planet":
+            index_url = "/photon-db-planet-0.7OS-latest.tar.bz2"
+        elif region_type == "continent":
+            index_url = f"/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
+        elif region_type == "sub-region":
+            continent = region_info["continent"]
+            index_url = f"/{continent}/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
+        else:
+            raise ValueError(f"Invalid region type: {region_type}")
     else:
-        index_file = "photon-db-latest.tar.bz2"
-        index_url = "/photon-db-latest.tar.bz2"
+        index_url = "/photon-db-planet-0.7OS-latest.tar.bz2"
 
     return config.BASE_URL + index_url
 
@@ -297,12 +311,25 @@ def download_index() -> str:
 
 
 def download_md5():
-    if config.COUNTRY_CODE:
-        md5_file = "photon-db-" + config.COUNTRY_CODE + "-latest.tar.bz2.md5"
-        md5_url = "/extracts/by-country-code/" + config.COUNTRY_CODE + "/" + md5_file
+    if config.REGION:
+        normalized = normalize_region(config.REGION)
+        region_info = get_region_info(config.REGION)
+        if not region_info:
+            raise ValueError(f"Unknown region: {config.REGION}")
+
+        region_type = region_info["type"]
+
+        if region_type == "planet":
+            md5_url = "/photon-db-planet-0.7OS-latest.tar.bz2.md5"
+        elif region_type == "continent":
+            md5_url = f"/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2.md5"
+        elif region_type == "sub-region":
+            continent = region_info["continent"]
+            md5_url = f"/{continent}/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2.md5"
+        else:
+            raise ValueError(f"Invalid region type: {region_type}")
     else:
-        md5_file = "photon-db-latest.tar.bz2.md5"
-        md5_url = "/photon-db-latest.tar.bz2.md5"
+        md5_url = "/photon-db-planet-0.7OS-latest.tar.bz2.md5"
 
     download_url = config.BASE_URL + md5_url
 
