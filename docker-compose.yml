@@ -7,7 +7,7 @@ services:
             - UPDATE_INTERVAL=30d
             - LOG_LEVEL=INFO # Options: DEBUG, INFO, ERROR
             # - BASE_URL=https://r2.koalasec.org/public
-            # - COUNTRY_CODE=zw
+            # - REGION=andorra
         volumes:
             - photon_data:/photon/data
         restart: unless-stopped

@@ -17,7 +17,7 @@ def main():
     logger.info("=== CONFIG VARIABLES ===")
     logger.info(f"UPDATE_STRATEGY: {config.UPDATE_STRATEGY}")
     logger.info(f"UPDATE_INTERVAL: {config.UPDATE_INTERVAL}")
-    logger.info(f"COUNTRY_CODE: {config.COUNTRY_CODE}")
+    logger.info(f"REGION: {config.REGION}")
     logger.info(f"FORCE_UPDATE: {config.FORCE_UPDATE}")
     # TODO ## some people may use HTTP Basic Auth in URL. Only debug log for now, possbily think of solution later. Same goes for BASE_URL, though less likely
     logger.debug(f"FILE_URL: {config.FILE_URL}")
