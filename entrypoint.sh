@@ -1,5 +1,21 @@
 #!/bin/sh
 
+PUID=${PUID:-9011}
+PGID=${PGID:-9011}
+
+CURRENT_UID=$(id -u photon 2>/dev/null || echo "0")
+CURRENT_GID=$(id -g photon 2>/dev/null || echo "0")
+
+if [ "$CURRENT_GID" != "$PGID" ]; then
+    echo "Updating photon group GID from $CURRENT_GID to $PGID"
+    groupmod -o -g "$PGID" photon
+fi
+
+if [ "$CURRENT_UID" != "$PUID" ]; then
+    echo "Updating photon user UID from $CURRENT_UID to $PUID"
+    usermod -o -u "$PUID" photon
+fi
+
 if [ -d "/photon/data/photon_data/node_1" ]; then
     if [ -d "/photon/data/node_1" ]; then
         echo "Removing old index..."
