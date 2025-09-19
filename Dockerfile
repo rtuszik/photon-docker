@@ -35,6 +35,12 @@ RUN gosu photon uv sync --locked
 RUN chmod 644 /photon/photon.jar && \
     chown -R photon:photon /photon
 
+LABEL org.opencontainers.image.title="photon-docker" \
+      org.opencontainers.image.description="Unofficial docker image for the Photon Geocoder" \
+      org.opencontainers.image.url="https://github.com/rtuszik/photon-docker" \
+      org.opencontainers.image.source="https://github.com/rtuszik/photon-docker" \
+      org.opencontainers.image.documentation="https://github.com/rtuszik/photon-docker#readme"
+
 EXPOSE 2322
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=240s --retries=3 \
