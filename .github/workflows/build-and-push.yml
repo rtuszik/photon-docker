@@ -121,8 +121,9 @@ jobs:
                   IS_PRERELEASE="${{ env.IS_PRERELEASE }}"
                   SHOULD_PUSH="${{ env.SHOULD_PUSH }}"
 
-                  DOCKERHUB_REPO="rtuszik/photon-docker"
-                  GHCR_REPO="ghcr.io/rtuszik/photon-docker"
+                  # TODO change 
+                  DOCKERHUB_REPO="rtuszik/photon-docker-dev"
+                  GHCR_REPO="ghcr.io/rtuszik/photon-docker-dev"
 
                   TAGS="$DOCKERHUB_REPO:$CONTAINER_VERSION,$GHCR_REPO:$CONTAINER_VERSION"
 
