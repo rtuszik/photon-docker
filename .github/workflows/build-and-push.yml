@@ -72,11 +72,12 @@ jobs:
               run: |
                   if [ -f ".last_release" ]; then
                     PHOTON_VERSION=$(cat .last_release | tr -d '[:space:]')
+                    if [[ -z "$PHOTON_VERSION" || ! "$PHOTON_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                      echo "Error: .last_release is missing, empty, or contains an invalid version: '$PHOTON_VERSION'"
+                      exit 1
+                    fi
                     echo "Read photon version from .last_release: $PHOTON_VERSION"
                   else
-                    echo "Warning: .last_release file not found, using default"
-                    PHOTON_VERSION="latest"
-                  fi
 
                   if [ "${{ github.event_name }}" == "release" ]; then
                     CONTAINER_VERSION="${{ github.event.release.tag_name }}"
@@ -113,9 +114,8 @@ jobs:
                   IS_PRERELEASE="${{ env.IS_PRERELEASE }}"
                   SHOULD_PUSH="${{ env.SHOULD_PUSH }}"
 
-                  # TODO change 
-                  DOCKERHUB_REPO="rtuszik/photon-docker-dev"
-                  GHCR_REPO="ghcr.io/rtuszik/photon-docker-dev"
+                  DOCKERHUB_REPO="rtuszik/photon-docker"
+                  GHCR_REPO="ghcr.io/rtuszik/photon-docker"
 
                   TAGS="$DOCKERHUB_REPO:$CONTAINER_VERSION,$GHCR_REPO:$CONTAINER_VERSION"
 
