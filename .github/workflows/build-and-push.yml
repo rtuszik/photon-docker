@@ -1,13 +1,15 @@
 name: Build and Publish Docker Image
+
 on:
     workflow_dispatch:
         inputs:
             container_version:
-                description: "Container version to build (e.g., 1.2.3 or 1.2.3-beta)"
+                description: "SemVer version to build (e.g., 1.2.3 or 1.2.3-beta)"
                 required: true
             photon_version:
-                description: "Photon version"
-                required: true
+                description: "Photon version (optional - will read from .last_release if not provided)"
+                required: false
+
             branch:
                 description: "Branch to build from"
                 required: true
@@ -17,6 +19,14 @@ on:
                     - main
                     - dev
 
+    release:
+        types: [published]
+
+    pull_request:
+        branches:
+            - main
+            - dev
+
 jobs:
     build-and-push:
         runs-on: ubuntu-latest
@@ -24,65 +34,140 @@ jobs:
             - name: Checkout Repository
               uses: actions/checkout@v5
               with:
-                  ref: ${{ github.event.inputs.branch }}
+                  ref: ${{ github.event.inputs.branch || github.ref }}
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
 
+            - name: Determine if we should push
+              id: should_push
+              run: |
+                  if [ "${{ github.event_name }}" == "pull_request" ]; then
+                    SHOULD_PUSH="false"
+                    echo "Pull request - building without push"
+                  else
+                    SHOULD_PUSH="true"
+                    echo "Release or manual dispatch - will push images"
+                  fi
+
+                  echo "SHOULD_PUSH=$SHOULD_PUSH" >> "$GITHUB_ENV"
+
             - name: Login to DockerHub
+              if: env.SHOULD_PUSH == 'true'
               uses: docker/login-action@v3
               with:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
             - name: Login to GitHub Container Registry
+              if: env.SHOULD_PUSH == 'true'
               uses: docker/login-action@v3
               with:
                   registry: ghcr.io
                   username: ${{ github.repository_owner }}
                   password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Determine version and tags
-              id: determine_tags
+            - name: Extract version information
+              id: version_info
               run: |
-                  CONTAINER_VERSION="${{ github.event.inputs.container_version }}"
-                  PHOTON_VERSION="${{ github.event.inputs.photon_version }}"
+                  if [ -f ".last_release" ]; then
+                    PHOTON_VERSION=$(cat .last_release | tr -d '[:space:]')
+                    echo "Read photon version from .last_release: $PHOTON_VERSION"
+                  else
+                    echo "Warning: .last_release file not found, using default"
+                    PHOTON_VERSION="latest"
+                  fi
 
-                  CONTAINER_VERSION="${CONTAINER_VERSION#v}"
-
-                  if [[ "$CONTAINER_VERSION" == *"-beta"* ]] || [ "${{ github.event.inputs.branch }}" == "dev" ]; then
+                  if [ "${{ github.event_name }}" == "release" ]; then
+                    CONTAINER_VERSION="${{ github.event.release.tag_name }}"
+                    CONTAINER_VERSION="${CONTAINER_VERSION#v}"
+                    
+                    IS_PRERELEASE="${{ github.event.release.prerelease }}"
+                  elif [ "${{ github.event_name }}" == "pull_request" ]; then
+                    CONTAINER_VERSION="pr-${{ github.event.pull_request.number }}"
                     IS_PRERELEASE="true"
                   else
-                    IS_PRERELEASE="false"
+                    CONTAINER_VERSION="${{ github.event.inputs.container_version }}"
+                    
+                    CONTAINER_VERSION="${CONTAINER_VERSION#v}"
+                    
+                    if [[ "$CONTAINER_VERSION" == *"-beta"* ]] || [ "${{ github.event.inputs.branch }}" == "dev" ]; then
+                      IS_PRERELEASE="true"
+                    else
+                      IS_PRERELEASE="false"
+                    fi
                   fi
 
                   echo "CONTAINER_VERSION=$CONTAINER_VERSION" >> "$GITHUB_ENV"
                   echo "PHOTON_VERSION=$PHOTON_VERSION" >> "$GITHUB_ENV"
                   echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
 
-                  TAGS="rtuszik/photon-docker:$CONTAINER_VERSION"
-                  TAGS="$TAGS,ghcr.io/rtuszik/photon-docker:$CONTAINER_VERSION"
-
-                  if [ "$IS_PRERELEASE" == "true" ]; then
-                    TAGS="$TAGS,rtuszik/photon-docker:beta"
-                    TAGS="$TAGS,ghcr.io/rtuszik/photon-docker:beta"
-                  else
-                    TAGS="$TAGS,rtuszik/photon-docker:latest"
-                    TAGS="$TAGS,ghcr.io/rtuszik/photon-docker:latest"
-                  fi
-
-                  echo "DOCKER_TAGS=$TAGS" >> "$GITHUB_ENV"
-
                   echo "Container Version: $CONTAINER_VERSION"
                   echo "Photon Version: $PHOTON_VERSION"
                   echo "Is Prerelease: $IS_PRERELEASE"
-                  echo "Tags: $TAGS"
+
+            - name: Generate Docker tags with semver support
+              id: generate_tags
+              run: |
+                  CONTAINER_VERSION="${{ env.CONTAINER_VERSION }}"
+                  IS_PRERELEASE="${{ env.IS_PRERELEASE }}"
+                  SHOULD_PUSH="${{ env.SHOULD_PUSH }}"
+
+                  # TODO change 
+                  DOCKERHUB_REPO="rtuszik/photon-docker-dev"
+                  GHCR_REPO="ghcr.io/rtuszik/photon-docker-dev"
+
+                  TAGS="$DOCKERHUB_REPO:$CONTAINER_VERSION,$GHCR_REPO:$CONTAINER_VERSION"
+
+
+                  if [ "$SHOULD_PUSH" == "true" ]; then
+                    if [ "$IS_PRERELEASE" == "true" ]; then
+                      TAGS="$TAGS,$DOCKERHUB_REPO:beta,$GHCR_REPO:beta"
+                    else
+
+                      if [[ "$CONTAINER_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+                        MAJOR="${BASH_REMATCH[1]}"
+                        MINOR="${BASH_REMATCH[2]}"
+                        PATCH="${BASH_REMATCH[3]}"
+                        
+                        TAGS="$TAGS,$DOCKERHUB_REPO:$MAJOR,$GHCR_REPO:$MAJOR"
+                        TAGS="$TAGS,$DOCKERHUB_REPO:$MAJOR.$MINOR,$GHCR_REPO:$MAJOR.$MINOR"
+                        TAGS="$TAGS,$DOCKERHUB_REPO:$MAJOR.$MINOR.$PATCH,$GHCR_REPO:$MAJOR.$MINOR.$PATCH"
+                        TAGS="$TAGS,$DOCKERHUB_REPO:latest,$GHCR_REPO:latest"
+                        
+                        echo "Generated semver tags for version $MAJOR.$MINOR.$PATCH"
+                      else
+                        echo "Version doesn't match semver pattern, skipping semver tags"
+                        TAGS="$TAGS,$DOCKERHUB_REPO:latest,$GHCR_REPO:latest"
+                      fi
+                    fi
+                  fi
+
+                  echo "DOCKER_TAGS=$TAGS" >> "$GITHUB_ENV"
+                  echo "Generated tags: $TAGS"
 
             - name: Build and push Docker image
               uses: docker/build-push-action@v6
               with:
                   build-args: |
                       PHOTON_VERSION=${{ env.PHOTON_VERSION }}
-                  push: true
+                  push: ${{ env.SHOULD_PUSH == 'true' }}
                   tags: ${{ env.DOCKER_TAGS }}
                   platforms: linux/amd64,linux/arm64
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Output summary
+              run: |
+                  echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Event:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Container Version:** ${{ env.CONTAINER_VERSION }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Photon Version:** ${{ env.PHOTON_VERSION }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Is Prerelease:** ${{ env.IS_PRERELEASE }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Pushed to Registry:** ${{ env.SHOULD_PUSH }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Tags:** ${{ env.DOCKER_TAGS }}" >> $GITHUB_STEP_SUMMARY
+
+                  if [ "${{ env.SHOULD_PUSH }}" == "false" ]; then
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "**Test build completed successfully**" >> $GITHUB_STEP_SUMMARY
+                  fi
