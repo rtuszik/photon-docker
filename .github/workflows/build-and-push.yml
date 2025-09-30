@@ -72,10 +72,11 @@ jobs:
               run: |
                   if [ -f ".last_release" ]; then
                     PHOTON_VERSION=$(cat .last_release | tr -d '[:space:]')
-                    if [[ -z "$PHOTON_VERSION" || ! "$PHOTON_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                      echo "Error: .last_release is missing, empty, or contains an invalid version: '$PHOTON_VERSION'"
-                      exit 1
-                    fi
+
+                  if [[ -z "$PHOTON_VERSION" || ! "$PHOTON_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "Error: .last_release is missing, empty, or contains an invalid version: '$PHOTON_VERSION'"
+                    exit 1
+                  fi
                     echo "Read photon version from .last_release: $PHOTON_VERSION"
                   else
 
