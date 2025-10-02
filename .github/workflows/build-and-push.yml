@@ -73,26 +73,32 @@ jobs:
                   if [ -f ".last_release" ]; then
                     PHOTON_VERSION=$(cat .last_release | tr -d '[:space:]')
 
-                  if [[ -z "$PHOTON_VERSION" || ! "$PHOTON_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                    echo "Error: .last_release is missing, empty, or contains an invalid version: '$PHOTON_VERSION'"
-                    exit 1
-                  fi
+                    if [[ -z "$PHOTON_VERSION" || ! "$PHOTON_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                      echo "Error: .last_release is missing, empty, or contains an invalid version: '$PHOTON_VERSION'"
+                      exit 1
+                    fi
                     echo "Read photon version from .last_release: $PHOTON_VERSION"
                   else
+                    PHOTON_VERSION="${{ github.event.inputs.photon_version }}"
+                    if [[ -z "$PHOTON_VERSION" ]]; then
+                      echo "Error: PHOTON_VERSION must be provided when .last_release file is missing"
+                      exit 1
+                    fi
+                  fi
 
                   if [ "${{ github.event_name }}" == "release" ]; then
                     CONTAINER_VERSION="${{ github.event.release.tag_name }}"
                     CONTAINER_VERSION="${CONTAINER_VERSION#v}"
-                    
+
                     IS_PRERELEASE="${{ github.event.release.prerelease }}"
                   elif [ "${{ github.event_name }}" == "pull_request" ]; then
                     CONTAINER_VERSION="pr-${{ github.event.pull_request.number }}"
                     IS_PRERELEASE="true"
                   else
                     CONTAINER_VERSION="${{ github.event.inputs.container_version }}"
-                    
+
                     CONTAINER_VERSION="${CONTAINER_VERSION#v}"
-                    
+
                     if [[ "$CONTAINER_VERSION" == *"-beta"* ]] || [ "${{ github.event.inputs.branch }}" == "dev" ]; then
                       IS_PRERELEASE="true"
                     else
