@@ -122,8 +122,8 @@ jobs:
                   SHOULD_PUSH="${{ env.SHOULD_PUSH }}"
 
                   # TODO change 
-                  DOCKERHUB_REPO="rtuszik/photon-docker-dev"
-                  GHCR_REPO="ghcr.io/rtuszik/photon-docker-dev"
+                  DOCKERHUB_REPO="rtuszik/photon-docker"
+                  GHCR_REPO="ghcr.io/rtuszik/photon-docker"
 
                   TAGS="$DOCKERHUB_REPO:$CONTAINER_VERSION,$GHCR_REPO:$CONTAINER_VERSION"
 
