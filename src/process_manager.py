@@ -73,7 +73,7 @@ class PhotonManager:
         signal.signal(signal.SIGTERM, self.handle_shutdown)
         signal.signal(signal.SIGINT, self.handle_shutdown)
 
-    def handle_shutdown(self, signum, frame):
+    def handle_shutdown(self, signum, _frame):
         logger.info(f"Received shutdown signal {signum}")
         self.should_exit = True
         self.shutdown()
