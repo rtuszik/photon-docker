@@ -30,25 +30,6 @@ def get_available_space(path: str) -> int:
         return 0
 
 
-def get_directory_size(path: str) -> int:
-    if not os.path.exists(path):
-        return 0
-
-    total_size = 0
-    try:
-        for dirpath, _, filenames in os.walk(path):
-            for filename in filenames:
-                file_path = os.path.join(dirpath, filename)
-                try:
-                    total_size += os.path.getsize(file_path)
-                except (OSError, FileNotFoundError):
-                    continue
-    except (OSError, PermissionError):
-        pass
-
-    return total_size
-
-
 def check_disk_space_requirements(download_size: int, is_parallel: bool = True) -> bool:
     temp_available = get_available_space(config.TEMP_DIR if os.path.exists(config.TEMP_DIR) else config.DATA_DIR)
     data_available = get_available_space(
