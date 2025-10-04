@@ -104,13 +104,3 @@ def get_region_info(region: str) -> dict | None:
 
 def is_valid_region(region: str) -> bool:
     return get_region_info(region) is not None
-
-
-def get_region_type(region: str) -> str | None:
-    info = get_region_info(region)
-    return info["type"] if info else None
-
-
-def get_continent_for_region(region: str) -> str | None:
-    info = get_region_info(region)
-    return info["continent"] if info else None
