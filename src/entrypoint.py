@@ -52,9 +52,7 @@ def main():
             raise
     elif not os.path.isdir(config.OS_NODE_DIR):
         if not config.INITIAL_DOWNLOAD:
-            logger.warning(
-                "Initial download is disabled but no existing Photon index was found. "
-            )
+            logger.warning("Initial download is disabled but no existing Photon index was found. ")
             return
         logger.info("Starting initial download using sequential strategy")
         logger.info("Note: Initial download will use sequential strategy regardless of config setting")
