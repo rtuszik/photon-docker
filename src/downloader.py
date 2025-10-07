@@ -490,10 +490,10 @@ def _perform_download(url, destination, resume_byte_pos, mode, start_time):
 
 
 def download_file(url, destination, max_retries=3):
-    resume_byte_pos, mode = _prepare_download(url, destination)
     start_time = time.time()
 
     for attempt in range(max_retries):
+        resume_byte_pos, mode = _prepare_download(url, destination)
         try:
             return _perform_download(url, destination, resume_byte_pos, mode, start_time)
 
