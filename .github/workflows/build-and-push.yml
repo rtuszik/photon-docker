@@ -121,8 +121,9 @@ jobs:
                   IS_PRERELEASE="${{ env.IS_PRERELEASE }}"
                   SHOULD_PUSH="${{ env.SHOULD_PUSH }}"
 
-                  DOCKERHUB_REPO="${{ github.repository }}"
-                  GHCR_REPO="ghcr.io/${{ github.repository }}"
+                  REPO_NAME="${{ github.repository }}"
+                  DOCKERHUB_REPO="${REPO_NAME,,}"
+                  GHCR_REPO="ghcr.io/${REPO_NAME,,}"
 
                   TAGS="$DOCKERHUB_REPO:$CONTAINER_VERSION,$GHCR_REPO:$CONTAINER_VERSION"
 
