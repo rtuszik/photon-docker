@@ -121,9 +121,9 @@ jobs:
                   IS_PRERELEASE="${{ env.IS_PRERELEASE }}"
                   SHOULD_PUSH="${{ env.SHOULD_PUSH }}"
 
-                  REPO_NAME="${{ github.repository }}"
-                  DOCKERHUB_REPO="${REPO_NAME,,}"
-                  GHCR_REPO="ghcr.io/${REPO_NAME,,}"
+                  # TODO change 
+                  DOCKERHUB_REPO="rtuszik/photon-docker"
+                  GHCR_REPO="ghcr.io/rtuszik/photon-docker"
 
                   TAGS="$DOCKERHUB_REPO:$CONTAINER_VERSION,$GHCR_REPO:$CONTAINER_VERSION"
 
@@ -137,12 +137,12 @@ jobs:
                         MAJOR="${BASH_REMATCH[1]}"
                         MINOR="${BASH_REMATCH[2]}"
                         PATCH="${BASH_REMATCH[3]}"
-
+                        
                         TAGS="$TAGS,$DOCKERHUB_REPO:$MAJOR,$GHCR_REPO:$MAJOR"
                         TAGS="$TAGS,$DOCKERHUB_REPO:$MAJOR.$MINOR,$GHCR_REPO:$MAJOR.$MINOR"
                         TAGS="$TAGS,$DOCKERHUB_REPO:$MAJOR.$MINOR.$PATCH,$GHCR_REPO:$MAJOR.$MINOR.$PATCH"
                         TAGS="$TAGS,$DOCKERHUB_REPO:latest,$GHCR_REPO:latest"
-
+                        
                         echo "Generated semver tags for version $MAJOR.$MINOR.$PATCH"
                       else
                         echo "Version doesn't match semver pattern, skipping semver tags"
