@@ -10,22 +10,12 @@ on:
                 description: "Photon version (optional - will read from .last_release if not provided)"
                 required: false
 
-            branch:
-                description: "Branch to build from"
-                required: true
-                default: "main"
-                type: choice
-                options:
-                    - main
-                    - dev
-
     release:
         types: [published]
 
     pull_request:
         branches:
             - main
-            - dev
 
 jobs:
     build-and-push:
@@ -34,7 +24,7 @@ jobs:
             - name: Checkout Repository
               uses: actions/checkout@v5
               with:
-                  ref: ${{ github.event.inputs.branch || github.ref }}
+                  ref: ${{ github.ref }}
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
@@ -99,7 +89,7 @@ jobs:
 
                     CONTAINER_VERSION="${CONTAINER_VERSION#v}"
 
-                    if [[ "$CONTAINER_VERSION" == *"-beta"* ]] || [ "${{ github.event.inputs.branch }}" == "dev" ]; then
+                    if [ "$CONTAINER_VERSION" == *"-beta"* ]; then
                       IS_PRERELEASE="true"
                     else
                       IS_PRERELEASE="false"
