@@ -1,19 +1,16 @@
 version: 2
 updates:
     - package-ecosystem: "github-actions"
-      target-branch: "dev"
       directory: "/"
       schedule:
           interval: "weekly"
 
     - package-ecosystem: "docker"
-      target-branch: "dev"
       directory: "/"
       schedule:
           interval: "weekly"
 
     - package-ecosystem: "uv"
-      target-branch: "dev"
 
       directory: "/"
       schedule:
