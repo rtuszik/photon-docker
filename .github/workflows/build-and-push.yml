@@ -70,7 +70,7 @@ jobs:
 
                     CONTAINER_VERSION="${CONTAINER_VERSION#v}"
 
-                    if [ "$CONTAINER_VERSION" == *"-beta"* ]; then
+                    if [[ "$CONTAINER_VERSION" == *"-beta"* ]]; then
                       IS_PRERELEASE="true"
                     else
                       IS_PRERELEASE="false"
