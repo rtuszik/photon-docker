@@ -1,0 +1,101 @@
+name: Container Test
+
+on:
+    pull_request:
+        branches:
+            - main
+        paths:
+            - "Dockerfile"
+            - "src/**"
+            - "docker-compose*.yml"
+            - ".last_release"
+            - "pyproject.toml"
+            - "uv.lock"
+
+jobs:
+    test-container:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v5
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Read Photon version from .last_release
+              id: photon_version
+              run: |
+                  PHOTON_VERSION=$(cat .last_release | tr -d '[:space:]')
+                  if [[ -z "$PHOTON_VERSION" || ! "$PHOTON_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "Error: .last_release is missing, empty, or contains an invalid version: '$PHOTON_VERSION'"
+                    exit 1
+                  fi
+                  echo "PHOTON_VERSION=$PHOTON_VERSION" >> "$GITHUB_ENV"
+                  echo "Photon Version: $PHOTON_VERSION"
+
+            - name: Build test image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: ./Dockerfile
+                  build-args: |
+                      PHOTON_VERSION=${{ env.PHOTON_VERSION }}
+                  push: false
+                  load: true
+                  tags: photon-test:pr-${{ github.event.pull_request.number }}
+                  platforms: linux/amd64
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Start container
+              run: |
+                  docker run -d \
+                    --name photon-test-pr-${{ github.event.pull_request.number }} \
+                    -e REGION=andorra \
+                    -e UPDATE_STRATEGY=DISABLED \
+                    photon-test:pr-${{ github.event.pull_request.number }}
+
+            - name: Wait for container to be healthy
+              run: |
+                  echo "Waiting for container to become healthy (timeout: 6 minutes)..."
+                  CONTAINER_NAME=photon-test-pr-${{ github.event.pull_request.number }}
+
+                  docker logs -f $CONTAINER_NAME &
+                  LOGS_PID=$!
+
+                  SECONDS=0
+                  TIMEOUT=360
+
+                  while [ $SECONDS -lt $TIMEOUT ]; do
+                    HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null || echo "unknown")
+
+                    if [ "$HEALTH_STATUS" = "healthy" ]; then
+                      echo "Container is healthy after $SECONDS seconds"
+                      kill $LOGS_PID 2>/dev/null || true
+                      exit 0
+                    fi
+
+                    echo "Health status: $HEALTH_STATUS (elapsed: ${SECONDS}s)"
+                    sleep 10
+                    SECONDS=$((SECONDS + 10))
+                  done
+
+                  kill $LOGS_PID 2>/dev/null || true
+                  echo "Container failed to become healthy within $TIMEOUT seconds"
+                  docker logs $CONTAINER_NAME
+                  exit 1
+
+            - name: Cleanup
+              if: always()
+              run: |
+                  docker stop photon-test-pr-${{ github.event.pull_request.number }} || true
+                  docker rm photon-test-pr-${{ github.event.pull_request.number }} || true
+                  docker rmi photon-test:pr-${{ github.event.pull_request.number }} || true
+
+            - name: Output summary
+              if: always()
+              run: |
+                  echo "## Container Test Summary" >> $GITHUB_STEP_SUMMARY
+                  echo "- **PR Number:** ${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Photon Version:** ${{ env.PHOTON_VERSION }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
