@@ -500,8 +500,9 @@ def _perform_download(url, destination, resume_byte_pos, mode, start_time):
                 progress_bar.close()
 
 
-def download_file(url, destination, max_retries=3):
+def download_file(url, destination):
     start_time = time.time()
+    max_retries = int(config.DOWNLOAD_MAX_RETRIES)
 
     for attempt in range(max_retries):
         resume_byte_pos, mode = _prepare_download(url, destination)
