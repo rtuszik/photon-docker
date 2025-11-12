@@ -119,7 +119,9 @@ def load_download_state(destination: str) -> dict:
                 state["downloaded_bytes"] = actual_size
                 logging.info(f"Resuming download: file size {actual_size} bytes (saved state: {saved_size} bytes)")
                 return state
-            logging.warning(f"File size mismatch: actual {actual_size} < expected {saved_size}, starting fresh download")
+            logging.warning(
+                f"File size mismatch: actual {actual_size} < expected {saved_size}, starting fresh download"
+            )
             cleanup_download_state(destination)
 
     except Exception as e:
@@ -231,8 +233,6 @@ def sequential_update():
     logging.info("Starting sequential download process...")
 
     try:
-        logging.info("Deleting old index...")
-
         if os.path.isdir(config.TEMP_DIR):
             logging.debug(f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it.")
             try:
@@ -511,7 +511,7 @@ def download_file(url, destination, max_retries=3):
         except RequestException as e:
             logging.warning(f"Download attempt {attempt + 1} failed: {e}")
             if attempt < max_retries - 1:
-                wait_time = 2 ** attempt  # 1s, 2s, 4s
+                wait_time = 2**attempt  # 1s, 2s, 4s
                 logging.info(f"Waiting {wait_time}s before retry...")
                 time.sleep(wait_time)
                 logging.info(f"Retrying download (attempt {attempt + 2}/{max_retries})...")
