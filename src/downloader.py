@@ -281,8 +281,11 @@ def sequential_update():
 
 
 def download_index() -> str:
-    output_file = "photon-db-latest.tar.bz2"
     download_url = get_download_url()
+    if download_url.endswith(".jsonl.zst"):
+        output_file = "photon-data-dump.jsonl.zst"
+    else:
+        output_file = "photon-db-latest.tar.bz2"
 
     output = os.path.join(config.TEMP_DIR, output_file)
 
