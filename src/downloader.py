@@ -281,8 +281,11 @@ def sequential_update():
 
 
 def download_index() -> str:
-    output_file = "photon-db-latest.tar.bz2"
     download_url = get_download_url()
+    if download_url.endswith(".jsonl.zst"):
+        output_file = "photon-data-dump.jsonl.zst"
+    else:
+        output_file = "photon-db-latest.tar.bz2"
 
     output = os.path.join(config.TEMP_DIR, output_file)
 
@@ -296,29 +299,13 @@ def download_index() -> str:
 
 
 def download_md5():
-    if config.REGION:
-        normalized = normalize_region(config.REGION)
-        region_info = get_region_info(config.REGION)
-        if not region_info:
-            raise ValueError(f"Unknown region: {config.REGION}")
-
-        region_type = region_info["type"]
-
-        if region_type == "planet":
-            md5_url = "/photon-db-planet-0.7OS-latest.tar.bz2.md5"
-        elif region_type == "continent":
-            md5_url = f"/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2.md5"
-        elif region_type == "sub-region":
-            continent = region_info["continent"]
-            md5_url = f"/{continent}/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2.md5"
-        else:
-            raise ValueError(f"Invalid region type: {region_type}")
+    download_url = get_download_url()
+    if download_url.endswith(".jsonl.zst"):
+        output_file = "photon-data-dump.jsonl.zst.md5"
     else:
-        md5_url = "/photon-db-planet-0.7OS-latest.tar.bz2.md5"
+        output_file = "photon-db-latest.tar.bz2.md5"
+    download_url = f"{download_url}.md5"
 
-    download_url = config.BASE_URL + md5_url
-
-    output_file = "photon-db-latest.tar.bz2.md5"
     output = os.path.join(config.TEMP_DIR, output_file)
 
     if not download_file(download_url, output):

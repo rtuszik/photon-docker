@@ -13,6 +13,7 @@ RUN apt-get update \
   lbzip2 \
   gosu \
   python3.12 \
+  zstd \
   curl \
   && rm -rf /var/lib/apt/lists/*
 
