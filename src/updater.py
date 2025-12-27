@@ -1,9 +1,9 @@
 import sys
 
-from .downloader import parallel_update, sequential_update
-from .utils import config
-from .utils.logger import get_logger, setup_logging
-from .utils.notify import send_notification
+from src.downloader import parallel_update, sequential_update
+from src.utils import config
+from src.utils.logger import get_logger, setup_logging
+from src.utils.notify import send_notification
 
 logger = get_logger()
 

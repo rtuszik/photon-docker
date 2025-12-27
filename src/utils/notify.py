@@ -2,8 +2,8 @@
 
 import apprise
 
-from . import config
-from .logger import get_logger
+from src.utils import config
+from src.utils.logger import get_logger
 
 logging = get_logger()
 

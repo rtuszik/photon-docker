@@ -3,7 +3,7 @@ import logging.handlers
 import sys
 from pathlib import Path
 
-from . import config
+from src.utils import config
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
