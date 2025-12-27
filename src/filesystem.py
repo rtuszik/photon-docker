@@ -27,7 +27,7 @@ def extract_index(index_file: str):
 
     try:
         logging.debug("Starting extraction process...")
-        result = subprocess.run(install_command, shell=True, capture_output=True, text=True, check=True)
+        result = subprocess.run(install_command, shell=True, capture_output=True, text=True, check=True)  # noqa S602
         logging.debug("Extraction process completed successfully")
 
         if result.stdout:
@@ -153,7 +153,7 @@ def cleanup_backup_after_verification(target_dir: str) -> bool:
 
 
 def verify_checksum(md5_file, index_file):
-    hash_md5 = hashlib.md5()
+    hash_md5 = hashlib.md5()  # noqa S303
     try:
         with open(index_file, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
