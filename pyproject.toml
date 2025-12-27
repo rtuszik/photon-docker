@@ -2,7 +2,6 @@
 name = "photon-docker"
 version = "1.2.1"
 description = "Unofficial docker image for the Photon Geocoder"
-readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "apprise>=1.9.3",
