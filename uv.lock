@@ -151,7 +151,7 @@ wheels = [
 [[package]]
 name = "photon-docker"
 version = "1.2.1"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "apprise" },
     { name = "psutil" },

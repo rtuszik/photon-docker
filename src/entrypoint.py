@@ -1,11 +1,11 @@
 import os
 import sys
 
-from .downloader import InsufficientSpaceError, parallel_update, sequential_update
-from .utils import config
-from .utils.logger import get_logger, setup_logging
-from .utils.notify import send_notification
-from .utils.validate_config import validate_config
+from src.downloader import InsufficientSpaceError, parallel_update, sequential_update
+from src.utils import config
+from src.utils.logger import get_logger, setup_logging
+from src.utils.notify import send_notification
+from src.utils.validate_config import validate_config
 
 logger = get_logger()
 

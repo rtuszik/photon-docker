@@ -14,10 +14,9 @@ import schedule
 from requests.exceptions import RequestException
 
 from src.check_remote import compare_mtime
-
-from .filesystem import cleanup_backup_after_verification
-from .utils import config
-from .utils.logger import get_logger, setup_logging
+from src.filesystem import cleanup_backup_after_verification
+from src.utils import config
+from src.utils.logger import get_logger, setup_logging
 
 logger = get_logger()
 

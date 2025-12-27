@@ -1,8 +1,8 @@
 import re
 
-from . import config
-from .logger import get_logger
-from .regions import is_valid_region
+from src.utils import config
+from src.utils.logger import get_logger
+from src.utils.regions import is_valid_region
 
 logging = get_logger()
 
