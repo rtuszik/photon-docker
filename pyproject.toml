@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["bandit>=1.8.6", "ruff>=0.12.7", "ty>=0.0.1a16", "vulture>=2.14"]
+dev = ["ruff>=0.12.7", "ty>=0.0.1a16", "vulture>=2.14"]
 
 [build-system]
 requires = ["uv_build>=0.9.10"]
