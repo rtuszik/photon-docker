@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21.0.9_10-jre-noble
+FROM dhi.io/eclipse-temurin:21.0.9-debian13
 
 # install astral uv
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/
@@ -9,12 +9,12 @@ ARG PUID=9011
 ARG PGID=9011
 
 RUN apt-get update \
-  && apt-get -y install --no-install-recommends \
-  lbzip2 \
-  gosu \
-  python3.12 \
-  curl \
-  && rm -rf /var/lib/apt/lists/*
+    && apt-get -y install --no-install-recommends \
+    lbzip2 \
+    gosu \
+    python3.12 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g ${PGID} -o photon && \
     useradd -l -u ${PUID} -g photon -o -s /bin/false -m -d /photon photon
@@ -36,15 +36,15 @@ RUN chmod 644 /photon/photon.jar && \
     chown -R photon:photon /photon
 
 LABEL org.opencontainers.image.title="photon-docker" \
-      org.opencontainers.image.description="Unofficial docker image for the Photon Geocoder" \
-      org.opencontainers.image.url="https://github.com/rtuszik/photon-docker" \
-      org.opencontainers.image.source="https://github.com/rtuszik/photon-docker" \
-      org.opencontainers.image.documentation="https://github.com/rtuszik/photon-docker#readme"
+    org.opencontainers.image.description="Unofficial docker image for the Photon Geocoder" \
+    org.opencontainers.image.url="https://github.com/rtuszik/photon-docker" \
+    org.opencontainers.image.source="https://github.com/rtuszik/photon-docker" \
+    org.opencontainers.image.documentation="https://github.com/rtuszik/photon-docker#readme"
 
 EXPOSE 2322
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=240s --retries=3 \
-  CMD curl -f http://localhost:2322/status || exit 1
+    CMD curl -f http://localhost:2322/status || exit 1
 
 ENTRYPOINT ["/bin/sh", "entrypoint.sh"]
 CMD ["uv", "run", "-m", "src.process_manager"]
