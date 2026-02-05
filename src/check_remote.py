@@ -12,6 +12,10 @@ from src.utils.regions import get_region_info, normalize_region
 logging = get_logger()
 
 
+class RemoteFileSizeError(Exception):
+    pass
+
+
 def get_remote_file_size(url: str) -> int:
     try:
         response = requests.head(url, allow_redirects=True, timeout=15)
@@ -30,10 +34,12 @@ def get_remote_file_size(url: str) -> int:
             if total_size.isdigit():
                 return int(total_size)
 
-    except Exception as e:
-        logging.warning(f"Could not determine remote file size for {url}: {e}")
+        raise RemoteFileSizeError(f"Server did not return file size for {url}")
 
-    return 0
+    except RemoteFileSizeError:
+        raise
+    except Exception as e:
+        raise RemoteFileSizeError(f"Could not determine remote file size for {url}: {e}") from e
 
 
 def get_remote_time(remote_url: str):

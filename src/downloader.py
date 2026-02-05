@@ -8,7 +8,7 @@ import requests
 from requests.exceptions import RequestException
 from tqdm import tqdm
 
-from src.check_remote import get_local_time, get_remote_file_size
+from src.check_remote import RemoteFileSizeError, get_local_time, get_remote_file_size
 from src.filesystem import clear_temp_dir, extract_index, move_index, verify_checksum
 from src.utils import config
 from src.utils.logger import get_logger
@@ -194,14 +194,23 @@ def parallel_update():
         os.makedirs(config.TEMP_DIR, exist_ok=True)
 
         download_url = get_download_url()
-        file_size = get_remote_file_size(download_url)
 
-        if file_size > 0:
+        try:
+            file_size = get_remote_file_size(download_url)
             if not check_disk_space_requirements(file_size, is_parallel=True):
                 logging.error("Insufficient disk space for parallel update")
                 raise InsufficientSpaceError("Insufficient disk space for parallel update")
-        else:
-            logging.warning("Could not determine download size, proceeding without space check")
+        except RemoteFileSizeError as e:
+            if config.SKIP_SPACE_CHECK:
+                logging.warning(f"{e}")
+                logging.warning("SKIP_SPACE_CHECK is enabled, proceeding without space check")
+            else:
+                logging.error(f"{e}")
+                logging.error(
+                    "Cannot proceed without verifying disk space. "
+                    "Set SKIP_SPACE_CHECK=true to bypass this check (not recommended)."
+                )
+                raise
 
         logging.info("Downloading index")
 
@@ -246,14 +255,23 @@ def sequential_update():
         os.makedirs(config.TEMP_DIR, exist_ok=True)
 
         download_url = get_download_url()
-        file_size = get_remote_file_size(download_url)
 
-        if file_size > 0:
+        try:
+            file_size = get_remote_file_size(download_url)
             if not check_disk_space_requirements(file_size, is_parallel=False):
                 logging.error("Insufficient disk space for sequential update")
                 raise InsufficientSpaceError("Insufficient disk space for sequential update")
-        else:
-            logging.warning("Could not determine download size, proceeding without space check")
+        except RemoteFileSizeError as e:
+            if config.SKIP_SPACE_CHECK:
+                logging.warning(f"{e}")
+                logging.warning("SKIP_SPACE_CHECK is enabled, proceeding without space check")
+            else:
+                logging.error(f"{e}")
+                logging.error(
+                    "Cannot proceed without verifying disk space. "
+                    "Set SKIP_SPACE_CHECK=true to bypass this check (not recommended)."
+                )
+                raise
 
         logging.info("Downloading new index and MD5 checksum...")
         index_file = download_index()
