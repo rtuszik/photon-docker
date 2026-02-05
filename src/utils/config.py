@@ -13,6 +13,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 BASE_URL = os.getenv("BASE_URL", "https://r2.koalasec.org/public").rstrip("/")
 SKIP_MD5_CHECK = os.getenv("SKIP_MD5_CHECK", "False").lower() in ("true", "1", "t")
 INITIAL_DOWNLOAD = os.getenv("INITIAL_DOWNLOAD", "True").lower() in ("true", "1", "t")
+SKIP_SPACE_CHECK = os.getenv("SKIP_SPACE_CHECK", "False").lower() in ("true", "1", "t")
 APPRISE_URLS = os.getenv("APPRISE_URLS")
 
 # APP CONFIG
