@@ -90,6 +90,7 @@ class PhotonManager:
             logger.info(f"Starting Photon (attempt {attempt + 1}/{max_startup_retries})...")
             self.state = AppState.RUNNING
 
+            enable_metrics = config.ENABLE_METRICS or ""
             java_params = config.JAVA_PARAMS or ""
             photon_params = config.PHOTON_PARAMS or ""
 
@@ -107,6 +108,9 @@ class PhotonManager:
                 cmd.extend(shlex.split(java_params))
 
             cmd.extend(["-jar", "/photon/photon.jar", "-data-dir", config.DATA_DIR])
+
+            if enable_metrics:
+                cmd.extend(["-metrics-enable", "prometheus"])
 
             if photon_params:
                 cmd.extend(shlex.split(photon_params))
