@@ -13,6 +13,10 @@ on:
     release:
         types: [published]
 
+    push:
+        branches:
+            - dev
+
 jobs:
     build-and-push:
         runs-on: ubuntu-latest
@@ -60,14 +64,16 @@ jobs:
                   if [ "${{ github.event_name }}" == "release" ]; then
                     CONTAINER_VERSION="${{ github.event.release.tag_name }}"
                     CONTAINER_VERSION="${CONTAINER_VERSION#v}"
-
                     IS_PRERELEASE="${{ github.event.release.prerelease }}"
+                  elif [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+                    SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+                    CONTAINER_VERSION="dev-${SHORT_SHA}"
+                    IS_PRERELEASE="true"
                   elif [ "${{ github.event_name }}" == "pull_request" ]; then
                     CONTAINER_VERSION="pr-${{ github.event.pull_request.number }}"
                     IS_PRERELEASE="true"
                   else
                     CONTAINER_VERSION="${{ github.event.inputs.container_version }}"
-
                     CONTAINER_VERSION="${CONTAINER_VERSION#v}"
 
                     if [[ "$CONTAINER_VERSION" == *"-beta"* ]]; then
@@ -97,11 +103,11 @@ jobs:
 
                   TAGS="$DOCKERHUB_REPO:$CONTAINER_VERSION,$GHCR_REPO:$CONTAINER_VERSION"
 
-
-                  if [ "$IS_PRERELEASE" == "true" ]; then
+                  if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+                    TAGS="$TAGS,$DOCKERHUB_REPO:dev,$GHCR_REPO:dev"
+                  elif [ "$IS_PRERELEASE" == "true" ]; then
                     TAGS="$TAGS,$DOCKERHUB_REPO:beta,$GHCR_REPO:beta"
                   else
-
                     if [[ "$CONTAINER_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
                       MAJOR="${BASH_REMATCH[1]}"
                       MINOR="${BASH_REMATCH[2]}"
