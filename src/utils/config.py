@@ -18,6 +18,9 @@ SKIP_SPACE_CHECK = os.getenv("SKIP_SPACE_CHECK", "False").lower() in ("true", "1
 APPRISE_URLS = os.getenv("APPRISE_URLS")
 
 # APP CONFIG
+INDEX_DB_VERSION = "1.0"
+INDEX_FILE_EXTENSION = "tar.bz2"
+
 PHOTON_DIR = "/photon"
 DATA_DIR = "/photon/data"
 PHOTON_DATA_DIR = os.path.join(DATA_DIR, "photon_data")
