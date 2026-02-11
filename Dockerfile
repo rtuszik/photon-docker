@@ -23,7 +23,22 @@ WORKDIR /photon
 
 RUN mkdir -p /photon/data/
 
-ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-opensearch-${PHOTON_VERSION}.jar /photon/photon.jar
+# 1. Install curl (required for the conditional download)
+# 2. Compare versions: if PHOTON_VERSION >= 1.0.0, use the new naming
+RUN apt-get update && apt-get install -y curl && \
+    VERSION_CHECK=$(printf '%s\n1.0.0\n' "$PHOTON_VERSION" | sort -V | head -n1) && \
+    if [ "$VERSION_CHECK" = "1.0.0" ]; then \
+        # Condition: PHOTON_VERSION is 1.0.0 or newer
+        FILE_NAME="photon-${PHOTON_VERSION}.jar"; \
+    else \
+        # Condition: PHOTON_VERSION is older than 1.0.0
+        FILE_NAME="photon-opensearch-${PHOTON_VERSION}.jar"; \
+    fi && \
+    URL="https://github.com{PHOTON_VERSION}/${FILE_NAME}" && \
+    mkdir -p /photon && \
+    curl -L "$URL" -o /photon/photon.jar && \
+    # Clean up apt to keep the image slim
+    apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 COPY src/ ./src/
 COPY entrypoint.sh .
