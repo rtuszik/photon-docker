@@ -106,7 +106,7 @@ class PhotonManager:
             if java_params:
                 cmd.extend(shlex.split(java_params))
 
-            cmd.extend(["-jar", "/photon/photon.jar", "-data-dir", config.DATA_DIR])
+            cmd.extend(["-jar", "/photon/photon.jar", "serve", "-data-dir", config.DATA_DIR])
 
             if photon_params:
                 cmd.extend(shlex.split(photon_params))

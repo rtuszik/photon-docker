@@ -7,7 +7,7 @@ from requests.exceptions import RequestException
 
 from src.utils import config
 from src.utils.logger import get_logger
-from src.utils.regions import get_region_info, normalize_region
+from src.utils.regions import get_index_url_path
 
 logging = get_logger()
 
@@ -59,29 +59,13 @@ def get_local_time(local_path: str):
 
 
 def compare_mtime() -> bool:
-    if config.REGION:
-        normalized = normalize_region(config.REGION)
-        region_info = get_region_info(config.REGION)
-        if not region_info:
-            logging.error(f"Unknown region: {config.REGION}")
-            return False
+    try:
+        index_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION)
+    except ValueError as e:
+        logging.error(str(e))
+        return False
 
-        region_type = region_info["type"]
-
-        if region_type == "planet":
-            index_file = "/photon-db-planet-0.7OS-latest.tar.bz2"
-        elif region_type == "continent":
-            index_file = f"/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
-        elif region_type == "sub-region":
-            continent = region_info["continent"]
-            index_file = f"/{continent}/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
-        else:
-            logging.error(f"Invalid region type: {region_type}")
-            return False
-    else:
-        index_file = "/photon-db-planet-0.7OS-latest.tar.bz2"
-
-    remote_url = config.BASE_URL + index_file
+    remote_url = config.BASE_URL + index_path
 
     remote_dt = get_remote_time(remote_url)
 
