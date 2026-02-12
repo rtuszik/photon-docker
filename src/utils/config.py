@@ -7,6 +7,7 @@ REGION = os.getenv("REGION")
 FORCE_UPDATE = os.getenv("FORCE_UPDATE", "False").lower() in ("true", "1", "t")
 DOWNLOAD_MAX_RETRIES = os.getenv("DOWNLOAD_MAX_RETRIES", "3")
 FILE_URL = os.getenv("FILE_URL")
+MD5_URL = os.getenv("MD5_URL")
 PHOTON_PARAMS = os.getenv("PHOTON_PARAMS")
 ENABLE_METRICS = os.getenv("ENABLE_METRICS", "False").lower() in ("true", "1", "t")
 JAVA_PARAMS = os.getenv("JAVA_PARAMS")
@@ -26,3 +27,11 @@ DATA_DIR = "/photon/data"
 PHOTON_DATA_DIR = os.path.join(DATA_DIR, "photon_data")
 TEMP_DIR = os.path.join(DATA_DIR, "temp")
 OS_NODE_DIR = os.path.join(PHOTON_DATA_DIR, "node_1")
+
+# Sanitise and extend config
+if FILE_URL:
+    # Force update strategy to disabled.
+    UPDATE_STRATEGY = "DISABLED"
+    if not MD5_URL:
+        # MD5 URL not provided. Override SKIP_MD5_CHECK.
+        SKIP_MD5_CHECK = True
