@@ -6,6 +6,7 @@ from src.utils import config
 from src.utils.logger import get_logger, setup_logging
 from src.utils.notify import send_notification
 from src.utils.validate_config import validate_config
+from src.utils.sanitise import sanitise_url
 
 logger = get_logger()
 
@@ -20,14 +21,20 @@ def main():
     logger.info(f"REGION: {config.REGION}")
     logger.info(f"FORCE_UPDATE: {config.FORCE_UPDATE}")
     logger.info(f"DOWNLOAD_MAX_RETRIES: {config.DOWNLOAD_MAX_RETRIES}")
-    # TODO ## some people may use HTTP Basic Auth in URL. Only debug log for now, possbily think of solution later. Same goes for BASE_URL, though less likely
-    logger.debug(f"FILE_URL: {config.FILE_URL}")
+    logger.info(f"FILE_URL (sanitised): {sanitise_url(config.FILE_URL)}")
+    logger.info(f"MD5_URL (sanitised): {sanitise_url(config.MD5_URL)}")
     logger.info(f"PHOTON_PARAMS: {config.PHOTON_PARAMS}")
+    logger.info(f"ENABLE_METRICS: {config.ENABLE_METRICS}")
     logger.info(f"JAVA_PARAMS: {config.JAVA_PARAMS}")
     logger.info(f"LOG_LEVEL: {config.LOG_LEVEL}")
     logger.info(f"BASE_URL: {config.BASE_URL}")
     logger.info(f"SKIP_MD5_CHECK: {config.SKIP_MD5_CHECK}")
     logger.info(f"INITIAL_DOWNLOAD: {config.INITIAL_DOWNLOAD}")
+    logger.info(f"SKIP_SPACE_CHECK: {config.SKIP_SPACE_CHECK}")
+    if config.APPRISE_URLS:
+        logger.info(f"APPRISE_URLS: REDACTED")
+    else:
+        logger.info(f"APPRISE_URLS: UNSET")
 
     logger.info("=== END CONFIG VARIABLES ===")
 
