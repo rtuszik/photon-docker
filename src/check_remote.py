@@ -69,17 +69,17 @@ def compare_mtime() -> bool:
         region_type = region_info["type"]
 
         if region_type == "planet":
-            index_file = "/photon-db-planet-0.7OS-latest.tar.bz2"
+            index_file = "/photon-db-planet-1.0-latest.tar.bz2"
         elif region_type == "continent":
-            index_file = f"/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
+            index_file = f"/{normalized}/photon-db-{normalized}-1.0-latest.tar.bz2"
         elif region_type == "sub-region":
             continent = region_info["continent"]
-            index_file = f"/{continent}/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
+            index_file = f"/{continent}/{normalized}/photon-db-{normalized}-1.0-latest.tar.bz2"
         else:
             logging.error(f"Invalid region type: {region_type}")
             return False
     else:
-        index_file = "/photon-db-planet-0.7OS-latest.tar.bz2"
+        index_file = "/photon-db-planet-1.0-latest.tar.bz2"
 
     remote_url = config.BASE_URL + index_file
 
