@@ -163,16 +163,16 @@ def get_download_url() -> str:
         region_type = region_info["type"]
 
         if region_type == "planet":
-            index_url = "/photon-db-planet-0.7OS-latest.tar.bz2"
+            index_url = "/photon-db-planet-1.0-latest.tar.bz2"
         elif region_type == "continent":
-            index_url = f"/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
+            index_url = f"/{normalized}/photon-db-{normalized}-1.0-latest.tar.bz2"
         elif region_type == "sub-region":
             continent = region_info["continent"]
-            index_url = f"/{continent}/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
+            index_url = f"/{continent}/{normalized}/photon-db-{normalized}-1.0-latest.tar.bz2"
         else:
             raise ValueError(f"Invalid region type: {region_type}")
     else:
-        index_url = "/photon-db-planet-0.7OS-latest.tar.bz2"
+        index_url = "/photon-db-planet-1.0-latest.tar.bz2"
 
     return config.BASE_URL + index_url
 
@@ -305,16 +305,16 @@ def download_md5():
         region_type = region_info["type"]
 
         if region_type == "planet":
-            md5_url = "/photon-db-planet-0.7OS-latest.tar.bz2.md5"
+            md5_url = "/photon-db-planet-1.0-latest.tar.bz2.md5"
         elif region_type == "continent":
-            md5_url = f"/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2.md5"
+            md5_url = f"/{normalized}/photon-db-{normalized}-1.0-latest.tar.bz2.md5"
         elif region_type == "sub-region":
             continent = region_info["continent"]
-            md5_url = f"/{continent}/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2.md5"
+            md5_url = f"/{continent}/{normalized}/photon-db-{normalized}-1.0-latest.tar.bz2.md5"
         else:
             raise ValueError(f"Invalid region type: {region_type}")
     else:
-        md5_url = "/photon-db-planet-0.7OS-latest.tar.bz2.md5"
+        md5_url = "/photon-db-planet-1.0-latest.tar.bz2.md5"
 
     download_url = config.BASE_URL + md5_url
 
