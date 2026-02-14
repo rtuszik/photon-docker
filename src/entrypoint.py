@@ -5,8 +5,8 @@ from src.downloader import InsufficientSpaceError, parallel_update, sequential_u
 from src.utils import config
 from src.utils.logger import get_logger, setup_logging
 from src.utils.notify import send_notification
+from src.utils.sanitize import sanitize_url
 from src.utils.validate_config import validate_config
-from src.utils.sanitise import sanitise_url
 
 logger = get_logger()
 
@@ -21,8 +21,8 @@ def main():
     logger.info(f"REGION: {config.REGION}")
     logger.info(f"FORCE_UPDATE: {config.FORCE_UPDATE}")
     logger.info(f"DOWNLOAD_MAX_RETRIES: {config.DOWNLOAD_MAX_RETRIES}")
-    logger.info(f"FILE_URL (sanitised): {sanitise_url(config.FILE_URL)}")
-    logger.info(f"MD5_URL (sanitised): {sanitise_url(config.MD5_URL)}")
+    logger.info(f"FILE_URL (sanitized): {sanitize_url(config.FILE_URL)}")
+    logger.info(f"MD5_URL (sanitized): {sanitize_url(config.MD5_URL)}")
     logger.info(f"PHOTON_PARAMS: {config.PHOTON_PARAMS}")
     logger.info(f"ENABLE_METRICS: {config.ENABLE_METRICS}")
     logger.info(f"JAVA_PARAMS: {config.JAVA_PARAMS}")
@@ -32,9 +32,9 @@ def main():
     logger.info(f"INITIAL_DOWNLOAD: {config.INITIAL_DOWNLOAD}")
     logger.info(f"SKIP_SPACE_CHECK: {config.SKIP_SPACE_CHECK}")
     if config.APPRISE_URLS:
-        logger.info(f"APPRISE_URLS: REDACTED")
+        logger.info("APPRISE_URLS: REDACTED")
     else:
-        logger.info(f"APPRISE_URLS: UNSET")
+        logger.info("APPRISE_URLS: UNSET")
 
     logger.info("=== END CONFIG VARIABLES ===")
 
