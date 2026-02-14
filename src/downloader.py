@@ -13,7 +13,7 @@ from src.filesystem import clear_temp_dir, extract_index, move_index, verify_che
 from src.utils import config
 from src.utils.logger import get_logger
 from src.utils.regions import get_index_url_path
-from src.utils.sanitise import sanitise_url
+from src.utils.sanitize import sanitize_url
 
 
 class InsufficientSpaceError(Exception):
@@ -153,7 +153,7 @@ def supports_range_requests(url: str) -> bool:
 
 def get_download_url() -> str:
     if config.FILE_URL:
-        logging.info("Using custom FILE_URL for download: %s", sanitise_url(config.FILE_URL))
+        logging.info("Using custom FILE_URL for download: %s", sanitize_url(config.FILE_URL))
         return config.FILE_URL
 
     index_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION)
@@ -301,7 +301,7 @@ def download_index() -> str:
 def download_md5():
     if config.MD5_URL:
         # MD5 URL provided, use it directly.
-        logging.info("Using custom MD5_URL for checksum: %s", sanitise_url(config.MD5_URL))
+        logging.info("Using custom MD5_URL for checksum: %s", sanitize_url(config.MD5_URL))
         download_url = config.MD5_URL
     else:
         md5_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION) + ".md5"
@@ -312,7 +312,7 @@ def download_md5():
     output = os.path.join(config.TEMP_DIR, output_file)
 
     if not download_file(download_url, output):
-        raise Exception(f"Failed to download MD5 checksum from {sanitise_url(download_url)}")
+        raise Exception(f"Failed to download MD5 checksum from {sanitize_url(download_url)}")
 
     return output
 
