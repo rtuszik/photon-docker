@@ -23,7 +23,7 @@ WORKDIR /photon
 
 RUN mkdir -p /photon/data/
 
-ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-opensearch-${PHOTON_VERSION}.jar /photon/photon.jar
+ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-${PHOTON_VERSION}.jar /photon/photon.jar
 
 COPY src/ ./src/
 COPY entrypoint.sh .

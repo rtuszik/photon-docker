@@ -8,11 +8,12 @@ import requests
 from requests.exceptions import RequestException
 from tqdm import tqdm
 
-from src.check_remote import get_local_time, get_remote_file_size
+from src.check_remote import RemoteFileSizeError, get_local_time, get_remote_file_size
 from src.filesystem import clear_temp_dir, extract_index, move_index, verify_checksum
 from src.utils import config
 from src.utils.logger import get_logger
-from src.utils.regions import get_region_info, normalize_region
+from src.utils.regions import get_index_url_path
+from src.utils.sanitize import sanitize_url
 
 
 class InsufficientSpaceError(Exception):
@@ -152,29 +153,13 @@ def supports_range_requests(url: str) -> bool:
 
 def get_download_url() -> str:
     if config.FILE_URL:
+        logging.info("Using custom FILE_URL for download: %s", sanitize_url(config.FILE_URL))
         return config.FILE_URL
 
-    if config.REGION:
-        normalized = normalize_region(config.REGION)
-        region_info = get_region_info(config.REGION)
-        if not region_info:
-            raise ValueError(f"Unknown region: {config.REGION}")
-
-        region_type = region_info["type"]
-
-        if region_type == "planet":
-            index_url = "/photon-db-planet-0.7OS-latest.tar.bz2"
-        elif region_type == "continent":
-            index_url = f"/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
-        elif region_type == "sub-region":
-            continent = region_info["continent"]
-            index_url = f"/{continent}/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2"
-        else:
-            raise ValueError(f"Invalid region type: {region_type}")
-    else:
-        index_url = "/photon-db-planet-0.7OS-latest.tar.bz2"
-
-    return config.BASE_URL + index_url
+    index_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION)
+    download_url = config.BASE_URL + index_path
+    logging.info("Using constructed location for download: %s", download_url)
+    return download_url
 
 
 def parallel_update():
@@ -194,14 +179,23 @@ def parallel_update():
         os.makedirs(config.TEMP_DIR, exist_ok=True)
 
         download_url = get_download_url()
-        file_size = get_remote_file_size(download_url)
 
-        if file_size > 0:
+        try:
+            file_size = get_remote_file_size(download_url)
             if not check_disk_space_requirements(file_size, is_parallel=True):
                 logging.error("Insufficient disk space for parallel update")
                 raise InsufficientSpaceError("Insufficient disk space for parallel update")
-        else:
-            logging.warning("Could not determine download size, proceeding without space check")
+        except RemoteFileSizeError as e:
+            if config.SKIP_SPACE_CHECK:
+                logging.warning(f"{e}")
+                logging.warning("SKIP_SPACE_CHECK is enabled, proceeding without space check")
+            else:
+                logging.error(f"{e}")
+                logging.error(
+                    "Cannot proceed without verifying disk space. "
+                    "Set SKIP_SPACE_CHECK=true to bypass this check (not recommended)."
+                )
+                raise
 
         logging.info("Downloading index")
 
@@ -246,14 +240,23 @@ def sequential_update():
         os.makedirs(config.TEMP_DIR, exist_ok=True)
 
         download_url = get_download_url()
-        file_size = get_remote_file_size(download_url)
 
-        if file_size > 0:
+        try:
+            file_size = get_remote_file_size(download_url)
             if not check_disk_space_requirements(file_size, is_parallel=False):
                 logging.error("Insufficient disk space for sequential update")
                 raise InsufficientSpaceError("Insufficient disk space for sequential update")
-        else:
-            logging.warning("Could not determine download size, proceeding without space check")
+        except RemoteFileSizeError as e:
+            if config.SKIP_SPACE_CHECK:
+                logging.warning(f"{e}")
+                logging.warning("SKIP_SPACE_CHECK is enabled, proceeding without space check")
+            else:
+                logging.error(f"{e}")
+                logging.error(
+                    "Cannot proceed without verifying disk space. "
+                    "Set SKIP_SPACE_CHECK=true to bypass this check (not recommended)."
+                )
+                raise
 
         logging.info("Downloading new index and MD5 checksum...")
         index_file = download_index()
@@ -281,7 +284,7 @@ def sequential_update():
 
 
 def download_index() -> str:
-    output_file = "photon-db-latest.tar.bz2"
+    output_file = f"photon-db-latest.{config.INDEX_FILE_EXTENSION}"
     download_url = get_download_url()
 
     output = os.path.join(config.TEMP_DIR, output_file)
@@ -296,33 +299,20 @@ def download_index() -> str:
 
 
 def download_md5():
-    if config.REGION:
-        normalized = normalize_region(config.REGION)
-        region_info = get_region_info(config.REGION)
-        if not region_info:
-            raise ValueError(f"Unknown region: {config.REGION}")
-
-        region_type = region_info["type"]
-
-        if region_type == "planet":
-            md5_url = "/photon-db-planet-0.7OS-latest.tar.bz2.md5"
-        elif region_type == "continent":
-            md5_url = f"/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2.md5"
-        elif region_type == "sub-region":
-            continent = region_info["continent"]
-            md5_url = f"/{continent}/{normalized}/photon-db-{normalized}-0.7OS-latest.tar.bz2.md5"
-        else:
-            raise ValueError(f"Invalid region type: {region_type}")
+    if config.MD5_URL:
+        # MD5 URL provided, use it directly.
+        logging.info("Using custom MD5_URL for checksum: %s", sanitize_url(config.MD5_URL))
+        download_url = config.MD5_URL
     else:
-        md5_url = "/photon-db-planet-0.7OS-latest.tar.bz2.md5"
+        md5_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION) + ".md5"
+        download_url = config.BASE_URL + md5_path
+        logging.info("Using constructed URL for checksum: %s", download_url)
 
-    download_url = config.BASE_URL + md5_url
-
-    output_file = "photon-db-latest.tar.bz2.md5"
+    output_file = f"photon-db-latest.{config.INDEX_FILE_EXTENSION}.md5"
     output = os.path.join(config.TEMP_DIR, output_file)
 
     if not download_file(download_url, output):
-        raise Exception(f"Failed to download MD5 checksum from {download_url}")
+        raise Exception(f"Failed to download MD5 checksum from {sanitize_url(download_url)}")
 
     return output
 
