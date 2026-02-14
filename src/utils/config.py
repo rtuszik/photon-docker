@@ -28,10 +28,7 @@ PHOTON_DATA_DIR = os.path.join(DATA_DIR, "photon_data")
 TEMP_DIR = os.path.join(DATA_DIR, "temp")
 OS_NODE_DIR = os.path.join(PHOTON_DATA_DIR, "node_1")
 
-# Sanitise and extend config
 if FILE_URL:
-    # Force update strategy to disabled.
     UPDATE_STRATEGY = "DISABLED"
     if not MD5_URL:
-        # MD5 URL not provided. Override SKIP_MD5_CHECK.
         SKIP_MD5_CHECK = True
