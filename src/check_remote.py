@@ -95,3 +95,31 @@ def compare_mtime() -> bool:
         logging.debug("Using directory timestamp - applying 144-hour grace period")
         grace_period = datetime.timedelta(hours=144)
         return remote_dt > (local_dt + grace_period)
+
+
+def check_index_age() -> bool:
+    if not config.MIN_INDEX_DATE:
+        return True
+
+    try:
+        min_date = datetime.datetime.strptime(config.MIN_INDEX_DATE, "%d.%m.%y").replace(tzinfo=datetime.UTC)
+    except ValueError:
+        logging.warning(f"Invalid MIN_INDEX_DATE format: {config.MIN_INDEX_DATE}. Expected DD.MM.YY")
+        return True
+
+    local_timestamp = get_local_time(config.OS_NODE_DIR)
+    if local_timestamp == 0.0:
+        logging.info("No local index found, update required")
+        return True
+
+    local_dt = datetime.datetime.fromtimestamp(local_timestamp, tz=datetime.UTC)
+
+    logging.debug(f"Local index date: {local_dt.date()}")
+    logging.debug(f"Minimum required date: {min_date.date()}")
+
+    if local_dt < min_date:
+        logging.info(f"Local index ({local_dt.date()}) is older than minimum required ({min_date.date()})")
+        return True
+
+    logging.info(f"Local index ({local_dt.date()}) meets minimum date requirement ({min_date.date()})")
+    return False
