@@ -1,6 +1,7 @@
 import os
 import sys
 
+from src.check_remote import check_index_age
 from src.downloader import InsufficientSpaceError, parallel_update, sequential_update
 from src.utils import config
 from src.utils.logger import get_logger, setup_logging
@@ -44,6 +45,9 @@ def main():
         logger.error(f"Stopping due to invalid configuration.\n{e}")
         sys.exit(1)
 
+    if config.MIN_INDEX_DATE:
+        logger.info(f"MIN_INDEX_DATE: {config.MIN_INDEX_DATE}")
+
     if config.FORCE_UPDATE:
         logger.info("Starting forced update")
         try:
@@ -72,6 +76,18 @@ def main():
             sys.exit(75)
     else:
         logger.info("Existing index found, skipping download")
+
+        if config.MIN_INDEX_DATE and check_index_age():
+            logger.info("Index is older than minimum required date, starting sequential update")
+            try:
+                sequential_update()
+            except InsufficientSpaceError as e:
+                logger.error(f"Cannot proceed with minimum date update: {e}")
+                send_notification(f"Photon-Docker minimum date update failed: {e}")
+                sys.exit(75)
+            except Exception:
+                logger.error("Minimum date update failed")
+                raise
 
 
 if __name__ == "__main__":

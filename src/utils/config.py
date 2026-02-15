@@ -17,6 +17,7 @@ SKIP_MD5_CHECK = os.getenv("SKIP_MD5_CHECK", "False").lower() in ("true", "1", "
 INITIAL_DOWNLOAD = os.getenv("INITIAL_DOWNLOAD", "True").lower() in ("true", "1", "t")
 SKIP_SPACE_CHECK = os.getenv("SKIP_SPACE_CHECK", "False").lower() in ("true", "1", "t")
 APPRISE_URLS = os.getenv("APPRISE_URLS")
+MIN_INDEX_DATE = os.getenv("MIN_INDEX_DATE", "10.02.26")
 
 # APP CONFIG
 INDEX_DB_VERSION = "1.0"
