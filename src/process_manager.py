@@ -79,7 +79,7 @@ class PhotonManager:
 
     def run_initial_setup(self):
         logger.info("Running initial setup...")
-        result = subprocess.run(["uv", "run", "-m", "src.entrypoint", "setup"], check=False, cwd="/photon")  # noqa S603
+        result = subprocess.run(["uv", "run", "--no-sync", "-m", "src.entrypoint", "setup"], check=False, cwd="/photon")  # noqa S603
 
         if result.returncode != 0:
             logger.error("Setup failed!")
@@ -208,7 +208,7 @@ class PhotonManager:
         if config.UPDATE_STRATEGY == "SEQUENTIAL":
             self.stop_photon()
 
-        result = subprocess.run(["uv", "run", "-m", "src.updater"], check=False, cwd="/photon")  # noqa S603
+        result = subprocess.run(["uv", "run", "--no-sync", "-m", "src.updater"], check=False, cwd="/photon")  # noqa S603
 
         if result.returncode == 0:
             logger.info("Update process completed, verifying Photon health...")
