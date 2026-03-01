@@ -9,10 +9,10 @@
 #       java -jar photon.jar import \
 #         -transport-addresses opensearch:9200 \
 #         -nominatim-db <dsn>
-#   - Import from a photon JSON dump:
+#   - Import from a photon JSON dump (JSONL format):
 #       java -jar photon.jar import \
 #         -transport-addresses opensearch:9200 \
-#         -json-dump <path>
+#         -import-file <path>
 #   - Restore an OpenSearch snapshot that contains the "photon" index.
 
 services:

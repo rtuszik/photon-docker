@@ -17,8 +17,6 @@ on:
 jobs:
     test-external-opensearch:
         runs-on: ubuntu-latest
-        env:
-            BASE_URL: "https://r2.koalasec.org/public"
 
         steps:
             - name: Checkout Repository
@@ -55,39 +53,15 @@ jobs:
             - name: Create Docker network
               run: docker network create photon-ext-os-test
 
-            - name: Download and extract Andorra index
-              run: |
-                  INDEX_DB_VERSION="1.0"
-                  FILE_NAME="photon-db-andorra-${INDEX_DB_VERSION}-latest.tar.bz2"
-                  DOWNLOAD_URL="${BASE_URL}/europe/andorra/${FILE_NAME}"
-
-                  echo "Downloading Andorra index from ${DOWNLOAD_URL}..."
-                  mkdir -p /tmp/photon-data
-                  wget -q "${DOWNLOAD_URL}" -O "/tmp/${FILE_NAME}"
-                  tar -xjf "/tmp/${FILE_NAME}" -C /tmp/photon-data
-                  echo "Index extracted to /tmp/photon-data"
-                  ls -la /tmp/photon-data/
-
-            - name: Prepare OpenSearch data directory
-              run: |
-                  # Remap photon's node_1/ to OpenSearch standalone's nodes/0/
-                  mkdir -p /tmp/os-data/nodes/0
-                  cp -r /tmp/photon-data/photon_data/node_1/. /tmp/os-data/nodes/0/
-                  # OpenSearch container runs as uid 1000
-                  chmod -R 777 /tmp/os-data
-                  echo "OpenSearch data directory prepared:"
-                  ls -laR /tmp/os-data/nodes/0/ | head -20
-
             - name: Start OpenSearch
               run: |
                   docker run -d \
                     --name opensearch-test \
                     --network photon-ext-os-test \
                     -p 9200:9200 \
-                    -v /tmp/os-data:/usr/share/opensearch/data \
                     -e "discovery.type=single-node" \
                     -e "DISABLE_SECURITY_PLUGIN=true" \
-                    -e "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m -Des.gateway.auto_import_dangling_indices=true" \
+                    -e "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" \
                     opensearchproject/opensearch:3.0.0
 
             - name: Wait for OpenSearch cluster health
@@ -113,32 +87,30 @@ jobs:
                     exit 1
                   fi
 
-            - name: Wait for photon index
+            - name: Import test data into OpenSearch via photon
               run: |
-                  echo "Waiting for photon index to appear (timeout: 120s)..."
-                  SECONDS=0
-                  TIMEOUT=120
+                  # Create a minimal Nominatim dump file (JSONL format)
+                  cat > /tmp/photon-dump.jsonl << 'DUMP'
+                  {"type":"NominatimDumpFile","content":{"version":"0.1.0","data_timestamp":"2025-01-01T00:00:00Z"}}
+                  {"type":"Place","place_id":1,"object_type":"R","object_id":9407,"osm_key":"place","osm_value":"country","name":{"default":"Andorra"},"country_code":"ad","centroid":[1.5218,42.5063],"importance":0.63527,"address_type":"country"}
+                  {"type":"Place","place_id":2,"object_type":"N","object_id":4929848842,"osm_key":"place","osm_value":"city","name":{"default":"Andorra la Vella"},"country_code":"ad","centroid":[1.5209,42.5076],"importance":0.45,"address_type":"city","address":{"country":{"name":{"default":"Andorra"}}}}
+                  DUMP
 
-                  while [ $SECONDS -lt $TIMEOUT ]; do
-                    if curl -sf "http://localhost:9200/photon" > /dev/null 2>&1; then
-                      echo "Photon index found after ${SECONDS}s"
-                      curl -s "http://localhost:9200/_cat/indices?v"
-                      break
-                    fi
-                    echo "Waiting for photon index... (elapsed: ${SECONDS}s)"
-                    sleep 5
-                    SECONDS=$((SECONDS + 5))
-                  done
+                  echo "Importing test data into OpenSearch using photon.jar..."
+                  docker run --rm \
+                    --network photon-ext-os-test \
+                    --entrypoint java \
+                    -v /tmp/photon-dump.jsonl:/tmp/dump.jsonl \
+                    photon-test:ext-os-${{ github.event.pull_request.number }} \
+                    --add-modules jdk.incubator.vector \
+                    --enable-native-access=ALL-UNNAMED \
+                    -jar /photon/photon.jar import \
+                    -transport-addresses opensearch-test:9200 \
+                    -import-file /tmp/dump.jsonl
 
-                  if [ $SECONDS -ge $TIMEOUT ]; then
-                    echo "Photon index did not appear within ${TIMEOUT}s"
-                    echo "OpenSearch indices:"
-                    curl -s "http://localhost:9200/_cat/indices?v" || true
-                    echo "Dangling indices:"
-                    curl -s "http://localhost:9200/_dangling" || true
-                    docker logs opensearch-test
-                    exit 1
-                  fi
+                  echo "Import complete. Verifying index:"
+                  curl -s "http://localhost:9200/_cat/indices?v"
+                  curl -s "http://localhost:9200/photon/_count" | python3 -m json.tool
 
             - name: Start photon container
               run: |
@@ -146,7 +118,6 @@ jobs:
                     --name photon-ext-os-test \
                     --network photon-ext-os-test \
                     -e OPENSEARCH_TRANSPORT_ADDRESSES=opensearch-test:9200 \
-                    -e OPENSEARCH_CLUSTER=photon \
                     photon-test:ext-os-${{ github.event.pull_request.number }}
 
             - name: Wait for photon to be healthy
