@@ -284,8 +284,11 @@ def sequential_update():
 
 
 def download_index() -> str:
-    output_file = f"photon-db-latest.{config.INDEX_FILE_EXTENSION}"
     download_url = get_download_url()
+    if download_url.endswith(".jsonl.zst"):
+        output_file = "photon-data-dump.jsonl.zst"
+    else:
+        output_file = f"photon-db-latest.{config.INDEX_FILE_EXTENSION}"
 
     output = os.path.join(config.TEMP_DIR, output_file)
 
@@ -304,11 +307,15 @@ def download_md5():
         logging.info("Using custom MD5_URL for checksum: %s", sanitize_url(config.MD5_URL))
         download_url = config.MD5_URL
     else:
-        md5_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION) + ".md5"
-        download_url = config.BASE_URL + md5_path
+        index_url = get_download_url()
+        download_url = f"{index_url}.md5"
         logging.info("Using constructed URL for checksum: %s", download_url)
 
-    output_file = f"photon-db-latest.{config.INDEX_FILE_EXTENSION}.md5"
+    index_url = get_download_url()
+    if index_url.endswith(".jsonl.zst"):
+        output_file = "photon-data-dump.jsonl.zst.md5"
+    else:
+        output_file = f"photon-db-latest.{config.INDEX_FILE_EXTENSION}.md5"
     output = os.path.join(config.TEMP_DIR, output_file)
 
     if not download_file(download_url, output):

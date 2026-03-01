@@ -11,6 +11,7 @@ ARG PGID=9011
 RUN apt-get update \
   && apt-get -y install --no-install-recommends \
   lbzip2 \
+  zstd \
   gosu \
   python3.12 \
   curl \

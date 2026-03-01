@@ -22,7 +22,10 @@ def extract_index(index_file: str):
         logging.debug(f"Creating temp directory: {config.TEMP_DIR}")
         os.makedirs(config.TEMP_DIR, exist_ok=True)
 
-    install_command = f"lbzip2 -d -c {index_file} | tar x -C {config.TEMP_DIR}"
+    if index_file.endswith(".jsonl.zst"):
+        install_command = f"zstd --stdout -d {index_file} | java -jar /photon/photon.jar -nominatim-import -import-file - -data-dir {config.TEMP_DIR} {config.BUILD_PHOTON_PARAMS}"
+    else:
+        install_command = f"lbzip2 -d -c {index_file} | tar x -C {config.TEMP_DIR}"
     logging.debug(f"Extraction command: {install_command}")
 
     try:
