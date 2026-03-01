@@ -59,7 +59,7 @@ jobs:
               run: |
                   INDEX_DB_VERSION="1.0"
                   FILE_NAME="photon-db-andorra-${INDEX_DB_VERSION}-latest.tar.bz2"
-                  DOWNLOAD_URL="${BASE_URL}/${FILE_NAME}"
+                  DOWNLOAD_URL="${BASE_URL}/europe/andorra/${FILE_NAME}"
 
                   echo "Downloading Andorra index from ${DOWNLOAD_URL}..."
                   mkdir -p /tmp/photon-data
