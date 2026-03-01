@@ -25,6 +25,12 @@ def validate_config():
     if config.REGION and not is_valid_region(config.REGION):
         error_messages.append(f"Invalid REGION: '{config.REGION}'. Must be a valid continent, sub-region, or 'planet'.")
 
+    if config.OPENSEARCH_TRANSPORT_ADDRESSES and config.REGION:
+        logging.warning(
+            "REGION is set alongside OPENSEARCH_TRANSPORT_ADDRESSES — "
+            "REGION will be ignored (index data is managed by external OpenSearch)"
+        )
+
     if error_messages:
         full_error_message = "Configuration validation failed:\n" + "\n".join(error_messages)
         raise ValueError(full_error_message)

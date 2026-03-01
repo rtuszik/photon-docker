@@ -36,6 +36,8 @@ def main():
         logger.info("APPRISE_URLS: REDACTED")
     else:
         logger.info("APPRISE_URLS: UNSET")
+    logger.info(f"OPENSEARCH_TRANSPORT_ADDRESSES: {config.OPENSEARCH_TRANSPORT_ADDRESSES}")
+    logger.info(f"OPENSEARCH_CLUSTER: {config.OPENSEARCH_CLUSTER}")
 
     logger.info("=== END CONFIG VARIABLES ===")
 
@@ -47,6 +49,10 @@ def main():
 
     if config.MIN_INDEX_DATE:
         logger.info(f"MIN_INDEX_DATE: {config.MIN_INDEX_DATE}")
+
+    if config.OPENSEARCH_TRANSPORT_ADDRESSES:
+        logger.info("External OpenSearch configured — skipping index download")
+        return
 
     if config.FORCE_UPDATE:
         logger.info("Starting forced update")

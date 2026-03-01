@@ -1,0 +1,51 @@
+# Docker Compose for running photon with an external OpenSearch instance.
+#
+# Usage:
+#   docker compose -f docker-compose.external-opensearch.yml up -d
+#
+# The photon index must be loaded into OpenSearch before photon can serve
+# requests.  Common approaches:
+#   - Import from a Nominatim database using photon.jar:
+#       java -jar photon.jar import \
+#         -transport-addresses opensearch:9200 \
+#         -nominatim-db <dsn>
+#   - Import from a photon JSON dump:
+#       java -jar photon.jar import \
+#         -transport-addresses opensearch:9200 \
+#         -json-dump <path>
+#   - Restore an OpenSearch snapshot that contains the "photon" index.
+
+services:
+    opensearch:
+        image: opensearchproject/opensearch:3.0.0
+        container_name: "photon-opensearch"
+        environment:
+            - discovery.type=single-node
+            - DISABLE_SECURITY_PLUGIN=true
+            - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+        volumes:
+            - opensearch_data:/usr/share/opensearch/data
+        healthcheck:
+            test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 60s
+        restart: unless-stopped
+
+    photon:
+        image: ghcr.io/rtuszik/photon-docker:latest
+        container_name: "photon-docker"
+        environment:
+            - OPENSEARCH_TRANSPORT_ADDRESSES=opensearch:9200
+            - OPENSEARCH_CLUSTER=photon
+            - LOG_LEVEL=INFO
+        depends_on:
+            opensearch:
+                condition: service_healthy
+        ports:
+            - "2322:2322"
+        restart: unless-stopped
+
+volumes:
+    opensearch_data:

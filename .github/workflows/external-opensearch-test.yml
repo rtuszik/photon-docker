@@ -1,0 +1,197 @@
+name: External OpenSearch Test
+
+on:
+    pull_request:
+        branches:
+            - main
+            - dev
+        paths:
+            - "Dockerfile"
+            - "src/**"
+            - "docker-compose*.yml"
+            - ".last_release"
+            - "pyproject.toml"
+            - "uv.lock"
+            - ".github/workflows/external-opensearch-test.yml"
+
+jobs:
+    test-external-opensearch:
+        runs-on: ubuntu-latest
+        env:
+            BASE_URL: "https://r2.koalasec.org/public"
+
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v6
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Read Photon version from .last_release
+              id: photon_version
+              run: |
+                  PHOTON_VERSION=$(cat .last_release | tr -d '[:space:]')
+                  if [[ -z "$PHOTON_VERSION" || ! "$PHOTON_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "Error: .last_release is missing, empty, or contains an invalid version: '$PHOTON_VERSION'"
+                    exit 1
+                  fi
+                  echo "PHOTON_VERSION=$PHOTON_VERSION" >> "$GITHUB_ENV"
+                  echo "Photon Version: $PHOTON_VERSION"
+
+            - name: Build test image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: ./Dockerfile
+                  build-args: |
+                      PHOTON_VERSION=${{ env.PHOTON_VERSION }}
+                  push: false
+                  load: true
+                  tags: photon-test:ext-os-${{ github.event.pull_request.number }}
+                  platforms: linux/amd64
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Create Docker network
+              run: docker network create photon-ext-os-test
+
+            - name: Download and extract Andorra index
+              run: |
+                  INDEX_DB_VERSION="1.0"
+                  FILE_NAME="photon-db-andorra-${INDEX_DB_VERSION}-latest.tar.bz2"
+                  DOWNLOAD_URL="${BASE_URL}/${FILE_NAME}"
+
+                  echo "Downloading Andorra index from ${DOWNLOAD_URL}..."
+                  mkdir -p /tmp/photon-data
+                  wget -q "${DOWNLOAD_URL}" -O "/tmp/${FILE_NAME}"
+                  tar -xjf "/tmp/${FILE_NAME}" -C /tmp/photon-data
+                  echo "Index extracted to /tmp/photon-data"
+                  ls -la /tmp/photon-data/
+
+            - name: Prepare OpenSearch data directory
+              run: |
+                  # Remap photon's node_1/ to OpenSearch standalone's nodes/0/
+                  mkdir -p /tmp/os-data/nodes/0
+                  cp -r /tmp/photon-data/photon_data/node_1/. /tmp/os-data/nodes/0/
+                  # OpenSearch container runs as uid 1000
+                  chmod -R 777 /tmp/os-data
+                  echo "OpenSearch data directory prepared:"
+                  ls -laR /tmp/os-data/nodes/0/ | head -20
+
+            - name: Start OpenSearch
+              run: |
+                  docker run -d \
+                    --name opensearch-test \
+                    --network photon-ext-os-test \
+                    -p 9200:9200 \
+                    -v /tmp/os-data:/usr/share/opensearch/data \
+                    -e "discovery.type=single-node" \
+                    -e "DISABLE_SECURITY_PLUGIN=true" \
+                    -e "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m -Des.gateway.auto_import_dangling_indices=true" \
+                    opensearchproject/opensearch:3.0.0
+
+            - name: Wait for OpenSearch cluster health
+              run: |
+                  echo "Waiting for OpenSearch cluster to be healthy (timeout: 120s)..."
+                  SECONDS=0
+                  TIMEOUT=120
+
+                  while [ $SECONDS -lt $TIMEOUT ]; do
+                    if curl -sf "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s" > /dev/null 2>&1; then
+                      echo "OpenSearch cluster is healthy after ${SECONDS}s"
+                      curl -s "http://localhost:9200/_cluster/health" | python3 -m json.tool
+                      break
+                    fi
+                    echo "Waiting for OpenSearch... (elapsed: ${SECONDS}s)"
+                    sleep 5
+                    SECONDS=$((SECONDS + 5))
+                  done
+
+                  if [ $SECONDS -ge $TIMEOUT ]; then
+                    echo "OpenSearch failed to become healthy within ${TIMEOUT}s"
+                    docker logs opensearch-test
+                    exit 1
+                  fi
+
+            - name: Wait for photon index
+              run: |
+                  echo "Waiting for photon index to appear (timeout: 120s)..."
+                  SECONDS=0
+                  TIMEOUT=120
+
+                  while [ $SECONDS -lt $TIMEOUT ]; do
+                    if curl -sf "http://localhost:9200/photon" > /dev/null 2>&1; then
+                      echo "Photon index found after ${SECONDS}s"
+                      curl -s "http://localhost:9200/_cat/indices?v"
+                      break
+                    fi
+                    echo "Waiting for photon index... (elapsed: ${SECONDS}s)"
+                    sleep 5
+                    SECONDS=$((SECONDS + 5))
+                  done
+
+                  if [ $SECONDS -ge $TIMEOUT ]; then
+                    echo "Photon index did not appear within ${TIMEOUT}s"
+                    echo "OpenSearch indices:"
+                    curl -s "http://localhost:9200/_cat/indices?v" || true
+                    echo "Dangling indices:"
+                    curl -s "http://localhost:9200/_dangling" || true
+                    docker logs opensearch-test
+                    exit 1
+                  fi
+
+            - name: Start photon container
+              run: |
+                  docker run -d \
+                    --name photon-ext-os-test \
+                    --network photon-ext-os-test \
+                    -e OPENSEARCH_TRANSPORT_ADDRESSES=opensearch-test:9200 \
+                    -e OPENSEARCH_CLUSTER=photon \
+                    photon-test:ext-os-${{ github.event.pull_request.number }}
+
+            - name: Wait for photon to be healthy
+              run: |
+                  echo "Waiting for photon container to become healthy (timeout: 6 minutes)..."
+                  CONTAINER_NAME=photon-ext-os-test
+
+                  docker logs -f $CONTAINER_NAME &
+                  LOGS_PID=$!
+
+                  SECONDS=0
+                  TIMEOUT=360
+
+                  while [ $SECONDS -lt $TIMEOUT ]; do
+                    HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null || echo "unknown")
+
+                    if [ "$HEALTH_STATUS" = "healthy" ]; then
+                      echo "Photon container is healthy after $SECONDS seconds"
+                      kill $LOGS_PID 2>/dev/null || true
+                      exit 0
+                    fi
+
+                    echo "Health status: $HEALTH_STATUS (elapsed: ${SECONDS}s)"
+                    sleep 10
+                    SECONDS=$((SECONDS + 10))
+                  done
+
+                  kill $LOGS_PID 2>/dev/null || true
+                  echo "Photon container failed to become healthy within $TIMEOUT seconds"
+                  docker logs $CONTAINER_NAME
+                  exit 1
+
+            - name: Cleanup
+              if: always()
+              run: |
+                  docker stop photon-ext-os-test opensearch-test 2>/dev/null || true
+                  docker rm photon-ext-os-test opensearch-test 2>/dev/null || true
+                  docker network rm photon-ext-os-test 2>/dev/null || true
+                  docker rmi photon-test:ext-os-${{ github.event.pull_request.number }} 2>/dev/null || true
+
+            - name: Output summary
+              if: always()
+              run: |
+                  echo "## External OpenSearch Test Summary" >> $GITHUB_STEP_SUMMARY
+                  echo "- **PR Number:** ${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Photon Version:** ${{ env.PHOTON_VERSION }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **OpenSearch Version:** 3.0.0" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

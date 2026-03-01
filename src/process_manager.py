@@ -107,7 +107,13 @@ class PhotonManager:
             if java_params:
                 cmd.extend(shlex.split(java_params))
 
-            cmd.extend(["-jar", "/photon/photon.jar", "serve", "-listen-ip", "0.0.0.0", "-data-dir", config.DATA_DIR]) #noqa S104
+            cmd.extend(["-jar", "/photon/photon.jar", "serve", "-listen-ip", "0.0.0.0"])  # noqa: S104
+
+            if config.OPENSEARCH_TRANSPORT_ADDRESSES:
+                cmd.extend(["-transport-addresses", config.OPENSEARCH_TRANSPORT_ADDRESSES])
+                cmd.extend(["-cluster", config.OPENSEARCH_CLUSTER])
+            else:
+                cmd.extend(["-data-dir", config.DATA_DIR])
 
             if enable_metrics:
                 cmd.extend(["-metrics-enable", "prometheus"])
@@ -177,6 +183,9 @@ class PhotonManager:
             logger.debug(f"Error checking for orphaned processes: {e}")
 
     def _cleanup_lock_files(self):
+        if config.OPENSEARCH_TRANSPORT_ADDRESSES:
+            return
+
         lock_files = [
             os.path.join(config.OS_NODE_DIR, "node.lock"),
             os.path.join(config.OS_NODE_DIR, "data", "node.lock"),
@@ -292,7 +301,9 @@ class PhotonManager:
     def run(self):
         logger.info("Photon Manager starting...")
 
-        if not config.FORCE_UPDATE and os.path.isdir(config.OS_NODE_DIR):
+        if config.OPENSEARCH_TRANSPORT_ADDRESSES:
+            logger.info("External OpenSearch configured — skipping initial setup")
+        elif not config.FORCE_UPDATE and os.path.isdir(config.OS_NODE_DIR):
             logger.info("Existing index found, skipping initial setup")
         else:
             self.run_initial_setup()
