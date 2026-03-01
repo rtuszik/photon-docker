@@ -80,14 +80,24 @@ jobs:
 
             - name: Start OpenSearch
               run: |
+                  # OpenSearch 3.0.0 ignores gateway settings from -D JVM properties;
+                  # they must be in opensearch.yml.  cluster.name must match the
+                  # OPENSEARCH_CLUSTER value photon will use to connect.
+                  printf '%s\n' \
+                    'cluster.name: photon' \
+                    'network.host: 0.0.0.0' \
+                    'gateway.auto_import_dangling_indices: true' \
+                    > /tmp/opensearch.yml
+
                   docker run -d \
                     --name opensearch-test \
                     --network photon-ext-os-test \
                     -p 9200:9200 \
                     -v /tmp/os-data:/usr/share/opensearch/data \
+                    -v /tmp/opensearch.yml:/usr/share/opensearch/config/opensearch.yml \
                     -e "discovery.type=single-node" \
                     -e "DISABLE_SECURITY_PLUGIN=true" \
-                    -e "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m -Dopensearch.gateway.auto_import_dangling_indices=true" \
+                    -e "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" \
                     opensearchproject/opensearch:3.0.0
 
             - name: Wait for OpenSearch cluster health
