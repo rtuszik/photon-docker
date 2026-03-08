@@ -16,16 +16,13 @@ enhancing data privacy and integration capabilities with services like [Dawarich
 ⚠️ **Warning: Large File Sizes** ⚠️
 
 - The Photon index file is fairly large and growing steadily.
-  As of the beginning of 2025, around 200GB is needed for the full index,
-  and it is growing by 10-20GB per year.
+  As of the beginning of 2025, around 90GB are needed for the full index. Note that this will grow over time.
 - Ensure you have sufficient disk space available before running the container.
 - The initial download and extraction process may take a considerable amount of time.
   Depending on your hardware, checksum verification and decompression may take multiple hours.
 
-♻️ **Change in Default Download Source** ♻️
-
 - To reduce the load on the official Photon servers,
-  the default `BASE_URL` for downloading the index files now points to a community-hosted mirror.
+  the default `BASE_URL` for downloading the index files points to a mirror hosted by my.
   Please see the **Community Mirrors** section for more details.
 
 ## Usage
@@ -157,6 +154,14 @@ If you are hosting a public mirror, please open an issue or pull request to have
 | ------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `https://download1.graphhopper.com/public/` | [GraphHopper](https://www.graphhopper.com/) (Official) | ![GraphHopper](https://img.shields.io/website?url=https%3A%2F%2Fdownload1.graphhopper.com%2Fpublic%2Fphoton-db-planet-0.7OS-latest.tar.bz2&style=for-the-badge&label=Status) |
 | `https://r2.koalasec.org/public/`           | [rtuszik](https://github.com/rtuszik)                  | ![KoalaSec](https://img.shields.io/website?url=https%3A%2F%2Fr2.koalasec.org%2Fpublic%2Fphoton-db-planet-0.7OS-latest.tar.bz2&style=for-the-badge&label=Status)              |
+
+## Metrics
+
+When `ENABLE_METRICS` is set to `TRUE`, Prometheus metrics are exposed through the at the `/metrics` endpoint.
+
+An example Grafana Dashboard is available here at [Grafana Labs](https://grafana.com/grafana/dashboards/24901-photon/).
+
+To see a live preview, [visit the public dashboard](https://r10k.grafana.net/public-dashboards/089de1d08d954a959e3a475af8968e1e) of the photon instance hosted by [rtuszik](https://github.com/rtuszik).
 
 ### Use with Dawarich
 
