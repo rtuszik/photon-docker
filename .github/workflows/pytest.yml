@@ -1,7 +1,11 @@
 name: pytest
 on:
-    pull_request:
     workflow_dispatch:
+    pull_request:
+        paths:
+            - "src/**"
+            - "tests/**"
+            - "pyproject.toml"
 
 permissions:
     contents: write
