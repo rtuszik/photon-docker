@@ -2,13 +2,15 @@
 
 Thanks for you interest in contributing to this project.
 
-Tools used in this repository:
+Main tools used in this repository:
 
-| Tool                                            | Description                        |
-| ----------------------------------------------- | ---------------------------------- |
-| [astral/uv](https://github.com/astral-sh/uv)    | Python project and package manager |
-| [go-task/task](https://github.com/go-task/task) | Task Runner                        |
-| [j178/prek](https://github.com/j178/prek)       | pre-commit hook runner             |
+| Tool                                             | Description                        |
+| ------------------------------------------------ | ---------------------------------- |
+| [astral/uv](https://github.com/astral-sh/uv)     | Python project and package manager |
+| [go-task/task](https://github.com/go-task/task)  | Task Runner                        |
+| [j178/prek](https://github.com/j178/prek)        | pre-commit hook runner             |
+| [astral/ruff](https://github.com/astral-sh/ruff) | Formatting/Linting/LSP             |
+| [astral/ty](https://github.com/astral-sh/ty)     | Type Checking                      |
 
 ## AI Policy
 
@@ -49,15 +51,16 @@ task install
 
 1. Create a feature branch from `dev`.
 2. Make your changes.
-3. Run quality checks:
-    ```bash
-    task check
-    ```
-4. Test your changes by building and running the Docker image:
+3. Test your changes by building and running the Docker image:
     ```bash
     task rebuild
     ```
     Verify that Photon starts successfully and OpenSearch is up.
+4. Run checks:
+    ```bash
+    task check
+    task test
+    ```
 5. Commit and push to your fork.
 6. Open a pull request to the upstream `dev` branch.
 
