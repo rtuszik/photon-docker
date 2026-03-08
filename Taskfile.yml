@@ -58,6 +58,11 @@ tasks:
         cmds:
             - uv run vulture --min-confidence 100 --exclude ".venv" .
 
+    test:
+        desc: Run pytest
+        cmds:
+            - uv run pytest
+
     rebuild:
         desc: Build and run Docker containers
         interactive: true

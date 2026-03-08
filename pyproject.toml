@@ -15,6 +15,8 @@ dependencies = [
 [dependency-groups]
 dev = [
     "prek>=0.3.4",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
     "ruff>=0.12.7",
     "ty>=0.0.1a16",
     "vulture>=2.14",
@@ -71,11 +73,15 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 [tool.ruff.lint.mccabe]
 max-complexity = 15
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
 docstring-code-format = false
+skip-magic-trailing-comma = true
 
 [tool.tombi.format.rules]
 indent-style = "space"
