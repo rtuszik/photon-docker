@@ -1,0 +1,126 @@
+version: "3"
+
+tasks:
+    default:
+        desc: Show available tasks
+        cmds:
+            - task --list
+        silent: true
+
+    help:
+        desc: Show available tasks
+        cmds:
+            - task --list
+        silent: true
+
+    install:
+        desc: Install dev dependencies and git hooks
+        cmds:
+            - |
+                if ! command -v uv >/dev/null 2>&1; then
+                  echo "uv is not installed or not on PATH."
+                  exit 1
+                fi
+
+                if ! command -v prek >/dev/null 2>&1; then
+                  echo "prek is not installed or not on PATH."
+                  exit 1
+                fi
+
+                prek install
+                uv sync --locked --group dev
+
+    check:
+        desc: Run all quality checks
+        deps:
+            - lint
+            - format
+            - typecheck
+            - deadcode
+
+    lint:
+        desc: Run ruff linter with auto-fix
+        cmds:
+            - uv run ruff check --fix
+
+    format:
+        desc: Run ruff formatter
+        cmds:
+            - uv run ruff format
+
+    typecheck:
+        desc: Run ty type checker
+        cmds:
+            - uv run ty check
+
+    deadcode:
+        desc: Run vulture dead code checker
+        cmds:
+            - uv run vulture --min-confidence 100 --exclude ".venv" .
+
+    rebuild:
+        desc: Build and run Docker containers
+        interactive: true
+        env:
+            PHOTON_VERSION: "{{.PHOTON_VERSION}}"
+        vars:
+            PHOTON_VERSION:
+                sh: tr -d '[:space:]' < .last_release
+            NOCACHE: '{{default "false" .NOCACHE}}'
+            VOLUMES: '{{default "false" .VOLUMES}}'
+        cmds:
+            - |
+                nocache="{{.NOCACHE}}"
+                volumes="{{.VOLUMES}}"
+
+                if [ "{{.CLI_ARGS}}" != "" ]; then
+                  echo "This task does not accept positional CLI args. Use Task vars like NOCACHE=true."
+                  exit 1
+                fi
+
+                if [ ! -t 0 ]; then
+                  if [ "$volumes" = "true" ]; then
+                    docker compose -f docker-compose.build.yml down -v
+                  else
+                    docker compose -f docker-compose.build.yml down
+                  fi
+
+                  if [ "$nocache" = "true" ]; then
+                    docker compose -f docker-compose.build.yml build --no-cache
+                  else
+                    docker compose -f docker-compose.build.yml build
+                  fi
+
+                  docker compose -f docker-compose.build.yml up
+                  exit 0
+                fi
+
+                read -r "?Rebuild without cache? (y/n): " nocache_input
+                read -r "?Remove volumes before rebuild? (y/n): " volumes_input
+
+                if [ "$nocache_input" = "y" ] || [ "$nocache_input" = "Y" ]; then
+                  nocache="true"
+                fi
+
+                if [ "$volumes_input" = "y" ] || [ "$volumes_input" = "Y" ]; then
+                  volumes="true"
+                fi
+
+                if [ "$volumes" = "true" ]; then
+                  docker compose -f docker-compose.build.yml down -v
+                else
+                  docker compose -f docker-compose.build.yml down
+                fi
+
+                if [ "$nocache" = "true" ]; then
+                  docker compose -f docker-compose.build.yml build --no-cache
+                else
+                  docker compose -f docker-compose.build.yml build
+                fi
+
+                docker compose -f docker-compose.build.yml up
+
+    clean:
+        desc: Stop and remove Docker containers
+        cmds:
+            - docker compose -f docker-compose.build.yml down
