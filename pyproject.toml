@@ -62,7 +62,7 @@ ignore = [
     "TRY",
     "SIM105",  # faster without contextlib
 ]
-extend-select = ["B", "S", "SIM", "T20", "C901", "RUF200"]
+extend-select = ["B", "S", "SIM", "T20", "C901", "RUF"]
 fixable = ["ALL"]
 unfixable = []
 # Allow unused variables when underscore-prefixed.
