@@ -195,7 +195,8 @@ http://localhost:2322/api?q=Harare
 
 ## Contributing
 
-Contributions are welcome. Please submit pull requests or open issues for suggestions and improvements.
+Contributions are welcome.
+Please checkout the [Contribution Guidelines](CONTRIBUTING.md).
 
 ## License
 
