@@ -13,34 +13,33 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.12.7", "ty>=0.0.1a16", "vulture>=2.14"]
+dev = [
+    "prek>=0.3.4",
+    "ruff>=0.12.7",
+    "ty>=0.0.1a16",
+    "vulture>=2.14",
+]
 
 [build-system]
-requires = ["uv_build>=0.9.10"]
+requires = ["uv_build>=0.10.9,<0.11.0"]
 build-backend = "uv_build"
-
-[tool.uv.build-backend]
-module-name = "src"
-module-root = ""
-
 
 [tool.ruff]
 indent-width = 4
 line-length = 120
 
-
 [tool.ruff.lint]
 # select = ["ALL"]
 ignore = [
-    "ANN",     # flake8-annotations
-    "COM",     # flake8-commas
-    "C90",     # mccabe complexity
-    "DJ",      # django
-    "EXE",     # flake8-executable
-    "BLE",     # blind except
-    "PTH",     # flake8-pathlib
-    "T10",     # debugger
-    "TID",     # flake8-tidy-imports
+    "ANN",  # flake8-annotations
+    "COM",  # flake8-commas
+    "C90",  # mccabe complexity
+    "DJ",  # django
+    "EXE",  # flake8-executable
+    "BLE",  # blind except
+    "PTH",  # flake8-pathlib
+    "T10",  # debugger
+    "TID",  # flake8-tidy-imports
     "D100",
     "D101",
     "D102",
@@ -50,36 +49,38 @@ ignore = [
     "D106",
     "D107",
     "D101",
-    "D107",    # missing docstring in public module
-    "D102",    # missing docstring in public class
-    "D104",    # missing docstring in public package
+    "D107",  # missing docstring in public module
+    "D102",  # missing docstring in public class
+    "D104",  # missing docstring in public package
     "D213",
     "D203",
     "D400",
     "D415",
     "G004",
     "PLR2004",
-    "E501",    # line too long
+    "E501",  # line too long
     "TRY",
     "SIM105",  # faster without contextlib
 ]
-
-extend-select = ["B", "S", "SIM", "T20", "C901"]
-
-
+extend-select = ["B", "S", "SIM", "T20", "C901", "RUF200"]
 fixable = ["ALL"]
 unfixable = []
-
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.mccabe]
 max-complexity = 15
 
-
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
-
 docstring-code-format = false
+
+[tool.tombi.format.rules]
+indent-style = "space"
+indent-width = 4
+
+[tool.uv.build-backend]
+module-name = "src"
+module-root = ""
