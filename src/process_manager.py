@@ -228,7 +228,7 @@ class PhotonManager:
                 if self.start_photon():
                     update_duration = time.time() - update_start
                     logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
-                    target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
+                    target_node_dir = os.path.join(config.PHOTON_DATA_DIR)
                     cleanup_backup_after_verification(target_node_dir)
                 else:
                     update_duration = time.time() - update_start
@@ -237,7 +237,7 @@ class PhotonManager:
                 if self.start_photon():
                     update_duration = time.time() - update_start
                     logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
-                    target_node_dir = os.path.join(config.PHOTON_DATA_DIR, "node_1")
+                    target_node_dir = os.path.join(config.PHOTON_DATA_DIR)
                     cleanup_backup_after_verification(target_node_dir)
                 else:
                     update_duration = time.time() - update_start
