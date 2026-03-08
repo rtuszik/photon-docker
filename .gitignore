@@ -66,4 +66,5 @@ venv.bak/
 # LSP config files
 pyrightconfig.json
 
-
+# dev biome.js - not required
+biome.json

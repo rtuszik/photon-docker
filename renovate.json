@@ -5,7 +5,8 @@
         "helpers:pinGitHubActionDigests",
         ":configMigration",
         ":pinDevDependencies",
-        "abandonments:recommended"
+        "abandonments:recommended",
+        ":enablePreCommit"
     ],
     "baseBranchPatterns": [
         "dev"
