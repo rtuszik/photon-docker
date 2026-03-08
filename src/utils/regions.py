@@ -1,39 +1,11 @@
 REGION_MAPPING = {
-    "planet": {
-        "type": "planet",
-        "continent": None,
-        "available": True,
-    },
-    "africa": {
-        "type": "continent",
-        "continent": "africa",
-        "available": True,
-    },
-    "asia": {
-        "type": "continent",
-        "continent": "asia",
-        "available": True,
-    },
-    "australia-oceania": {
-        "type": "continent",
-        "continent": "australia-oceania",
-        "available": True,
-    },
-    "europe": {
-        "type": "continent",
-        "continent": "europe",
-        "available": True,
-    },
-    "north-america": {
-        "type": "continent",
-        "continent": "north-america",
-        "available": True,
-    },
-    "south-america": {
-        "type": "continent",
-        "continent": "south-america",
-        "available": True,
-    },
+    "planet": {"type": "planet", "continent": None, "available": True},
+    "africa": {"type": "continent", "continent": "africa", "available": True},
+    "asia": {"type": "continent", "continent": "asia", "available": True},
+    "australia-oceania": {"type": "continent", "continent": "australia-oceania", "available": True},
+    "europe": {"type": "continent", "continent": "europe", "available": True},
+    "north-america": {"type": "continent", "continent": "north-america", "available": True},
+    "south-america": {"type": "continent", "continent": "south-america", "available": True},
     "india": {"type": "sub-region", "continent": "asia", "available": True},
     "japan": {"type": "sub-region", "continent": "asia", "available": True},
     "andorra": {"type": "sub-region", "continent": "europe", "available": True},

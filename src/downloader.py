@@ -463,15 +463,7 @@ def _perform_download(url, destination, resume_byte_pos, mode, start_time):
         progress_bar = _create_progress_bar(total_size, resume_byte_pos, destination)
 
         try:
-            downloaded = _download_content(
-                response,
-                destination,
-                mode,
-                url,
-                total_size,
-                resume_byte_pos,
-                progress_bar,
-            )
+            downloaded = _download_content(response, destination, mode, url, total_size, resume_byte_pos, progress_bar)
 
             if progress_bar:
                 progress_bar.close()
