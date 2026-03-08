@@ -2,18 +2,22 @@
 
 ## Development Setup
 
-Fork this repository and clone your fork:
-
-Install dependencies:
+### MacOS/Linux
 
 ```bash
-uv sync --locked
+brew bundle
 ```
 
-List available local tasks:
+### Windows
+
+- install [Task](https://taskfile.dev/docs/installation#official-package-managers)
+- install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+
+### Install Project
 
 ```bash
-task --list
+# installs python project with uv with dev dependencies and hooks
+task install
 ```
 
 ## Making Changes
@@ -34,9 +38,15 @@ task --list
 
 ## Code Quality
 
-- All code must pass linting, type checking, and dead code analysis
+- All code must pass checks done through `task check`
 - All changes must be tested with Docker
-- Avoid unnecessary comments
+- Avoid unnecessary comments.
+
+To list available tasks:
+
+```bash
+task
+```
 
 ## Pull Requests
 
