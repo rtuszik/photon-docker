@@ -1,6 +1,6 @@
 [project]
 name = "photon-docker"
-version = "1.2.1"
+version = "2.1.0"
 description = "Unofficial docker image for the Photon Geocoder"
 requires-python = ">=3.12"
 dependencies = [
