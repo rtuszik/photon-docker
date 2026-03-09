@@ -1,7 +1,7 @@
 FROM eclipse-temurin:21.0.9_10-jre-noble
 
 # install astral uv
-COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.10 /uv /usr/local/bin/
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG PHOTON_VERSION
