@@ -1,0 +1,40 @@
+name: Release Drafter
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+permissions:
+    contents: write
+    pull-requests: read
+
+jobs:
+    update-release-draft:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v6
+
+            - name: Run Release Drafter
+              id: release-drafter
+              uses: release-drafter/release-drafter@v6
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Add upstream Photon release notes link
+              if: steps.release-drafter.outputs.id != ''
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  DRAFT_BODY: ${{ steps.release-drafter.outputs.body }}
+              run: |
+                  PHOTON_VERSION=$(tr -d '[:space:]' < .last_release)
+                  {
+                    printf '%s' "$DRAFT_BODY"
+                    printf '\n\n---\n **Upstream Photon release notes (%s):** https://github.com/komoot/photon/releases/tag/%s\n' \
+                      "$PHOTON_VERSION" "$PHOTON_VERSION"
+                  } > /tmp/new_body.txt
+                  gh api "repos/${{ github.repository }}/releases/${{ steps.release-drafter.outputs.id }}" \
+                    --method PATCH \
+                    --field body=@/tmp/new_body.txt
