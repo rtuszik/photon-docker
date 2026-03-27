@@ -15,11 +15,13 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout Repository
-              uses: actions/checkout@v6
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                persist-credentials: false
 
             - name: Run Release Drafter
               id: release-drafter
-              uses: release-drafter/release-drafter@v6
+              uses: release-drafter/release-drafter@6a93d829887aa2e0748befe2e808c66c0ec6e4c7 # v6
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -28,6 +30,7 @@ jobs:
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   DRAFT_BODY: ${{ steps.release-drafter.outputs.body }}
+                  STEPS_RELEASE_DRAFTER_OUTPUTS_ID: ${{ steps.release-drafter.outputs.id }}
               run: |
                   PHOTON_VERSION=$(tr -d '[:space:]' < .last_release)
                   {
@@ -35,6 +38,6 @@ jobs:
                     printf '\n\n---\n **[Photon release notes](https://github.com/komoot/photon/releases/tag/%s) (%s):** \n' \
                       "$PHOTON_VERSION" "$PHOTON_VERSION"
                   } > /tmp/new_body.txt
-                  gh api "repos/${{ github.repository }}/releases/${{ steps.release-drafter.outputs.id }}" \
+                  gh api "repos/${{ github.repository }}/releases/${STEPS_RELEASE_DRAFTER_OUTPUTS_ID}" \
                     --method PATCH \
                     --field body=@/tmp/new_body.txt
