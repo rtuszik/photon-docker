@@ -35,7 +35,6 @@ line-length = 120
 ignore = [
     "ANN",  # flake8-annotations
     "COM",  # flake8-commas
-    "C90",  # mccabe complexity
     "DJ",  # django
     "EXE",  # flake8-executable
     "BLE",  # blind except
