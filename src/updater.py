@@ -12,6 +12,10 @@ def main():
     logger.info("Starting update process...")
 
     try:
+        if config.IMPORT_MODE == "jsonl":
+            logger.info("Scheduled JSONL rebuilds are not implemented yet, skipping updater run")
+            return
+
         if config.UPDATE_STRATEGY == "PARALLEL":
             logger.info("Running parallel update...")
             parallel_update()

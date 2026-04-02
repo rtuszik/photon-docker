@@ -205,6 +205,10 @@ class PhotonManager:
             logger.info("Updates disabled, skipping")
             return
 
+        if config.IMPORT_MODE == "jsonl":
+            logger.info("Scheduled JSONL rebuilds are not implemented yet, skipping")
+            return
+
         self.state = AppState.UPDATING
         logger.info(f"Running {config.UPDATE_STRATEGY.lower()} update...")
         update_start = time.time()
@@ -255,6 +259,10 @@ class PhotonManager:
     def schedule_updates(self):
         if config.UPDATE_STRATEGY == "DISABLED":
             logger.info("Updates disabled, not scheduling")
+            return
+
+        if config.IMPORT_MODE == "jsonl":
+            logger.info("Skipping scheduled updates in JSONL mode until rebuild support is implemented")
             return
 
         interval = config.UPDATE_INTERVAL.lower()
