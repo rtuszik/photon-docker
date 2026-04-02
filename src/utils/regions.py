@@ -1,27 +1,32 @@
 REGION_MAPPING = {
-    "planet": {"type": "planet", "continent": None, "available": True},
-    "africa": {"type": "continent", "continent": "africa", "available": True},
-    "asia": {"type": "continent", "continent": "asia", "available": True},
-    "australia-oceania": {"type": "continent", "continent": "australia-oceania", "available": True},
-    "europe": {"type": "continent", "continent": "europe", "available": True},
-    "north-america": {"type": "continent", "continent": "north-america", "available": True},
-    "south-america": {"type": "continent", "continent": "south-america", "available": True},
-    "india": {"type": "sub-region", "continent": "asia", "available": True},
-    "japan": {"type": "sub-region", "continent": "asia", "available": True},
-    "andorra": {"type": "sub-region", "continent": "europe", "available": True},
-    "austria": {"type": "sub-region", "continent": "europe", "available": True},
-    "denmark": {"type": "sub-region", "continent": "europe", "available": True},
-    "france-monacco": {"type": "sub-region", "continent": "europe", "available": True},
-    "germany": {"type": "sub-region", "continent": "europe", "available": True},
-    "luxemburg": {"type": "sub-region", "continent": "europe", "available": True},
-    "netherlands": {"type": "sub-region", "continent": "europe", "available": True},
-    "russia": {"type": "sub-region", "continent": "europe", "available": True},
-    "slovakia": {"type": "sub-region", "continent": "europe", "available": True},
-    "spain": {"type": "sub-region", "continent": "europe", "available": True},
-    "canada": {"type": "sub-region", "continent": "north-america", "available": True},
-    "mexico": {"type": "sub-region", "continent": "north-america", "available": True},
-    "usa": {"type": "sub-region", "continent": "north-america", "available": True},
-    "argentina": {"type": "sub-region", "continent": "south-america", "available": True},
+    "planet": {"type": "planet", "continent": None, "db_available": True, "jsonl_available": True},
+    "africa": {"type": "continent", "continent": "africa", "db_available": True, "jsonl_available": True},
+    "asia": {"type": "continent", "continent": "asia", "db_available": True, "jsonl_available": True},
+    "australia-oceania": {
+        "type": "continent",
+        "continent": "australia-oceania",
+        "db_available": True,
+        "jsonl_available": True,
+    },
+    "europe": {"type": "continent", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "north-america": {"type": "continent", "continent": "north-america", "db_available": True, "jsonl_available": True},
+    "south-america": {"type": "continent", "continent": "south-america", "db_available": True, "jsonl_available": True},
+    "india": {"type": "sub-region", "continent": "asia", "db_available": True, "jsonl_available": True},
+    "japan": {"type": "sub-region", "continent": "asia", "db_available": True, "jsonl_available": True},
+    "andorra": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "austria": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "denmark": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "france-monacco": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "germany": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "luxemburg": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "netherlands": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "russia": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "slovakia": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "spain": {"type": "sub-region", "continent": "europe", "db_available": True, "jsonl_available": True},
+    "canada": {"type": "sub-region", "continent": "north-america", "db_available": True, "jsonl_available": True},
+    "mexico": {"type": "sub-region", "continent": "north-america", "db_available": True, "jsonl_available": True},
+    "usa": {"type": "sub-region", "continent": "north-america", "db_available": True, "jsonl_available": True},
+    "argentina": {"type": "sub-region", "continent": "south-america", "db_available": True, "jsonl_available": True},
 }
 
 REGION_ALIASES = {
@@ -82,6 +87,10 @@ def get_index_filename(region_name: str, db_version: str, extension: str) -> str
     return f"photon-db-{region_name}-{db_version}-latest.{extension}"
 
 
+def get_jsonl_filename(region_name: str, extension: str, channel: str = "master") -> str:
+    return f"photon-dump-{region_name}-{channel}-latest.{extension}"
+
+
 def get_index_url_path(region: str | None, db_version: str, extension: str) -> str:
     if region:
         normalized = normalize_region(region)
@@ -106,3 +115,43 @@ def get_index_url_path(region: str | None, db_version: str, extension: str) -> s
         raise ValueError(f"Invalid region type: {region_type}")
 
     return f"/{get_index_filename('planet', db_version, extension)}"
+
+
+def get_jsonl_url_path(region: str, extension: str) -> str:
+    normalized = normalize_region(region)
+    if normalized is None:
+        raise ValueError(f"Unknown region: {region}")
+
+    region_info = get_region_info(region)
+    if not region_info:
+        raise ValueError(f"Unknown region: {region}")
+
+    if not region_info.get("jsonl_available", False):
+        raise ValueError(f"JSONL not available for region: {region}")
+
+    filename = get_jsonl_filename(normalized, extension)
+    region_type = region_info["type"]
+
+    if region_type == "planet":
+        return f"/{filename}"
+    if region_type == "continent":
+        return f"/{normalized}/{filename}"
+    if region_type == "sub-region":
+        continent = region_info["continent"]
+        return f"/{continent}/{normalized}/{filename}"
+
+    raise ValueError(f"Invalid region type: {region_type}")
+
+
+def get_regions_for_jsonl(regions: list[str]) -> list[str]:
+    validated_regions = []
+
+    for region in regions:
+        region_info = get_region_info(region)
+        if not region_info:
+            raise ValueError(f"Unknown region: {region}")
+        if not region_info.get("jsonl_available", False):
+            raise ValueError(f"JSONL not available for region: {region}")
+        validated_regions.append(normalize_region(region))
+
+    return [region for region in validated_regions if region]
