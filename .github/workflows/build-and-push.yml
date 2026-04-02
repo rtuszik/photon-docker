@@ -25,6 +25,7 @@ jobs:
               uses: actions/checkout@v6
               with:
                   ref: ${{ github.ref }}
+                  persist-credentials: false
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
@@ -54,7 +55,7 @@ jobs:
                     fi
                     echo "Read photon version from .last_release: $PHOTON_VERSION"
                   else
-                    PHOTON_VERSION="${{ github.event.inputs.photon_version }}"
+                    PHOTON_VERSION="${GITHUB_EVENT_INPUTS_PHOTON_VERSION}"
                     if [[ -z "$PHOTON_VERSION" ]]; then
                       echo "Error: PHOTON_VERSION must be provided when .last_release file is missing"
                       exit 1
@@ -62,10 +63,10 @@ jobs:
                   fi
 
                   if [ "${{ github.event_name }}" == "release" ]; then
-                    CONTAINER_VERSION="${{ github.event.release.tag_name }}"
+                    CONTAINER_VERSION="${GITHUB_EVENT_RELEASE_TAG_NAME}"
                     CONTAINER_VERSION="${CONTAINER_VERSION#v}"
                     IS_PRERELEASE="${{ github.event.release.prerelease }}"
-                  elif [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+                  elif [ "${{ github.event_name }}" == "push" ] && [ "${GITHUB_REF}" == "refs/heads/dev" ]; then
                     SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
                     CONTAINER_VERSION="dev-${SHORT_SHA}"
                     IS_PRERELEASE="true"
@@ -73,7 +74,7 @@ jobs:
                     CONTAINER_VERSION="pr-${{ github.event.pull_request.number }}"
                     IS_PRERELEASE="true"
                   else
-                    CONTAINER_VERSION="${{ github.event.inputs.container_version }}"
+                    CONTAINER_VERSION="${GITHUB_EVENT_INPUTS_CONTAINER_VERSION}"
                     CONTAINER_VERSION="${CONTAINER_VERSION#v}"
 
                     if [[ "$CONTAINER_VERSION" == *"-beta"* ]]; then
@@ -90,12 +91,16 @@ jobs:
                   echo "Container Version: $CONTAINER_VERSION"
                   echo "Photon Version: $PHOTON_VERSION"
                   echo "Is Prerelease: $IS_PRERELEASE"
+              env:
+                GITHUB_EVENT_INPUTS_PHOTON_VERSION: ${{ github.event.inputs.photon_version }}
+                GITHUB_EVENT_RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
+                GITHUB_EVENT_INPUTS_CONTAINER_VERSION: ${{ github.event.inputs.container_version }}
 
             - name: Generate Docker tags with semver support
               id: generate_tags
               run: |
-                  CONTAINER_VERSION="${{ env.CONTAINER_VERSION }}"
-                  IS_PRERELEASE="${{ env.IS_PRERELEASE }}"
+                  CONTAINER_VERSION="${CONTAINER_VERSION}"
+                  IS_PRERELEASE="${IS_PRERELEASE}"
 
                   REPO_NAME="${{ github.repository }}"
                   DOCKERHUB_REPO="${REPO_NAME,,}"
@@ -103,7 +108,7 @@ jobs:
 
                   TAGS="$DOCKERHUB_REPO:$CONTAINER_VERSION,$GHCR_REPO:$CONTAINER_VERSION"
 
-                  if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+                  if [ "${{ github.event_name }}" == "push" ] && [ "${GITHUB_REF}" == "refs/heads/dev" ]; then
                     TAGS="$TAGS,$DOCKERHUB_REPO:dev,$GHCR_REPO:dev"
                   elif [ "$IS_PRERELEASE" == "true" ]; then
                     TAGS="$TAGS,$DOCKERHUB_REPO:beta,$GHCR_REPO:beta"
@@ -143,7 +148,7 @@ jobs:
               run: |
                   echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
                   echo "- **Event:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Container Version:** ${{ env.CONTAINER_VERSION }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Photon Version:** ${{ env.PHOTON_VERSION }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Is Prerelease:** ${{ env.IS_PRERELEASE }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Tags:** ${{ env.DOCKER_TAGS }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Container Version:** ${CONTAINER_VERSION}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Photon Version:** ${PHOTON_VERSION}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Is Prerelease:** ${IS_PRERELEASE}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Tags:** ${DOCKER_TAGS}" >> $GITHUB_STEP_SUMMARY
