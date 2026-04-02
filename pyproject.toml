@@ -11,6 +11,7 @@ dependencies = [
     "schedule>=1.2.2",
     "tqdm==4.67.3",
     "urllib3==2.7.0",
+    "zstandard>=0.23.0",
 ]
 
 [dependency-groups]
@@ -37,14 +38,14 @@ line-length = 120
 [tool.ruff.lint]
 # select = ["ALL"]
 ignore = [
-    "ANN",  # flake8-annotations
-    "COM",  # flake8-commas
-    "DJ",  # django
-    "EXE",  # flake8-executable
-    "BLE",  # blind except
-    "PTH",  # flake8-pathlib
-    "T10",  # debugger
-    "TID",  # flake8-tidy-imports
+    "ANN", # flake8-annotations
+    "COM", # flake8-commas
+    "DJ", # django
+    "EXE", # flake8-executable
+    "BLE", # blind except
+    "PTH", # flake8-pathlib
+    "T10", # debugger
+    "TID", # flake8-tidy-imports
     "D100",
     "D101",
     "D102",
@@ -54,18 +55,18 @@ ignore = [
     "D106",
     "D107",
     "D101",
-    "D107",  # missing docstring in public module
-    "D102",  # missing docstring in public class
-    "D104",  # missing docstring in public package
+    "D107", # missing docstring in public module
+    "D102", # missing docstring in public class
+    "D104", # missing docstring in public package
     "D213",
     "D203",
     "D400",
     "D415",
     "G004",
     "PLR2004",
-    "E501",  # line too long
+    "E501", # line too long
     "TRY",
-    "SIM105",  # faster without contextlib
+    "SIM105", # faster without contextlib
 ]
 extend-select = ["B", "S", "SIM", "T20", "C901", "RUF"]
 fixable = ["ALL"]
