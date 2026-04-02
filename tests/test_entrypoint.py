@@ -12,6 +12,7 @@ from src.utils import config
 def base_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     os_node_dir = tmp_path / "node_1"
     monkeypatch.setattr(config, "OS_NODE_DIR", str(os_node_dir))
+    monkeypatch.setattr(config, "IMPORT_MODE", "db")
     monkeypatch.setattr(config, "FORCE_UPDATE", False)
     monkeypatch.setattr(config, "INITIAL_DOWNLOAD", True)
     monkeypatch.setattr(config, "MIN_INDEX_DATE", None)
@@ -206,3 +207,37 @@ def test_entrypoint_logs_apprise_redacted_when_set(
     with patch("src.entrypoint.send_notification"), patch("src.entrypoint.validate_config"):
         entrypoint.main()
     assert any("APPRISE_URLS: REDACTED" in r.message for r in caplog.records)
+
+
+def test_entrypoint_runs_jsonl_import_when_no_index(base_config: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "IMPORT_MODE", "jsonl")
+    notify, validate = _patch_common()
+    with notify, validate, patch("src.entrypoint.run_jsonl_import") as imp:
+        entrypoint.main()
+    imp.assert_called_once()
+
+
+def test_entrypoint_skips_jsonl_rebuild_when_index_present(base_config: Path, monkeypatch: pytest.MonkeyPatch):
+    base_config.mkdir()
+    monkeypatch.setattr(config, "IMPORT_MODE", "jsonl")
+    notify, validate = _patch_common()
+    with notify, validate, patch("src.entrypoint.run_jsonl_import") as imp:
+        entrypoint.main()
+    imp.assert_not_called()
+
+
+def test_entrypoint_force_update_runs_jsonl_import(base_config: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "IMPORT_MODE", "jsonl")
+    monkeypatch.setattr(config, "FORCE_UPDATE", True)
+    notify, validate = _patch_common()
+    with (
+        notify,
+        validate,
+        patch("src.entrypoint.run_jsonl_import") as imp,
+        patch("src.entrypoint.sequential_update") as seq,
+        patch("src.entrypoint.parallel_update") as par,
+    ):
+        entrypoint.main()
+    imp.assert_called_once()
+    seq.assert_not_called()
+    par.assert_not_called()
