@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import datetime
 import os
 import shlex
 import signal
@@ -246,6 +247,38 @@ class PhotonManager:
         finally:
             self.state = AppState.RUNNING
 
+    def _parse_interval(self, interval: str) -> datetime.timedelta:
+        interval = interval.lower()
+        value = int(interval[:-1])
+        unit = interval[-1]
+        if unit == "d":
+            return datetime.timedelta(days=value)
+        if unit == "h":
+            return datetime.timedelta(hours=value)
+        if unit == "m":
+            return datetime.timedelta(minutes=value)
+        logger.warning(f"Invalid UPDATE_INTERVAL format: {interval}, defaulting to 1 day")
+        return datetime.timedelta(days=1)
+
+    def _is_update_due(self) -> bool:
+        marker_file = os.path.join(config.DATA_DIR, ".photon-index-updated")
+        if not os.path.exists(marker_file):
+            logger.info("No marker file found, update is due")
+            return True
+
+        marker_time = datetime.datetime.fromtimestamp(os.path.getmtime(marker_file), tz=datetime.UTC)
+        now = datetime.datetime.now(tz=datetime.UTC)
+        elapsed = now - marker_time
+        interval = self._parse_interval(config.UPDATE_INTERVAL)
+
+        if elapsed < interval:
+            remaining = interval - elapsed
+            logger.info(f"Last update was {elapsed} ago, next check in {remaining}, skipping")
+            return False
+
+        logger.info(f"Last update was {elapsed} ago (interval: {interval}), update due")
+        return True
+
     def schedule_updates(self):
         if config.UPDATE_STRATEGY == "DISABLED":
             logger.info("Updates disabled, not scheduling")
@@ -255,23 +288,8 @@ class PhotonManager:
             logger.info("Skipping scheduled updates in JSONL mode until rebuild support is implemented")
             return
 
-        interval = config.UPDATE_INTERVAL.lower()
-
-        if interval.endswith("d"):
-            days = int(interval[:-1])
-            schedule.every(days).days.do(self.run_update)
-            logger.info(f"Scheduling updates every {days} days")
-        elif interval.endswith("h"):
-            hours = int(interval[:-1])
-            schedule.every(hours).hours.do(self.run_update)
-            logger.info(f"Scheduling updates every {hours} hours")
-        elif interval.endswith("m"):
-            minutes = int(interval[:-1])
-            schedule.every(minutes).minutes.do(self.run_update)
-            logger.info(f"Scheduling updates every {minutes} minutes")
-        else:
-            logger.warning(f"Invalid UPDATE_INTERVAL format: {interval}, defaulting to daily")
-            schedule.every().day.do(self.run_update)
+        logger.info(f"Scheduling daily update checks (update interval: {config.UPDATE_INTERVAL})")
+        schedule.every().day.do(self._maybe_update)
 
         def scheduler_loop():
             while not self.should_exit:
@@ -280,6 +298,10 @@ class PhotonManager:
 
         thread = threading.Thread(target=scheduler_loop, daemon=True)
         thread.start()
+
+    def _maybe_update(self):
+        if self._is_update_due():
+            self.run_update()
 
     def _run_pending_jobs(self):
         try:
