@@ -1,14 +1,58 @@
 {
-    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-    "extends": [
-        "config:recommended",
-        "helpers:pinGitHubActionDigests",
-        ":configMigration",
-        ":pinDevDependencies",
-        "abandonments:recommended",
-        ":enablePreCommit"
-    ],
-    "baseBranchPatterns": [
-        "dev"
-    ]
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:best-practices", ":enablePreCommit"],
+	"prConcurrentLimit": 0,
+	"prCreation": "not-pending",
+	"rebaseWhen": "behind-base-branch",
+	"labels": ["renovate"],
+	"baseBranchPatterns": ["dev"],
+	"useBaseBranchConfig": "merge",
+	"internalChecksFilter": "strict",
+	"minimumReleaseAge": "3 days",
+	"packageRules": [
+		{
+			"matchUpdateTypes": ["patch"],
+			"addLabels": ["dependencies", "patch"],
+			"minimumReleaseAge": "3 days"
+		},
+		{
+			"matchUpdateTypes": ["minor"],
+			"addLabels": ["dependencies", "minor"],
+			"minimumReleaseAge": "3 days"
+		},
+		{
+			"matchUpdateTypes": ["major"],
+			"addLabels": ["dependencies", "major"],
+			"minimumReleaseAge": "7 days"
+		},
+		{
+			"matchDepTypes": ["devDependencies", "dev"],
+			"matchUpdateTypes": ["minor", "patch"],
+			"matchCurrentVersion": "!/^0/",
+			"automerge": true
+		},
+		{
+			"matchPackageNames": ["ruff", "astral-sh/ruff-pre-commit"],
+			"groupName": "ruff"
+		},
+		{
+			"groupName": "Python Version",
+			"matchPackageNames": ["python"],
+			"matchManagers": ["custom.regex", "pyenv", "pep621"]
+		}
+	],
+
+	"customManagers": [
+		{
+			// updates ruff target version
+			"customType": "regex",
+			"managerFilePatterns": ["/^pyproject\\.toml$/"],
+			"matchStrings": ["target-version = \"py3(?<minor>\\d+)\""],
+			"currentValueTemplate": "3.{{{minor}}}",
+			"autoReplaceStringTemplate": "target-version = \"py3{{{replace '.' '' newValue}}}\"",
+			"depNameTemplate": "python",
+			"datasourceTemplate": "python-version",
+			"versioningTemplate": "python"
+		}
+	]
 }

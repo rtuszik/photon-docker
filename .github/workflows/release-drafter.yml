@@ -16,6 +16,8 @@ jobs:
         steps:
             - name: Checkout Repository
               uses: actions/checkout@v6
+              with:
+                persist-credentials: false
 
             - name: Run Release Drafter
               id: release-drafter
@@ -28,13 +30,14 @@ jobs:
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   DRAFT_BODY: ${{ steps.release-drafter.outputs.body }}
+                  STEPS_RELEASE_DRAFTER_OUTPUTS_ID: ${{ steps.release-drafter.outputs.id }}
               run: |
                   PHOTON_VERSION=$(tr -d '[:space:]' < .last_release)
                   {
                     printf '%s' "$DRAFT_BODY"
-                    printf '\n\n---\n **Upstream Photon release notes (%s):** https://github.com/komoot/photon/releases/tag/%s\n' \
+                    printf '\n\n---\n **[Photon release notes](https://github.com/komoot/photon/releases/tag/%s) (%s):** \n' \
                       "$PHOTON_VERSION" "$PHOTON_VERSION"
                   } > /tmp/new_body.txt
-                  gh api "repos/${{ github.repository }}/releases/${{ steps.release-drafter.outputs.id }}" \
+                  gh api "repos/${{ github.repository }}/releases/${STEPS_RELEASE_DRAFTER_OUTPUTS_ID}" \
                     --method PATCH \
                     --field body=@/tmp/new_body.txt
