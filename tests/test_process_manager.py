@@ -1,5 +1,8 @@
+import os
 import signal
 import subprocess
+import time
+from datetime import timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -398,9 +401,9 @@ def test_run_pending_jobs_survives_job_exception(
     manager._run_pending_jobs()
 
 
-@pytest.mark.parametrize(("interval", "expected_unit"), [("3d", "days"), ("12h", "hours"), ("30m", "minutes")])
-def test_schedule_updates_parses_intervals(
-    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, interval: str, expected_unit: str
+@pytest.mark.parametrize("interval", ["3d", "12h", "30m"])
+def test_schedule_updates_polls_daily_regardless_of_interval(
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, interval: str
 ):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
     monkeypatch.setattr(config, "UPDATE_INTERVAL", interval)
@@ -408,19 +411,35 @@ def test_schedule_updates_parses_intervals(
     manager.schedule_updates()
     jobs = schedule.get_jobs()
     assert len(jobs) == 1
-    assert jobs[0].unit == expected_unit
-
-
-def test_schedule_updates_falls_back_to_daily_on_invalid_interval(
-    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
-):
-    monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
-    monkeypatch.setattr(config, "UPDATE_INTERVAL", "garbage")
-    monkeypatch.setattr(process_manager.threading, "Thread", lambda **_: MagicMock(start=lambda: None))
-    manager.schedule_updates()
-    jobs = schedule.get_jobs()
-    assert len(jobs) == 1
     assert jobs[0].unit == "days"
+
+
+@pytest.mark.parametrize(
+    ("interval", "expected"),
+    [("3d", timedelta(days=3)), ("12h", timedelta(hours=12)), ("30m", timedelta(minutes=30))],
+)
+def test_parse_interval(manager: process_manager.PhotonManager, interval: str, expected: timedelta):
+    assert manager._parse_interval(interval) == expected
+
+
+def test_is_update_due_when_marker_missing(
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
+    assert manager._is_update_due() is True
+
+
+@pytest.mark.parametrize(("age_days", "due"), [(31, True), (1, False)])
+def test_is_update_due_compares_marker_age_to_interval(
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, age_days: int, due: bool
+):
+    monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "UPDATE_INTERVAL", "30d")
+    marker = tmp_path / ".photon-index-updated"
+    marker.touch()
+    mtime = time.time() - age_days * 86400
+    os.utime(marker, (mtime, mtime))
+    assert manager._is_update_due() is due
 
 
 def test_schedule_updates_skipped_when_disabled(
