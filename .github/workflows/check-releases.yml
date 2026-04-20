@@ -14,7 +14,9 @@ jobs:
 
         steps:
             - name: Checkout Repository
-              uses: actions/checkout@v6
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                persist-credentials: false
 
             - name: Check for new Photon release
               id: check_release
@@ -43,30 +45,32 @@ jobs:
             - name: Determine if update is needed
               id: prepare_update
               run: |
-                  if [[ -n "${{ env.latest_release_version }}" && "${{ env.latest_release_version }}" != "${{ env.last_processed_version }}" ]]; then
-                    echo "New version found: ${{ env.latest_release_version }}. (Previous: ${{ env.last_processed_version }})"
+                  if [[ -n "${LATEST_RELEASE_VERSION}" && "${LATEST_RELEASE_VERSION}" != "${LAST_PROCESSED_VERSION}" ]]; then
+                    echo "New version found: ${LATEST_RELEASE_VERSION}. (Previous: ${LAST_PROCESSED_VERSION})"
                     {
                       echo "update_needed=true"
-                      echo "new_version=${{ env.latest_release_version }}"
-                      echo "new_branch_name=update-photon-${{ env.latest_release_version }}"
+                      echo "new_version=${LATEST_RELEASE_VERSION}"
+                      echo "new_branch_name=update-photon-${LATEST_RELEASE_VERSION}"
                     } >> "$GITHUB_OUTPUT"
                   else
-                    echo "No new Photon release detected or version is already up-to-date. Latest fetched: '${{ env.latest_release_version }}', last processed: '${{ env.last_processed_version }}'."
+                    echo "No new Photon release detected or version is already up-to-date. Latest fetched: '${LATEST_RELEASE_VERSION}', last processed: '${LAST_PROCESSED_VERSION}'."
                     {
                       echo "update_needed=false"
-                      echo "new_version=${{ env.last_processed_version }}"
+                      echo "new_version=${LAST_PROCESSED_VERSION}"
                     } >> "$GITHUB_OUTPUT"
                   fi
 
             - name: Update release file(s) locally
               if: steps.prepare_update.outputs.update_needed == 'true'
               run: |
-                  echo "Updating .last_release to ${{ steps.prepare_update.outputs.new_version }}"
-                  echo "${{ steps.prepare_update.outputs.new_version }}" > .last_release
+                  echo "Updating .last_release to ${STEPS_PREPARE_UPDATE_OUTPUTS_NEW_VERSION}"
+                  echo "${STEPS_PREPARE_UPDATE_OUTPUTS_NEW_VERSION}" > .last_release
+              env:
+                STEPS_PREPARE_UPDATE_OUTPUTS_NEW_VERSION: ${{ steps.prepare_update.outputs.new_version }}
 
             - name: Create Pull Request
               if: steps.prepare_update.outputs.update_needed == 'true'
-              uses: peter-evans/create-pull-request@v8
+              uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
               with:
                   token: ${{ secrets.MY_PAT_TOKEN }}
                   commit-message: |
