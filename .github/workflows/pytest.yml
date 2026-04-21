@@ -1,3 +1,4 @@
+---
 name: pytest
 on:
     workflow_dispatch:
@@ -6,6 +7,8 @@ on:
             - "src/**"
             - "tests/**"
             - "pyproject.toml"
+            - "uv.lock"
+            - "Dockerfile"
 
 permissions:
     contents: write
@@ -22,27 +25,27 @@ jobs:
             - name: Set up Python
               uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
               with:
-                  python-version-file: "pyproject.toml"
+                python-version-file: "pyproject.toml"
 
             - name: Install uv
               uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8
               with:
-                  enable-cache: true
-                  version: 0.*.*
+                enable-cache: true
+                version: 0.*.*
 
             - name: Install dependencies
               run: uv sync --locked
 
             - name: Run tests (with coverage)
               run: |
-                  uv run pytest \
-                    --junitxml=pytest.xml \
-                    --cov-report=term-missing:skip-covered \
-                    --cov=. \
-                    | tee pytest-coverage.txt
+                uv run pytest \
+                  --junitxml=pytest.xml \
+                  --cov-report=term-missing:skip-covered \
+                  --cov=. \
+                  | tee pytest-coverage.txt
 
             - name: Pytest coverage comment
               uses: MishaKav/pytest-coverage-comment@a01708271d42c5703d489b13eb503ba47c01e82a # main
               with:
-                  pytest-coverage-path: ./pytest-coverage.txt
-                  junitxml-path: ./pytest.xml
+                pytest-coverage-path: ./pytest-coverage.txt
+                junitxml-path: ./pytest.xml
