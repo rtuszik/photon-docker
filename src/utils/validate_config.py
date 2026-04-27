@@ -43,9 +43,7 @@ def validate_config():
             error_messages.append("REGION is required when IMPORT_MODE=jsonl.")
         else:
             try:
-                validated_regions = get_regions_for_jsonl(config.get_jsonl_regions())
-                if len(validated_regions) != 1:
-                    error_messages.append("JSONL mode currently supports exactly one region.")
+                get_regions_for_jsonl(config.get_jsonl_regions())
             except ValueError as exc:
                 error_messages.append(str(exc))
 
