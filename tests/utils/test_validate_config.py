@@ -69,13 +69,12 @@ def test_validate_config_requires_regions_for_jsonl(monkeypatch: pytest.MonkeyPa
         validate_config()
 
 
-def test_validate_config_rejects_multiple_jsonl_regions_for_now(monkeypatch: pytest.MonkeyPatch):
+def test_validate_config_accepts_multiple_jsonl_regions(monkeypatch: pytest.MonkeyPatch):
     _set_base_config(monkeypatch)
     monkeypatch.setattr(config, "IMPORT_MODE", "jsonl")
     monkeypatch.setattr(config, "REGION", "de,fr")
 
-    with pytest.raises(ValueError, match="currently supports exactly one region"):
-        validate_config()
+    validate_config()
 
 
 def test_validate_config_rejects_multiple_db_regions(monkeypatch: pytest.MonkeyPatch):
