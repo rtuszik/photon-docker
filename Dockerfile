@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21.0.9_10-jre-noble
+FROM eclipse-temurin:21.0.10_7-jre-noble@sha256:420374e45e8e9dce3057e768c87a3e8ba58e815049511d8df95ca88a041ec82b
 
 # install astral uv
 COPY --from=ghcr.io/astral-sh/uv:0.10 /uv /usr/local/bin/
