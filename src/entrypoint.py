@@ -3,6 +3,7 @@ import sys
 
 from src.check_remote import check_index_age
 from src.downloader import InsufficientSpaceError, parallel_update, sequential_update
+from src.importer import run_jsonl_import
 from src.utils import config
 from src.utils.logger import get_logger, setup_logging
 from src.utils.notify import send_notification
@@ -12,14 +13,15 @@ from src.utils.validate_config import validate_config
 logger = get_logger()
 
 
-def main():
-    send_notification("Photon-Docker Initializing")
-
-    logger.debug("Entrypoint setup called")
+def log_config() -> None:
     logger.info("=== CONFIG VARIABLES ===")
+    logger.info(f"IMPORT_MODE: {config.IMPORT_MODE}")
     logger.info(f"UPDATE_STRATEGY: {config.UPDATE_STRATEGY}")
     logger.info(f"UPDATE_INTERVAL: {config.UPDATE_INTERVAL}")
     logger.info(f"REGION: {config.REGION}")
+    logger.info(f"LANGUAGES: {config.LANGUAGES}")
+    logger.info(f"EXTRA_TAGS: {config.EXTRA_TAGS}")
+    logger.info(f"IMPORT_GEOMETRIES: {config.IMPORT_GEOMETRIES}")
     logger.info(f"FORCE_UPDATE: {config.FORCE_UPDATE}")
     logger.info(f"DOWNLOAD_MAX_RETRIES: {config.DOWNLOAD_MAX_RETRIES}")
     logger.info(f"FILE_URL (sanitized): {sanitize_url(config.FILE_URL)}")
@@ -39,6 +41,32 @@ def main():
 
     logger.info("=== END CONFIG VARIABLES ===")
 
+
+def run_update_or_import(force_update: bool = False) -> None:
+    if config.IMPORT_MODE == "jsonl":
+        action = "forced JSONL import" if force_update else "initial JSONL import"
+        logger.info(f"Starting {action}")
+        run_jsonl_import()
+        return
+
+    if not force_update:
+        logger.info("Starting initial download using sequential strategy")
+        logger.info("Note: Initial download will use sequential strategy regardless of config setting")
+        sequential_update()
+        return
+
+    if config.UPDATE_STRATEGY == "PARALLEL":
+        parallel_update()
+    else:
+        sequential_update()
+
+
+def main():
+    send_notification("Photon-Docker Initializing")
+
+    logger.debug("Entrypoint setup called")
+    log_config()
+
     try:
         validate_config()
     except ValueError as e:
@@ -51,10 +79,7 @@ def main():
     if config.FORCE_UPDATE:
         logger.info("Starting forced update")
         try:
-            if config.UPDATE_STRATEGY == "PARALLEL":
-                parallel_update()
-            else:
-                sequential_update()
+            run_update_or_import(force_update=True)
         except InsufficientSpaceError as e:
             logger.error(f"Cannot proceed with force update: {e}")
             send_notification(f"Photon-Docker force update failed: {e}")
@@ -66,16 +91,21 @@ def main():
         if not config.INITIAL_DOWNLOAD:
             logger.warning("Initial download is disabled but no existing Photon index was found. ")
             return
-        logger.info("Starting initial download using sequential strategy")
-        logger.info("Note: Initial download will use sequential strategy regardless of config setting")
         try:
-            sequential_update()
+            run_update_or_import(force_update=False)
         except InsufficientSpaceError as e:
             logger.error(f"Cannot proceed: {e}")
             send_notification(f"Photon-Docker cannot start: {e}")
             sys.exit(75)
+        except Exception:
+            logger.error("Initial setup failed")
+            raise
     else:
         logger.info("Existing index found, skipping download")
+
+        if config.IMPORT_MODE == "jsonl":
+            logger.info("JSONL mode with existing index found, skipping automatic rebuild during setup")
+            return
 
         if config.MIN_INDEX_DATE and check_index_age():
             logger.info("Index is older than minimum required date, starting sequential update")

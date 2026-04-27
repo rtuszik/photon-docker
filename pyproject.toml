@@ -10,6 +10,7 @@ dependencies = [
     "requests==2.33.1",
     "schedule>=1.2.2",
     "tqdm==4.67.3",
+    "zstandard>=0.23.0",
 ]
 
 [dependency-groups]
