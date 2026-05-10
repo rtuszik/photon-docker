@@ -26,6 +26,9 @@ dev = [
 requires = ["uv_build>=0.11.7,<0.12.0"]
 build-backend = "uv_build"
 
+[tool.coverage.run]
+omit = ["tests/*"]
+
 [tool.ruff]
 indent-width = 4
 line-length = 120
