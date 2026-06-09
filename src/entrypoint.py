@@ -3,6 +3,7 @@ import sys
 
 from src.check_remote import check_index_age
 from src.downloader import InsufficientSpaceError, parallel_update, sequential_update
+from src.filesystem import reconcile_interrupted_import
 from src.importer import run_jsonl_import
 from src.utils import config
 from src.utils.logger import get_logger, setup_logging
@@ -75,6 +76,8 @@ def main():
 
     if config.MIN_INDEX_DATE:
         logger.info(f"MIN_INDEX_DATE: {config.MIN_INDEX_DATE}")
+
+    reconcile_interrupted_import()
 
     if config.FORCE_UPDATE:
         logger.info("Starting forced update")
