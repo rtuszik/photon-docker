@@ -207,3 +207,46 @@ def update_timestamp_marker():
         logging.info(f"Updated timestamp marker: {marker_file}")
     except Exception as e:
         logging.warning(f"Failed to update timestamp marker: {e}")
+
+
+def _import_in_progress_marker() -> str:
+    return os.path.join(config.DATA_DIR, ".photon-import-in-progress")
+
+
+def mark_import_in_progress():
+    marker_file = _import_in_progress_marker()
+    try:
+        Path(marker_file).touch()
+        logging.debug(f"Marked import in progress: {marker_file}")
+    except Exception as e:
+        logging.warning(f"Failed to write import-in-progress marker: {e}")
+
+
+def clear_import_in_progress():
+    marker_file = _import_in_progress_marker()
+    try:
+        Path(marker_file).unlink(missing_ok=True)
+    except Exception as e:
+        logging.warning(f"Failed to clear import-in-progress marker: {e}")
+
+
+def import_was_interrupted() -> bool:
+    return os.path.exists(_import_in_progress_marker())
+
+
+def remove_incomplete_index():
+    if os.path.isdir(config.PHOTON_DATA_DIR):
+        logging.warning(f"Removing incomplete index at {config.PHOTON_DATA_DIR}")
+        shutil.rmtree(config.PHOTON_DATA_DIR)
+
+
+def reconcile_interrupted_import():
+    if not import_was_interrupted():
+        return
+
+    logging.warning(
+        "Detected an interrupted import (in-progress marker present). "
+        "Removing the partial index so a clean import can run."
+    )
+    remove_incomplete_index()
+    clear_import_in_progress()

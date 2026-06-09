@@ -96,6 +96,53 @@ def test_update_timestamp_marker_swallows_errors(fake_dirs: Path):
         filesystem.update_timestamp_marker()
 
 
+def test_import_in_progress_marker_roundtrip(fake_dirs: Path):
+    assert filesystem.import_was_interrupted() is False
+
+    filesystem.mark_import_in_progress()
+    assert filesystem.import_was_interrupted() is True
+
+    filesystem.clear_import_in_progress()
+    assert filesystem.import_was_interrupted() is False
+
+
+def test_clear_import_in_progress_is_idempotent(fake_dirs: Path):
+    filesystem.clear_import_in_progress()
+    assert filesystem.import_was_interrupted() is False
+
+
+def test_remove_incomplete_index_removes_photon_data(fake_dirs: Path):
+    node_dir = Path(config.OS_NODE_DIR)
+    node_dir.mkdir(parents=True)
+    (node_dir / "segment.bin").write_text("partial")
+
+    filesystem.remove_incomplete_index()
+
+    assert not Path(config.PHOTON_DATA_DIR).exists()
+
+
+def test_reconcile_interrupted_import_cleans_partial_index(fake_dirs: Path):
+    node_dir = Path(config.OS_NODE_DIR)
+    node_dir.mkdir(parents=True)
+    (node_dir / "segment.bin").write_text("partial")
+    filesystem.mark_import_in_progress()
+
+    filesystem.reconcile_interrupted_import()
+
+    assert not Path(config.PHOTON_DATA_DIR).exists()
+    assert filesystem.import_was_interrupted() is False
+
+
+def test_reconcile_interrupted_import_noop_without_marker(fake_dirs: Path):
+    node_dir = Path(config.OS_NODE_DIR)
+    node_dir.mkdir(parents=True)
+    (node_dir / "segment.bin").write_text("complete")
+
+    filesystem.reconcile_interrupted_import()
+
+    assert Path(config.OS_NODE_DIR).exists()
+
+
 def test_cleanup_staging_and_temp_backup_removes_both(tmp_path: Path):
     staging = tmp_path / "staging"
     backup = tmp_path / "backup"

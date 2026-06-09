@@ -14,7 +14,7 @@ import schedule
 from requests.exceptions import RequestException
 
 from src.check_remote import compare_mtime
-from src.filesystem import cleanup_backup_after_verification
+from src.filesystem import cleanup_backup_after_verification, reconcile_interrupted_import
 from src.utils import config
 from src.utils.logger import get_logger, setup_logging
 
@@ -309,6 +309,8 @@ class PhotonManager:
 
     def run(self):
         logger.info("Photon Manager starting...")
+
+        reconcile_interrupted_import()
 
         if not config.FORCE_UPDATE and os.path.isdir(config.OS_NODE_DIR):
             logger.info("Existing index found, skipping initial setup")
