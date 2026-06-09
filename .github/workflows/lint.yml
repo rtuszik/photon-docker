@@ -10,109 +10,53 @@ on:
     workflow_dispatch:
 
 jobs:
-    setup:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-              with:
-                persist-credentials: false
-            - name: "Set up Python"
-              uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-              with:
-                python-version-file: "pyproject.toml"
-            - name: Install uv
-              uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8
-              with:
-                enable-cache: true
-                version: 0.11.*
-            - name: Install dependencies
-              run: uv sync --locked
-            - name: Cache dependencies
-              uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-              with:
-                path: |
-                    .venv
-                    ~/.cache/uv
-                key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
-
     lint:
         runs-on: ubuntu-latest
-        needs: setup
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                 persist-credentials: false
-            - name: "Set up Python"
-              uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+            - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
               with:
-                python-version-file: "pyproject.toml"
-            - name: Install uv
-              uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8
+                python-version-file: ".python-version"
+
+            - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8
               with:
                 enable-cache: true
                 version: 0.11.*
-            - name: Restore dependencies
-              uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-              with:
-                path: |
-                    .venv
-                    ~/.cache/uv
-                key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
-                fail-on-cache-miss: true
-            - name: Run linting
-              run: |
-                uv run ruff check --fix
-                uv run ruff format
+            - run: uv sync --locked
+            - run: |
+                uv run ruff check
+                uv run ruff format --check
 
     typecheck:
         runs-on: ubuntu-latest
-        needs: setup
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                 persist-credentials: false
-            - name: "Set up Python"
-              uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+            - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
               with:
-                python-version-file: "pyproject.toml"
-            - name: Install uv
-              uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8
+                python-version-file: ".python-version"
+            - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8
               with:
                 enable-cache: true
                 version: 0.11.*
-            - name: Restore dependencies
-              uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-              with:
-                path: |
-                    .venv
-                    ~/.cache/uv
-                key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
-                fail-on-cache-miss: true
-            - name: Run type checking
-              run: uv run ty check
+            - run: uv sync --locked
+            - run: uv run ty check
+
     vulture:
         runs-on: ubuntu-latest
-        needs: setup
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                 persist-credentials: false
-            - name: "Set up Python"
-              uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+            - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
               with:
-                python-version-file: "pyproject.toml"
-            - name: Install uv
-              uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8
+                python-version-file: ".python-version"
+            - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8
               with:
                 enable-cache: true
                 version: 0.11.*
-            - name: Restore dependencies
-              uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-              with:
-                path: |
-                    .venv
-                    ~/.cache/uv
-                key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
-                fail-on-cache-miss: true
-            - name: Run vulture
-              run: uv run vulture --min-confidence 100 --exclude ".venv" .
+            - run: uv sync --locked
+            - run: uv run vulture --min-confidence 100 --exclude ".venv" .
