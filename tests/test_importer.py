@@ -6,6 +6,13 @@ from src import importer
 from src.utils import config
 
 
+@pytest.fixture(autouse=True)
+def _stub_index_markers(monkeypatch):
+    monkeypatch.setattr(importer, "mark_import_in_progress", lambda: None)
+    monkeypatch.setattr(importer, "update_timestamp_marker", lambda: None)
+    monkeypatch.setattr(importer, "clear_import_in_progress", lambda: None)
+
+
 def _noop_makedirs(path: str, exist_ok: bool = False) -> None:
     _ = (path, exist_ok)
 
@@ -206,3 +213,40 @@ def test_run_jsonl_import_raises_when_import_process_fails(monkeypatch):
     assert process.kill_calls == 1
     assert process.wait_calls == 2
     assert cleanup_calls == [True]
+
+
+def test_run_jsonl_import_marks_then_clears_progress_on_success(monkeypatch):
+    process = RecordingProcess()
+    events = []
+
+    monkeypatch.setattr(config, "REGION", "andorra")
+    monkeypatch.setattr(importer, "download_jsonl", lambda region: "/photon/data/temp/andorra.jsonl.zst")
+    monkeypatch.setattr(importer, "stream_decompress", lambda path: [b'{"type":"Place"}\n'])
+    monkeypatch.setattr(importer, "_start_photon_import", lambda input_source, country_codes=None: process)
+    monkeypatch.setattr(importer, "clear_temp_dir", lambda: None)
+    monkeypatch.setattr(importer, "mark_import_in_progress", lambda: events.append("mark"))
+    monkeypatch.setattr(importer, "update_timestamp_marker", lambda: events.append("timestamp"))
+    monkeypatch.setattr(importer, "clear_import_in_progress", lambda: events.append("clear"))
+
+    importer.run_jsonl_import()
+
+    assert events == ["mark", "timestamp", "clear"]
+
+
+def test_run_jsonl_import_leaves_progress_marker_on_failure(monkeypatch):
+    process = RecordingProcess(wait_return_code=2)
+    events = []
+
+    monkeypatch.setattr(config, "REGION", "andorra")
+    monkeypatch.setattr(importer, "download_jsonl", lambda region: "/photon/data/temp/andorra.jsonl.zst")
+    monkeypatch.setattr(importer, "stream_decompress", lambda path: [b'{"type":"Place"}\n'])
+    monkeypatch.setattr(importer, "_start_photon_import", lambda input_source, country_codes=None: process)
+    monkeypatch.setattr(importer, "clear_temp_dir", lambda: None)
+    monkeypatch.setattr(importer, "mark_import_in_progress", lambda: events.append("mark"))
+    monkeypatch.setattr(importer, "update_timestamp_marker", lambda: events.append("timestamp"))
+    monkeypatch.setattr(importer, "clear_import_in_progress", lambda: events.append("clear"))
+
+    with pytest.raises(RuntimeError, match="exit code 2"):
+        importer.run_jsonl_import()
+
+    assert events == ["mark"]
