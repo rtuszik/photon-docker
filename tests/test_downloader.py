@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -159,19 +158,45 @@ def test_supports_range_requests_false_on_error():
         assert downloader.supports_range_requests("https://example.com/x") is False
 
 
-def test_get_download_url_uses_file_url_when_set(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "FILE_URL", "https://override.example/file.tar.bz2")
-    assert downloader.get_download_url() == "https://override.example/file.tar.bz2"
+def test_prepare_temp_dir_creates_fresh_dir(fake_dirs: Path):
+    assert not Path(config.TEMP_DIR).exists()
+    downloader.prepare_temp_dir()
+    assert Path(config.TEMP_DIR).exists()
 
 
-def test_get_download_url_constructs_from_region_and_base(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "FILE_URL", None)
-    monkeypatch.setattr(config, "BASE_URL", "https://example.com/public")
-    monkeypatch.setattr(config, "REGION", "europe")
-    monkeypatch.setattr(config, "INDEX_DB_VERSION", "1.0")
-    monkeypatch.setattr(config, "INDEX_FILE_EXTENSION", "tar.bz2")
-    url = downloader.get_download_url()
-    assert url == "https://example.com/public/europe/photon-db-europe-1.0-latest.tar.bz2"
+def test_prepare_temp_dir_replaces_existing_dir(fake_dirs: Path):
+    temp = Path(config.TEMP_DIR)
+    temp.mkdir()
+    (temp / "stale.txt").write_text("stale")
+
+    downloader.prepare_temp_dir()
+
+    assert temp.exists()
+    assert not (temp / "stale.txt").exists()
+
+
+def test_prepare_temp_dir_raises_when_removal_fails(fake_dirs: Path):
+    temp = Path(config.TEMP_DIR)
+    temp.mkdir()
+    with patch("src.downloader.shutil.rmtree", side_effect=OSError("locked")), pytest.raises(OSError, match="locked"):
+        downloader.prepare_temp_dir()
+
+
+def test_clear_temp_dir_removes_existing_temp(fake_dirs: Path):
+    temp = Path(config.TEMP_DIR)
+    temp.mkdir()
+    (temp / "file.txt").write_text("x")
+    (temp / "sub").mkdir()
+    (temp / "sub" / "nested").write_text("y")
+
+    downloader.clear_temp_dir()
+
+    assert not temp.exists()
+
+
+def test_clear_temp_dir_handles_missing_temp_dir(fake_dirs: Path):
+    assert not Path(config.TEMP_DIR).exists()
+    downloader.clear_temp_dir()
 
 
 def test_prepare_download_no_state(tmp_path: Path):
@@ -340,154 +365,11 @@ def test_download_file_returns_false_on_unexpected_exception(tmp_path: Path, mon
         assert downloader.download_file("https://example.com/x", str(dest)) is False
 
 
-def test_download_index_returns_path(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "INDEX_FILE_EXTENSION", "tar.bz2")
-    monkeypatch.setattr(downloader, "get_download_url", lambda: "https://example.com/x")
-    Path(config.TEMP_DIR).mkdir(parents=True, exist_ok=True)
-
-    def fake_download(_url, output):
-        Path(output).write_bytes(b"x")
-        return True
-
-    with patch("src.downloader.download_file", side_effect=fake_download):
-        out = downloader.download_index()
-
-    assert out == os.path.join(config.TEMP_DIR, "photon-db-latest.tar.bz2")
-    assert Path(out).exists()
-
-
-def test_download_index_raises_on_failure(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "INDEX_FILE_EXTENSION", "tar.bz2")
-    monkeypatch.setattr(downloader, "get_download_url", lambda: "https://example.com/x")
-    Path(config.TEMP_DIR).mkdir(parents=True, exist_ok=True)
+def test_download_file_propagates_oserror(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    dest = tmp_path / "out.bin"
+    monkeypatch.setattr(config, "DOWNLOAD_MAX_RETRIES", "1")
     with (
-        patch("src.downloader.download_file", return_value=False),
-        pytest.raises(Exception, match="Failed to download index"),
+        patch("src.downloader.requests.get", side_effect=OSError("disk full")),
+        pytest.raises(OSError, match="disk full"),
     ):
-        downloader.download_index()
-
-
-def test_download_md5_uses_explicit_url(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "MD5_URL", "https://example.com/custom.md5")
-    monkeypatch.setattr(config, "INDEX_FILE_EXTENSION", "tar.bz2")
-    Path(config.TEMP_DIR).mkdir(parents=True, exist_ok=True)
-
-    captured = {}
-
-    def fake_download(url, output):
-        captured["url"] = url
-        captured["output"] = output
-        Path(output).write_text("md5")
-        return True
-
-    with patch("src.downloader.download_file", side_effect=fake_download):
-        out = downloader.download_md5()
-
-    assert captured["url"] == "https://example.com/custom.md5"
-    assert out.endswith("photon-db-latest.tar.bz2.md5")
-
-
-def test_download_md5_constructs_url_when_unset(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "MD5_URL", None)
-    monkeypatch.setattr(config, "FILE_URL", None)
-    monkeypatch.setattr(config, "BASE_URL", "https://example.com/public")
-    monkeypatch.setattr(config, "REGION", None)
-    monkeypatch.setattr(config, "INDEX_DB_VERSION", "1.0")
-    monkeypatch.setattr(config, "INDEX_FILE_EXTENSION", "tar.bz2")
-    Path(config.TEMP_DIR).mkdir(parents=True, exist_ok=True)
-
-    captured = {}
-
-    def fake_download(url, output):
-        captured["url"] = url
-        Path(output).write_text("md5")
-        return True
-
-    with patch("src.downloader.download_file", side_effect=fake_download):
-        downloader.download_md5()
-
-    assert captured["url"] == "https://example.com/public/photon-db-planet-1.0-latest.tar.bz2.md5"
-
-
-def test_download_md5_raises_on_failure(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "MD5_URL", "https://example.com/x.md5")
-    monkeypatch.setattr(config, "INDEX_FILE_EXTENSION", "tar.bz2")
-    Path(config.TEMP_DIR).mkdir(parents=True, exist_ok=True)
-    with (
-        patch("src.downloader.download_file", return_value=False),
-        pytest.raises(Exception, match="Failed to download MD5"),
-    ):
-        downloader.download_md5()
-
-
-def _make_orchestrator_patches(monkeypatch: pytest.MonkeyPatch):
-    fake_index = str(Path(config.TEMP_DIR) / "index.tar.bz2")
-    fake_md5 = fake_index + ".md5"
-    monkeypatch.setattr(downloader, "get_download_url", lambda: "https://example.com/x")
-    monkeypatch.setattr(downloader, "get_remote_file_size", lambda _: 1024)
-    monkeypatch.setattr(downloader, "check_disk_space_requirements", lambda *_, **__: True)
-    monkeypatch.setattr(downloader, "download_index", lambda: fake_index)
-    monkeypatch.setattr(downloader, "download_md5", lambda: fake_md5)
-    monkeypatch.setattr(downloader, "extract_index", lambda _: None)
-    monkeypatch.setattr(downloader, "verify_checksum", lambda *_: True)
-    monkeypatch.setattr(downloader, "move_index", lambda: True)
-    monkeypatch.setattr(downloader, "clear_temp_dir", lambda: None)
-
-
-def test_parallel_update_happy_path(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "SKIP_MD5_CHECK", False)
-    _make_orchestrator_patches(monkeypatch)
-    downloader.parallel_update()
-    assert Path(config.TEMP_DIR).exists()
-
-
-def test_parallel_update_skips_md5_when_configured(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "SKIP_MD5_CHECK", True)
-    _make_orchestrator_patches(monkeypatch)
-
-    md5_called = {"n": 0}
-
-    def fake_md5():
-        md5_called["n"] += 1
-        return str(Path(config.TEMP_DIR) / "x.md5")
-
-    monkeypatch.setattr(downloader, "download_md5", fake_md5)
-    downloader.parallel_update()
-    assert md5_called["n"] == 0
-
-
-def test_parallel_update_raises_on_insufficient_space(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    _make_orchestrator_patches(monkeypatch)
-    monkeypatch.setattr(downloader, "check_disk_space_requirements", lambda *_, **__: False)
-    with pytest.raises(SystemExit):
-        downloader.parallel_update()
-
-
-def test_parallel_update_skip_space_check_proceeds_on_size_error(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "SKIP_SPACE_CHECK", True)
-    monkeypatch.setattr(config, "SKIP_MD5_CHECK", True)
-    _make_orchestrator_patches(monkeypatch)
-
-    def boom(_url):
-        raise downloader.RemoteFileSizeError("no size")
-
-    monkeypatch.setattr(downloader, "get_remote_file_size", boom)
-    downloader.parallel_update()
-
-
-def test_sequential_update_happy_path(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "SKIP_MD5_CHECK", False)
-    _make_orchestrator_patches(monkeypatch)
-    downloader.sequential_update()
-
-
-def test_sequential_update_raises_on_size_error_without_skip(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "SKIP_SPACE_CHECK", False)
-    _make_orchestrator_patches(monkeypatch)
-
-    def boom(_url):
-        raise downloader.RemoteFileSizeError("no size")
-
-    monkeypatch.setattr(downloader, "get_remote_file_size", boom)
-    with pytest.raises(SystemExit):
-        downloader.sequential_update()
+        downloader.download_file("https://example.com/x", str(dest))
