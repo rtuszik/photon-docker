@@ -2,7 +2,8 @@ import os
 import shlex
 import subprocess
 
-from src.filesystem import clear_import_in_progress, clear_temp_dir, mark_import_in_progress, update_timestamp_marker
+from src.downloader import clear_temp_dir
+from src.index import begin_import, complete_import
 from src.jsonl.decompressor import stream_decompress
 from src.jsonl.downloader import download_jsonl
 from src.utils import config
@@ -20,7 +21,7 @@ def run_jsonl_import() -> None:
     parent_region = get_jsonl_parent_region(regions)
     country_codes = get_country_codes_for_regions(regions) if len(regions) > 1 else None
 
-    mark_import_in_progress()
+    begin_import()
     try:
         jsonl_path = download_jsonl(parent_region)
         import_proc = _start_photon_import("-", country_codes=country_codes)
@@ -38,8 +39,7 @@ def run_jsonl_import() -> None:
             import_proc.kill()
             import_proc.wait()
             raise
-        update_timestamp_marker()
-        clear_import_in_progress()
+        complete_import()
     finally:
         clear_temp_dir()
 

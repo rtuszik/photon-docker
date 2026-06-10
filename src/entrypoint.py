@@ -1,12 +1,9 @@
-import os
-import sys
-
+from src import index
 from src.check_remote import check_index_age
-from src.downloader import InsufficientSpaceError, parallel_update, sequential_update
-from src.filesystem import reconcile_interrupted_import
 from src.importer import run_jsonl_import
+from src.update import InsufficientSpaceError, run_update
 from src.utils import config
-from src.utils.logger import get_logger, setup_logging
+from src.utils.logger import get_logger
 from src.utils.notify import send_notification
 from src.utils.sanitize import sanitize_url
 from src.utils.validate_config import validate_config
@@ -53,31 +50,22 @@ def run_update_or_import(force_update: bool = False) -> None:
     if not force_update:
         logger.info("Starting initial download using sequential strategy")
         logger.info("Note: Initial download will use sequential strategy regardless of config setting")
-        sequential_update()
+        run_update("SEQUENTIAL")
         return
 
-    if config.UPDATE_STRATEGY == "PARALLEL":
-        parallel_update()
-    else:
-        sequential_update()
+    run_update("PARALLEL" if config.UPDATE_STRATEGY == "PARALLEL" else "SEQUENTIAL")
 
 
-def main():
+def run_setup() -> None:
     send_notification("Photon-Docker Initializing")
 
-    logger.debug("Entrypoint setup called")
     log_config()
-
-    try:
-        validate_config()
-    except ValueError as e:
-        logger.error(f"Stopping due to invalid configuration.\n{e}")
-        sys.exit(1)
+    validate_config()
 
     if config.MIN_INDEX_DATE:
         logger.info(f"MIN_INDEX_DATE: {config.MIN_INDEX_DATE}")
 
-    reconcile_interrupted_import()
+    index.reconcile()
 
     if config.FORCE_UPDATE:
         logger.info("Starting forced update")
@@ -86,11 +74,10 @@ def main():
         except InsufficientSpaceError as e:
             logger.error(f"Cannot proceed with force update: {e}")
             send_notification(f"Photon-Docker force update failed: {e}")
-            sys.exit(75)
-        except Exception:
-            logger.error("Force update failed")
             raise
-    elif not os.path.isdir(config.OS_NODE_DIR):
+        return
+
+    if not index.is_present():
         if not config.INITIAL_DOWNLOAD:
             logger.warning("Initial download is disabled but no existing Photon index was found. ")
             return
@@ -99,30 +86,20 @@ def main():
         except InsufficientSpaceError as e:
             logger.error(f"Cannot proceed: {e}")
             send_notification(f"Photon-Docker cannot start: {e}")
-            sys.exit(75)
-        except Exception:
-            logger.error("Initial setup failed")
             raise
-    else:
-        logger.info("Existing index found, skipping download")
+        return
 
-        if config.IMPORT_MODE == "jsonl":
-            logger.info("JSONL mode with existing index found, skipping automatic rebuild during setup")
-            return
+    logger.info("Existing index found, skipping download")
 
-        if config.MIN_INDEX_DATE and check_index_age():
-            logger.info("Index is older than minimum required date, starting sequential update")
-            try:
-                sequential_update()
-            except InsufficientSpaceError as e:
-                logger.error(f"Cannot proceed with minimum date update: {e}")
-                send_notification(f"Photon-Docker minimum date update failed: {e}")
-                sys.exit(75)
-            except Exception:
-                logger.error("Minimum date update failed")
-                raise
+    if config.IMPORT_MODE == "jsonl":
+        logger.info("JSONL mode with existing index found, skipping automatic rebuild during setup")
+        return
 
-
-if __name__ == "__main__":
-    setup_logging()
-    main()
+    if config.MIN_INDEX_DATE and check_index_age():
+        logger.info("Index is older than minimum required date, starting sequential update")
+        try:
+            run_update("SEQUENTIAL")
+        except InsufficientSpaceError as e:
+            logger.error(f"Cannot proceed with minimum date update: {e}")
+            send_notification(f"Photon-Docker minimum date update failed: {e}")
+            raise

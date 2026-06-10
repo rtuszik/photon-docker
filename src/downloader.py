@@ -8,17 +8,8 @@ import requests
 from requests.exceptions import RequestException
 from tqdm import tqdm
 
-from src.check_remote import RemoteFileSizeError, get_local_time, get_remote_file_size
-from src.filesystem import clear_temp_dir, extract_index, move_index, verify_checksum
 from src.utils import config
 from src.utils.logger import get_logger
-from src.utils.regions import get_index_url_path
-from src.utils.sanitize import sanitize_url
-
-
-class InsufficientSpaceError(Exception):
-    pass
-
 
 logging = get_logger()
 
@@ -81,6 +72,29 @@ def check_disk_space_requirements(download_size: int, is_parallel: bool = True) 
 
     logging.info("Sufficient disk space available for update")
     return True
+
+
+def prepare_temp_dir():
+    if os.path.isdir(config.TEMP_DIR):
+        logging.debug(f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it.")
+        try:
+            shutil.rmtree(config.TEMP_DIR)
+        except Exception as e:
+            logging.error(f"Failed to remove existing TEMP_DIR: {e}")
+            raise
+
+    logging.debug(f"Creating temporary directory: {config.TEMP_DIR}")
+    os.makedirs(config.TEMP_DIR, exist_ok=True)
+
+
+def clear_temp_dir():
+    logging.info("Removing TEMP dir")
+    if not os.path.exists(config.TEMP_DIR):
+        return
+    try:
+        shutil.rmtree(config.TEMP_DIR)
+    except Exception:
+        logging.exception("Failed to Remove TEMP_DIR")
 
 
 def get_download_state_file(destination: str) -> str:
@@ -149,172 +163,6 @@ def supports_range_requests(url: str) -> bool:
     except Exception as e:
         logging.warning(f"Could not determine range support for {url}: {e}")
         return False
-
-
-def get_download_url() -> str:
-    if config.FILE_URL:
-        logging.info("Using custom FILE_URL for download: %s", sanitize_url(config.FILE_URL))
-        return config.FILE_URL
-
-    index_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION)
-    download_url = config.BASE_URL + index_path
-    logging.info("Using constructed location for download: %s", download_url)
-    return download_url
-
-
-def parallel_update():
-    logging.info("Starting parallel update process...")
-
-    try:
-        if os.path.isdir(config.TEMP_DIR):
-            logging.debug(f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it.")
-            try:
-                shutil.rmtree(config.TEMP_DIR)
-                logging.debug(f"Successfully removed directory: {config.TEMP_DIR}")
-            except Exception as e:
-                logging.error(f"Failed to remove existing TEMP_DIR: {e}")
-                raise
-
-        logging.debug(f"Creating temporary directory: {config.TEMP_DIR}")
-        os.makedirs(config.TEMP_DIR, exist_ok=True)
-
-        download_url = get_download_url()
-
-        try:
-            file_size = get_remote_file_size(download_url)
-            if not check_disk_space_requirements(file_size, is_parallel=True):
-                logging.error("Insufficient disk space for parallel update")
-                raise InsufficientSpaceError("Insufficient disk space for parallel update")
-        except RemoteFileSizeError as e:
-            if config.SKIP_SPACE_CHECK:
-                logging.warning(f"{e}")
-                logging.warning("SKIP_SPACE_CHECK is enabled, proceeding without space check")
-            else:
-                logging.error(f"{e}")
-                logging.error(
-                    "Cannot proceed without verifying disk space. "
-                    "Set SKIP_SPACE_CHECK=true to bypass this check (not recommended)."
-                )
-                raise
-
-        logging.info("Downloading index")
-
-        index_file = download_index()
-
-        extract_index(index_file)
-
-        if not config.SKIP_MD5_CHECK:
-            md5_file = download_md5()
-
-            logging.info("Verifying checksum...")
-            verify_checksum(md5_file, index_file)
-
-            logging.debug("Checksum verification successful.")
-
-        logging.info("Moving Index")
-        move_index()
-        clear_temp_dir()
-
-        logging.info("Parallel update process completed successfully.")
-
-    except Exception as e:
-        logging.error(f"FATAL: Update process failed with an error: {e}")
-        logging.error("Aborting script.")
-        sys.exit(1)
-
-
-def sequential_update():
-    logging.info("Starting sequential download process...")
-
-    try:
-        if os.path.isdir(config.TEMP_DIR):
-            logging.debug(f"Temporary directory {config.TEMP_DIR} exists. Attempting to remove it.")
-            try:
-                shutil.rmtree(config.TEMP_DIR)
-                logging.debug(f"Successfully removed directory: {config.TEMP_DIR}")
-            except Exception as e:
-                logging.error(f"Failed to remove existing TEMP_DIR: {e}")
-                raise
-
-        logging.debug(f"Creating temporary directory: {config.TEMP_DIR}")
-        os.makedirs(config.TEMP_DIR, exist_ok=True)
-
-        download_url = get_download_url()
-
-        try:
-            file_size = get_remote_file_size(download_url)
-            if not check_disk_space_requirements(file_size, is_parallel=False):
-                logging.error("Insufficient disk space for sequential update")
-                raise InsufficientSpaceError("Insufficient disk space for sequential update")
-        except RemoteFileSizeError as e:
-            if config.SKIP_SPACE_CHECK:
-                logging.warning(f"{e}")
-                logging.warning("SKIP_SPACE_CHECK is enabled, proceeding without space check")
-            else:
-                logging.error(f"{e}")
-                logging.error(
-                    "Cannot proceed without verifying disk space. "
-                    "Set SKIP_SPACE_CHECK=true to bypass this check (not recommended)."
-                )
-                raise
-
-        logging.info("Downloading new index and MD5 checksum...")
-        index_file = download_index()
-        extract_index(index_file)
-
-        if not config.SKIP_MD5_CHECK:
-            md5_file = download_md5()
-
-            logging.info("Verifying checksum...")
-            verify_checksum(md5_file, index_file)
-
-            logging.debug("Checksum verification successful.")
-
-        logging.info("Moving new index into place...")
-        move_index()
-
-        clear_temp_dir()
-
-        logging.info("Sequential download process completed successfully.")
-
-    except Exception as e:
-        logging.critical(f"FATAL: Update process failed with an error: {e}")
-        logging.critical("Aborting script.")
-        sys.exit(1)
-
-
-def download_index() -> str:
-    output_file = f"photon-db-latest.{config.INDEX_FILE_EXTENSION}"
-    download_url = get_download_url()
-
-    output = os.path.join(config.TEMP_DIR, output_file)
-
-    if not download_file(download_url, output):
-        raise Exception(f"Failed to download index from {download_url}")
-
-    local_timestamp = get_local_time(config.OS_NODE_DIR)
-
-    logging.debug(f"New index timestamp: {local_timestamp}")
-    return output
-
-
-def download_md5():
-    if config.MD5_URL:
-        # MD5 URL provided, use it directly.
-        logging.info("Using custom MD5_URL for checksum: %s", sanitize_url(config.MD5_URL))
-        download_url = config.MD5_URL
-    else:
-        md5_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION) + ".md5"
-        download_url = config.BASE_URL + md5_path
-        logging.info("Using constructed URL for checksum: %s", download_url)
-
-    output_file = f"photon-db-latest.{config.INDEX_FILE_EXTENSION}.md5"
-    output = os.path.join(config.TEMP_DIR, output_file)
-
-    if not download_file(download_url, output):
-        raise Exception(f"Failed to download MD5 checksum from {sanitize_url(download_url)}")
-
-    return output
 
 
 def _prepare_download(url, destination):
@@ -501,6 +349,10 @@ def download_file(url, destination):
                 continue
             logging.exception(f"Download failed after {max_retries} attempts")
             return False
+
+        except OSError:
+            logging.exception("Download failed due to a local filesystem error")
+            raise
 
         except Exception:
             logging.exception("Download failed")
