@@ -1,10 +1,10 @@
 import datetime
-import os
 
 import requests
 from dateutil.parser import parse as parsedate
 from requests.exceptions import RequestException
 
+from src import index
 from src.utils import config
 from src.utils.logger import get_logger
 from src.utils.regions import get_index_url_path
@@ -54,16 +54,6 @@ def get_remote_time(remote_url: str):
     return None
 
 
-def get_local_time(local_path: str):
-    marker_file = os.path.join(config.DATA_DIR, ".photon-index-updated")
-    if os.path.exists(marker_file):
-        return os.path.getmtime(marker_file)
-
-    if not os.path.exists(local_path):
-        return 0.0
-    return os.path.getmtime(local_path)
-
-
 def compare_mtime() -> bool:
     try:
         index_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION)
@@ -79,11 +69,9 @@ def compare_mtime() -> bool:
         logging.warning("Could not determine remote time. Assuming no update is needed.")
         return False
 
-    marker_file = os.path.join(config.DATA_DIR, ".photon-index-updated")
-    using_marker_file = os.path.exists(marker_file)
+    using_marker_file = index.has_update_timestamp()
 
-    local_timestamp = get_local_time(config.OS_NODE_DIR)
-    local_dt = datetime.datetime.fromtimestamp(local_timestamp, tz=datetime.UTC)
+    local_dt = datetime.datetime.fromtimestamp(index.last_updated(), tz=datetime.UTC)
 
     logging.debug(f"Remote index time: {remote_dt}")
     logging.debug(f"Local index time:  {local_dt}")
@@ -107,7 +95,7 @@ def check_index_age() -> bool:
         logging.warning(f"Invalid MIN_INDEX_DATE format: {config.MIN_INDEX_DATE}. Expected DD.MM.YY")
         return True
 
-    local_timestamp = get_local_time(config.OS_NODE_DIR)
+    local_timestamp = index.last_updated()
     if local_timestamp == 0.0:
         logging.info("No local index found, update required")
         return True
