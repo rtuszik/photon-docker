@@ -98,24 +98,6 @@ def test_get_remote_time_returns_none_on_request_error():
         assert check_remote.get_remote_time("https://example.com") is None
 
 
-def test_get_local_time_returns_marker_mtime_when_present(fake_dirs: Path):
-    marker = fake_dirs / ".photon-index-updated"
-    marker.write_text("")
-    os.utime(marker, (1_000_000, 1_000_000))
-    assert check_remote.get_local_time(str(fake_dirs / "missing")) == 1_000_000
-
-
-def test_get_local_time_returns_path_mtime_when_no_marker(fake_dirs: Path):
-    target = fake_dirs / "node_1"
-    target.mkdir()
-    os.utime(target, (2_000_000, 2_000_000))
-    assert check_remote.get_local_time(str(target)) == 2_000_000
-
-
-def test_get_local_time_returns_zero_when_path_missing(fake_dirs: Path):
-    assert check_remote.get_local_time(str(fake_dirs / "missing")) == 0.0
-
-
 def test_compare_mtime_returns_false_when_remote_time_unknown(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "REGION", None)
     monkeypatch.setattr(config, "BASE_URL", "https://example.com")

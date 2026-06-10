@@ -79,19 +79,6 @@ def test_handle_shutdown_sets_exit_and_calls_shutdown(manager: process_manager.P
     shutdown.assert_called_once()
 
 
-def test_run_initial_setup_exits_on_failure(manager: process_manager.PhotonManager):
-    completed = subprocess.CompletedProcess(args=[], returncode=1)
-    with patch("src.process_manager.subprocess.run", return_value=completed), pytest.raises(SystemExit) as exc:
-        manager.run_initial_setup()
-    assert exc.value.code == 1
-
-
-def test_run_initial_setup_succeeds_on_zero_exit(manager: process_manager.PhotonManager):
-    completed = subprocess.CompletedProcess(args=[], returncode=0)
-    with patch("src.process_manager.subprocess.run", return_value=completed):
-        manager.run_initial_setup()
-
-
 def test_start_photon_builds_full_command(manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "ENABLE_METRICS", True)
     monkeypatch.setattr(config, "JAVA_PARAMS", "-Xmx4g")
@@ -242,7 +229,7 @@ def test_cleanup_lock_files_swallows_remove_errors(
 
 def test_run_update_skips_when_disabled(manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "DISABLED")
-    with patch("src.process_manager.subprocess.run") as run:
+    with patch("src.process_manager.update.run_update") as run:
         manager.run_update()
     run.assert_not_called()
 
@@ -253,7 +240,7 @@ def test_run_update_no_op_when_index_up_to_date(
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
     with (
         patch("src.process_manager.compare_mtime", return_value=False),
-        patch("src.process_manager.subprocess.run") as run,
+        patch("src.process_manager.update.run_update") as run,
     ):
         manager.run_update()
     run.assert_not_called()
@@ -262,66 +249,149 @@ def test_run_update_no_op_when_index_up_to_date(
 
 def test_run_update_parallel_path(manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "PARALLEL")
-    completed = subprocess.CompletedProcess(args=[], returncode=0)
     with (
         patch("src.process_manager.compare_mtime", return_value=True),
-        patch("src.process_manager.subprocess.run", return_value=completed),
+        patch("src.process_manager.update.run_update") as run,
+        patch("src.process_manager.send_notification"),
         patch.object(manager, "stop_photon") as stop,
         patch.object(manager, "start_photon", return_value=True) as start,
-        patch("src.process_manager.cleanup_backup_after_verification") as cleanup,
+        patch("src.process_manager.index.drop_backup") as cleanup,
     ):
         manager.run_update()
+    run.assert_called_once_with("PARALLEL")
     stop.assert_called_once()
     start.assert_called_once()
     cleanup.assert_called_once()
+    assert manager.state == process_manager.AppState.RUNNING
 
 
-def test_run_update_parallel_logs_failure_when_health_check_fails(
+def test_run_update_parallel_keeps_backup_when_health_check_fails(
     manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
 ):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "PARALLEL")
-    completed = subprocess.CompletedProcess(args=[], returncode=0)
     with (
         patch("src.process_manager.compare_mtime", return_value=True),
-        patch("src.process_manager.subprocess.run", return_value=completed),
+        patch("src.process_manager.update.run_update"),
+        patch("src.process_manager.send_notification"),
         patch.object(manager, "stop_photon"),
         patch.object(manager, "start_photon", return_value=False),
-        patch("src.process_manager.cleanup_backup_after_verification") as cleanup,
+        patch("src.process_manager.index.drop_backup") as cleanup,
     ):
         manager.run_update()
     cleanup.assert_not_called()
+    assert manager.state == process_manager.AppState.RUNNING
 
 
 def test_run_update_sequential_path(manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
-    completed = subprocess.CompletedProcess(args=[], returncode=0)
     with (
         patch("src.process_manager.compare_mtime", return_value=True),
-        patch("src.process_manager.subprocess.run", return_value=completed),
+        patch("src.process_manager.update.run_update") as run,
+        patch("src.process_manager.send_notification"),
         patch.object(manager, "stop_photon") as stop,
         patch.object(manager, "start_photon", return_value=True) as start,
-        patch("src.process_manager.cleanup_backup_after_verification") as cleanup,
+        patch("src.process_manager.index.drop_backup") as cleanup,
     ):
         manager.run_update()
-    stop.assert_called_once()
+    run.assert_called_once_with("SEQUENTIAL")
+    assert stop.call_count == 2
     start.assert_called_once()
     cleanup.assert_called_once()
 
 
-def test_run_update_sequential_restarts_photon_after_failed_update(
+def test_run_update_restarts_photon_and_notifies_after_failed_update(
     manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
 ):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
-    completed = subprocess.CompletedProcess(args=[], returncode=1)
     manager.photon_process = None
     with (
         patch("src.process_manager.compare_mtime", return_value=True),
-        patch("src.process_manager.subprocess.run", return_value=completed),
+        patch("src.process_manager.update.run_update", side_effect=process_manager.update.UpdateError("boom")),
+        patch("src.process_manager.send_notification") as notify,
         patch.object(manager, "stop_photon"),
         patch.object(manager, "start_photon", return_value=True) as start,
+        patch("src.process_manager.index.drop_backup") as cleanup,
     ):
         manager.run_update()
     start.assert_called_once()
+    cleanup.assert_not_called()
+    assert manager.state == process_manager.AppState.RUNNING
+
+    messages = [call.args[0] for call in notify.call_args_list]
+    assert any("Photon Update Failed" in m for m in messages)
+
+
+def test_run_update_notifies_success(manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
+    with (
+        patch("src.process_manager.compare_mtime", return_value=True),
+        patch("src.process_manager.update.run_update"),
+        patch("src.process_manager.send_notification") as notify,
+        patch.object(manager, "stop_photon"),
+        patch.object(manager, "start_photon", return_value=True),
+        patch("src.process_manager.index.drop_backup"),
+    ):
+        manager.run_update()
+
+    messages = [call.args[0] for call in notify.call_args_list]
+    assert any("Updated Successfully" in m for m in messages)
+
+
+def test_run_update_restores_state_when_pipeline_raises_unexpectedly(
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(config, "UPDATE_STRATEGY", "PARALLEL")
+    manager.photon_process = MagicMock()
+    with (
+        patch("src.process_manager.compare_mtime", return_value=True),
+        patch("src.process_manager.update.run_update", side_effect=RuntimeError("unexpected")),
+        patch("src.process_manager.send_notification"),
+        patch.object(manager, "stop_photon") as stop,
+        patch.object(manager, "start_photon", return_value=True) as start,
+    ):
+        manager.run_update()
+    assert manager.state == process_manager.AppState.RUNNING
+    stop.assert_not_called()
+    start.assert_not_called()
+
+
+def test_run_update_survives_error_outside_pipeline(
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
+    with (
+        patch("src.process_manager.compare_mtime", side_effect=RuntimeError("header parse boom")),
+        patch("src.process_manager.send_notification") as notify,
+    ):
+        manager.run_update()
+    assert manager.state == process_manager.AppState.RUNNING
+    messages = [call.args[0] for call in notify.call_args_list]
+    assert any("Photon Update Failed" in m for m in messages)
+
+
+def test_run_update_notifies_when_health_check_fails_after_swap(
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(config, "UPDATE_STRATEGY", "PARALLEL")
+    with (
+        patch("src.process_manager.compare_mtime", return_value=True),
+        patch("src.process_manager.update.run_update"),
+        patch("src.process_manager.send_notification") as notify,
+        patch.object(manager, "stop_photon"),
+        patch.object(manager, "start_photon", return_value=False),
+        patch("src.process_manager.index.drop_backup"),
+    ):
+        manager.run_update()
+    messages = [call.args[0] for call in notify.call_args_list]
+    assert any("Photon Update Failed" in m for m in messages)
+    assert not any("Updated Successfully" in m for m in messages)
+
+
+def test_run_pending_jobs_survives_job_exception(
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(process_manager.schedule, "run_pending", MagicMock(side_effect=RuntimeError("job boom")))
+    manager._run_pending_jobs()
 
 
 @pytest.mark.parametrize(("interval", "expected_unit"), [("3d", "days"), ("12h", "hours"), ("30m", "minutes")])
@@ -397,45 +467,39 @@ def test_shutdown_calls_stop_and_exits(manager: process_manager.PhotonManager):
     assert exc.value.code == 0
 
 
-def test_run_skips_setup_when_index_present(
-    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    node = tmp_path / "node_1"
-    node.mkdir()
-    monkeypatch.setattr(config, "OS_NODE_DIR", str(node))
-    monkeypatch.setattr(config, "FORCE_UPDATE", False)
+def test_run_invokes_setup_then_starts_photon(manager: process_manager.PhotonManager):
     with (
-        patch.object(manager, "run_initial_setup") as setup,
-        patch.object(manager, "start_photon", return_value=True),
-        patch.object(manager, "schedule_updates"),
-        patch.object(manager, "monitor_photon"),
-    ):
-        manager.run()
-    setup.assert_not_called()
-
-
-def test_run_invokes_initial_setup_when_no_index(
-    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    monkeypatch.setattr(config, "OS_NODE_DIR", str(tmp_path / "missing"))
-    monkeypatch.setattr(config, "FORCE_UPDATE", False)
-    with (
-        patch.object(manager, "run_initial_setup") as setup,
-        patch.object(manager, "start_photon", return_value=True),
-        patch.object(manager, "schedule_updates"),
+        patch("src.process_manager.run_setup") as setup,
+        patch.object(manager, "start_photon", return_value=True) as start,
+        patch.object(manager, "schedule_updates") as sched,
         patch.object(manager, "monitor_photon"),
     ):
         manager.run()
     setup.assert_called_once()
+    start.assert_called_once()
+    sched.assert_called_once()
 
 
-def test_run_exits_when_photon_fails_to_start(
-    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    node = tmp_path / "node_1"
-    node.mkdir()
-    monkeypatch.setattr(config, "OS_NODE_DIR", str(node))
-    monkeypatch.setattr(config, "FORCE_UPDATE", False)
-    with patch.object(manager, "start_photon", return_value=False), pytest.raises(SystemExit) as exc:
+def test_run_exits_75_when_setup_hits_insufficient_space(manager: process_manager.PhotonManager):
+    with (
+        patch("src.process_manager.run_setup", side_effect=process_manager.update.InsufficientSpaceError("no space")),
+        pytest.raises(SystemExit) as exc,
+    ):
+        manager.run()
+    assert exc.value.code == 75
+
+
+def test_run_exits_1_when_setup_fails(manager: process_manager.PhotonManager):
+    with patch("src.process_manager.run_setup", side_effect=ValueError("bad config")), pytest.raises(SystemExit) as exc:
+        manager.run()
+    assert exc.value.code == 1
+
+
+def test_run_exits_when_photon_fails_to_start(manager: process_manager.PhotonManager):
+    with (
+        patch("src.process_manager.run_setup"),
+        patch.object(manager, "start_photon", return_value=False),
+        pytest.raises(SystemExit) as exc,
+    ):
         manager.run()
     assert exc.value.code == 1

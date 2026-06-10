@@ -13,10 +13,12 @@ import requests
 import schedule
 from requests.exceptions import RequestException
 
+from src import index, update
 from src.check_remote import compare_mtime
-from src.filesystem import cleanup_backup_after_verification, reconcile_interrupted_import
+from src.entrypoint import run_setup
 from src.utils import config
 from src.utils.logger import get_logger, setup_logging
+from src.utils.notify import send_notification
 
 logger = get_logger()
 
@@ -76,14 +78,6 @@ class PhotonManager:
         logger.info(f"Received shutdown signal {signum}")
         self.should_exit = True
         self.shutdown()
-
-    def run_initial_setup(self):
-        logger.info("Running initial setup...")
-        result = subprocess.run([sys.executable, "-m", "src.entrypoint", "setup"], check=False, cwd="/photon")  # noqa S603
-
-        if result.returncode != 0:
-            logger.error("Setup failed!")
-            sys.exit(1)
 
     def start_photon(self, max_startup_retries=3):
         for attempt in range(max_startup_retries):
@@ -213,48 +207,44 @@ class PhotonManager:
         logger.info(f"Running {config.UPDATE_STRATEGY.lower()} update...")
         update_start = time.time()
 
-        if not compare_mtime():
-            update_duration = time.time() - update_start
-            logger.info(f"Index already up to date - no restart needed ({update_duration:.1f}s)")
-            self.state = AppState.RUNNING
-            return
+        try:
+            if not compare_mtime():
+                update_duration = time.time() - update_start
+                logger.info(f"Index already up to date - no restart needed ({update_duration:.1f}s)")
+                return
 
-        if config.UPDATE_STRATEGY == "SEQUENTIAL":
-            self.stop_photon()
+            if config.UPDATE_STRATEGY == "SEQUENTIAL":
+                self.stop_photon()
 
-        result = subprocess.run([sys.executable, "-m", "src.updater"], check=False, cwd="/photon")  # noqa S603
+            try:
+                update.run_update(config.UPDATE_STRATEGY)
+            except Exception as e:
+                update_duration = time.time() - update_start
+                logger.error(f"Update failed: {e} ({update_duration:.1f}s)")
+                send_notification(f"Photon Update Failed - {e}")
+                if not self.photon_process:
+                    logger.info("Attempting to restart Photon after failed update")
+                    if not self.start_photon():
+                        logger.error("Failed to restart Photon after update failure")
+                return
 
-        if result.returncode == 0:
             logger.info("Update process completed, verifying Photon health...")
 
-            if config.UPDATE_STRATEGY == "PARALLEL":
-                self.stop_photon()
-                if self.start_photon():
-                    update_duration = time.time() - update_start
-                    logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
-                    target_node_dir = os.path.join(config.PHOTON_DATA_DIR)
-                    cleanup_backup_after_verification(target_node_dir)
-                else:
-                    update_duration = time.time() - update_start
-                    logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
-            elif config.UPDATE_STRATEGY == "SEQUENTIAL":
-                if self.start_photon():
-                    update_duration = time.time() - update_start
-                    logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
-                    target_node_dir = os.path.join(config.PHOTON_DATA_DIR)
-                    cleanup_backup_after_verification(target_node_dir)
-                else:
-                    update_duration = time.time() - update_start
-                    logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
-        else:
-            update_duration = time.time() - update_start
-            logger.error(f"Update process failed with code {result.returncode} ({update_duration:.1f}s)")
-            if config.UPDATE_STRATEGY == "SEQUENTIAL" and not self.photon_process:
-                logger.info("Attempting to restart Photon after failed update")
-                if not self.start_photon():
-                    logger.error("Failed to restart Photon after update failure")
-
-        self.state = AppState.RUNNING
+            self.stop_photon()
+            if self.start_photon():
+                update_duration = time.time() - update_start
+                logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
+                send_notification("Photon Index Updated Successfully")
+                index.drop_backup()
+            else:
+                update_duration = time.time() - update_start
+                logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
+                send_notification("Photon Update Failed - health check failed after index swap, service may be down")
+        except Exception:
+            logger.exception("Update run failed unexpectedly")
+            send_notification("Photon Update Failed - unexpected error during update run")
+        finally:
+            self.state = AppState.RUNNING
 
     def schedule_updates(self):
         if config.UPDATE_STRATEGY == "DISABLED":
@@ -285,11 +275,17 @@ class PhotonManager:
 
         def scheduler_loop():
             while not self.should_exit:
-                schedule.run_pending()
+                self._run_pending_jobs()
                 time.sleep(1)
 
         thread = threading.Thread(target=scheduler_loop, daemon=True)
         thread.start()
+
+    def _run_pending_jobs(self):
+        try:
+            schedule.run_pending()
+        except Exception:
+            logger.exception("Scheduled job raised unexpectedly; scheduler continues running")
 
     def monitor_photon(self):
         while not self.should_exit:
@@ -310,12 +306,14 @@ class PhotonManager:
     def run(self):
         logger.info("Photon Manager starting...")
 
-        reconcile_interrupted_import()
-
-        if not config.FORCE_UPDATE and os.path.isdir(config.OS_NODE_DIR):
-            logger.info("Existing index found, skipping initial setup")
-        else:
-            self.run_initial_setup()
+        try:
+            run_setup()
+        except update.InsufficientSpaceError:
+            logger.error("Setup failed: insufficient disk space")
+            sys.exit(75)
+        except Exception:
+            logger.exception("Setup failed!")
+            sys.exit(1)
 
         if not self.start_photon():
             logger.error("Failed to start Photon during initial startup")
