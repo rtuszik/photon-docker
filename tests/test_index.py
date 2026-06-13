@@ -94,6 +94,13 @@ def test_complete_import_raises_when_marker_cannot_be_cleared(fake_dirs: Path):
         index.complete_import()
 
 
+def test_complete_import_does_not_mark_updated_when_clear_fails(fake_dirs: Path):
+    index.begin_import()
+    with patch("src.index.Path.unlink", side_effect=OSError("read-only")), pytest.raises(OSError, match="read-only"):
+        index.complete_import()
+    assert index.has_update_timestamp() is False
+
+
 def test_reconcile_cleans_partial_index(fake_dirs: Path):
     node_dir = Path(config.OS_NODE_DIR)
     node_dir.mkdir(parents=True)

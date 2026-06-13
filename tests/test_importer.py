@@ -218,8 +218,12 @@ def test_run_jsonl_import_marks_then_completes_on_success(monkeypatch):
     process = RecordingProcess()
     events = []
 
+    def fake_download(region):
+        events.append("download")
+        return "/photon/data/temp/andorra.jsonl.zst"
+
     monkeypatch.setattr(config, "REGION", "andorra")
-    monkeypatch.setattr(importer, "download_jsonl", lambda region: "/photon/data/temp/andorra.jsonl.zst")
+    monkeypatch.setattr(importer, "download_jsonl", fake_download)
     monkeypatch.setattr(importer, "stream_decompress", lambda path: [b'{"type":"Place"}\n'])
     monkeypatch.setattr(importer, "_start_photon_import", lambda input_source, country_codes=None: process)
     monkeypatch.setattr(importer, "clear_temp_dir", lambda: None)
@@ -228,7 +232,7 @@ def test_run_jsonl_import_marks_then_completes_on_success(monkeypatch):
 
     importer.run_jsonl_import()
 
-    assert events == ["begin", "complete"]
+    assert events == ["download", "begin", "complete"]
 
 
 def test_run_jsonl_import_leaves_progress_marker_on_failure(monkeypatch):
@@ -247,3 +251,21 @@ def test_run_jsonl_import_leaves_progress_marker_on_failure(monkeypatch):
         importer.run_jsonl_import()
 
     assert events == ["begin"]
+
+
+def test_run_jsonl_import_sets_no_marker_when_download_fails(monkeypatch):
+    events = []
+
+    def failing_download(region):
+        raise RuntimeError("download failed")
+
+    monkeypatch.setattr(config, "REGION", "andorra")
+    monkeypatch.setattr(importer, "download_jsonl", failing_download)
+    monkeypatch.setattr(importer, "clear_temp_dir", lambda: None)
+    monkeypatch.setattr(importer, "begin_import", lambda: events.append("begin"))
+    monkeypatch.setattr(importer, "complete_import", lambda: events.append("complete"))
+
+    with pytest.raises(RuntimeError, match="download failed"):
+        importer.run_jsonl_import()
+
+    assert events == []
