@@ -40,7 +40,7 @@ def get_download_url() -> str:
 
     index_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION)
     download_url = config.BASE_URL + index_path
-    logging.info("Using constructed location for download: %s", download_url)
+    logging.info("Using constructed location for download: %s", sanitize_url(download_url))
     return download_url
 
 
@@ -63,7 +63,7 @@ def download_md5() -> str:
     else:
         md5_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION) + ".md5"
         download_url = config.BASE_URL + md5_path
-        logging.info("Using constructed URL for checksum: %s", download_url)
+        logging.info("Using constructed URL for checksum: %s", sanitize_url(download_url))
 
     output_file = f"photon-db-latest.{config.INDEX_FILE_EXTENSION}.md5"
     output = os.path.join(config.TEMP_DIR, output_file)
