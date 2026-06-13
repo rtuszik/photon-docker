@@ -21,9 +21,9 @@ def run_jsonl_import() -> None:
     parent_region = get_jsonl_parent_region(regions)
     country_codes = get_country_codes_for_regions(regions) if len(regions) > 1 else None
 
-    begin_import()
     try:
         jsonl_path = download_jsonl(parent_region)
+        begin_import()
         import_proc = _start_photon_import("-", country_codes=country_codes)
         try:
             if import_proc.stdin is None:

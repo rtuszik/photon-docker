@@ -54,8 +54,8 @@ def begin_import():
 
 
 def complete_import():
-    mark_updated()
     _clear_import_marker()
+    mark_updated()
 
 
 def import_was_interrupted() -> bool:
