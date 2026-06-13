@@ -85,6 +85,21 @@ def test_validate_config_rejects_multiple_db_regions(monkeypatch: pytest.MonkeyP
         validate_config()
 
 
+def test_validate_config_accepts_db_available_region(monkeypatch: pytest.MonkeyPatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setattr(config, "REGION", "germany")
+
+    validate_config()
+
+
+def test_validate_config_rejects_db_unavailable_region(monkeypatch: pytest.MonkeyPatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setattr(config, "REGION", "albania")
+
+    with pytest.raises(ValueError, match="DB index is not available for REGION: 'albania'"):
+        validate_config()
+
+
 def test_validate_config_reports_multiple_errors(monkeypatch: pytest.MonkeyPatch):
     _set_base_config(monkeypatch)
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "WRONG")

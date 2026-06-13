@@ -219,12 +219,19 @@ PLANET_COUNTRY_CODES = [
     "AR",
 ]
 
-AFRICA_COUNTRY_CODES = PLANET_COUNTRY_CODES[:56]
-ASIA_COUNTRY_CODES = PLANET_COUNTRY_CODES[56:104]
-AUSTRALIA_OCEANIA_COUNTRY_CODES = PLANET_COUNTRY_CODES[104:122]
-EUROPE_COUNTRY_CODES = PLANET_COUNTRY_CODES[122:176]
-NORTH_AMERICA_COUNTRY_CODES = PLANET_COUNTRY_CODES[176:207]
-SOUTH_AMERICA_COUNTRY_CODES = PLANET_COUNTRY_CODES[207:220]
+
+def _slice_codes(start_code: str, end_code: str) -> list[str]:
+    start_idx = PLANET_COUNTRY_CODES.index(start_code)
+    end_idx = PLANET_COUNTRY_CODES.index(end_code) + 1
+    return PLANET_COUNTRY_CODES[start_idx:end_idx]
+
+
+AFRICA_COUNTRY_CODES = _slice_codes("DZ", "SH")
+ASIA_COUNTRY_CODES = _slice_codes("KZ", "JP")
+AUSTRALIA_OCEANIA_COUNTRY_CODES = _slice_codes("AU", "VU")
+EUROPE_COUNTRY_CODES = _slice_codes("AL", "SK")
+NORTH_AMERICA_COUNTRY_CODES = _slice_codes("BZ", "MX")
+SOUTH_AMERICA_COUNTRY_CODES = _slice_codes("CL", "AR")
 
 
 def _region(region_type: str, continent: str | None, db_available: bool, country_codes: list[str]) -> dict:

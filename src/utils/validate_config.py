@@ -2,7 +2,7 @@ import re
 
 from src.utils import config
 from src.utils.logger import get_logger
-from src.utils.regions import get_regions_for_jsonl, is_valid_region
+from src.utils.regions import get_region_info, get_regions_for_jsonl, is_valid_region
 
 logging = get_logger()
 
@@ -27,12 +27,17 @@ def validate_config():
         )
 
     if config.IMPORT_MODE == "db":
-        if config.REGION and not is_valid_region(config.REGION):
-            error_messages.append(
-                f"Invalid REGION: '{config.REGION}'. Must be a valid continent, sub-region, or 'planet'."
-            )
         if config.REGION and len(config.get_jsonl_regions()) > 1:
             error_messages.append("DB mode supports exactly one region in REGION.")
+        elif config.REGION:
+            if not is_valid_region(config.REGION):
+                error_messages.append(
+                    f"Invalid REGION: '{config.REGION}'. Must be a valid continent, sub-region, or 'planet'."
+                )
+            else:
+                region_info = get_region_info(config.REGION)
+                if region_info and not region_info.get("db_available", False):
+                    error_messages.append(f"DB index is not available for REGION: '{config.REGION}'.")
 
     if config.IMPORT_MODE == "jsonl":
         if config.FILE_URL:
