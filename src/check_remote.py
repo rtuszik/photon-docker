@@ -79,10 +79,10 @@ def compare_mtime() -> bool:
     if using_marker_file:
         logging.debug("Using marker file timestamp - comparing directly without grace period")
         return remote_dt > local_dt
-    else:
-        logging.debug("Using directory timestamp - applying 144-hour grace period")
-        grace_period = datetime.timedelta(hours=144)
-        return remote_dt > (local_dt + grace_period)
+
+    logging.debug("Using directory timestamp - applying 144-hour grace period")
+    grace_period = datetime.timedelta(hours=144)
+    return remote_dt > (local_dt + grace_period)
 
 
 def check_index_age() -> bool:
