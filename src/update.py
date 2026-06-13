@@ -124,7 +124,7 @@ def verify_checksum(md5_file: str, index_file: str) -> bool:
     raise ChecksumMismatchError(f"Checksum mismatch for {index_file}. Expected: {md5_sum}, Got: {dl_sum}")
 
 
-def _ensure_disk_space(download_url: str, parallel: bool):
+def _ensure_disk_space(download_url: str, *, parallel: bool):
     try:
         file_size = get_remote_file_size(download_url)
     except RemoteFileSizeError as e:

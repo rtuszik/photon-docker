@@ -40,7 +40,7 @@ def log_config() -> None:
     logger.info("=== END CONFIG VARIABLES ===")
 
 
-def run_update_or_import(force_update: bool = False) -> None:
+def run_update_or_import(*, force_update: bool = False) -> None:
     if config.IMPORT_MODE == "jsonl":
         action = "forced JSONL import" if force_update else "initial JSONL import"
         logger.info(f"Starting {action}")
