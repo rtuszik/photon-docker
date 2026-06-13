@@ -99,9 +99,12 @@ def test_start_photon_builds_full_command(manager: process_manager.PhotonManager
     assert "-Xmx4g" in cmd
     assert "-cors-any" in cmd
     assert "/photon/photon.jar" in cmd
-    assert "-listen-ip" in cmd and "127.0.0.1" in cmd
-    assert "-data-dir" in cmd and "/data" in cmd
-    assert "-metrics-enable" in cmd and "prometheus" in cmd
+    assert "-listen-ip" in cmd
+    assert "127.0.0.1" in cmd
+    assert "-data-dir" in cmd
+    assert "/data" in cmd
+    assert "-metrics-enable" in cmd
+    assert "prometheus" in cmd
 
 
 def test_start_photon_retries_until_failure(manager: process_manager.PhotonManager):
@@ -151,7 +154,8 @@ def test_stop_photon_force_kills_on_timeout(manager: process_manager.PhotonManag
     ):
         manager.stop_photon()
     signals = [c.args[1] for c in killpg.call_args_list]
-    assert signal.SIGTERM in signals and signal.SIGKILL in signals
+    assert signal.SIGTERM in signals
+    assert signal.SIGKILL in signals
 
 
 def test_stop_photon_handles_lookup_error(manager: process_manager.PhotonManager):

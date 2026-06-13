@@ -91,7 +91,7 @@ def test_validate_config_reports_multiple_errors(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(config, "UPDATE_INTERVAL", "hourly")
     monkeypatch.setattr(config, "REGION", "atlantis")
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ValueError, match="Configuration validation failed:") as exc_info:
         validate_config()
 
     message = str(exc_info.value)

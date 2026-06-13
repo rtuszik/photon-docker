@@ -22,7 +22,7 @@ def get_available_space(path: str) -> int:
         return 0
 
 
-def check_disk_space_requirements(download_size: int, is_parallel: bool = True) -> bool:
+def check_disk_space_requirements(download_size: int, *, is_parallel: bool = True) -> bool:
     temp_available = get_available_space(config.TEMP_DIR if os.path.exists(config.TEMP_DIR) else config.DATA_DIR)
     data_available = get_available_space(
         config.PHOTON_DATA_DIR if os.path.exists(config.PHOTON_DATA_DIR) else config.DATA_DIR
