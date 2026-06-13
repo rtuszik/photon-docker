@@ -24,8 +24,8 @@ def run_jsonl_import() -> None:
     try:
         jsonl_path = download_jsonl(parent_region)
         import_proc = _start_photon_import("-", country_codes=country_codes)
-        mark_import_started()
         try:
+            mark_import_started()
             if import_proc.stdin is None:
                 raise RuntimeError("Photon import process stdin is unavailable")
             for chunk in stream_decompress(jsonl_path):

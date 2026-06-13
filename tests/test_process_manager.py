@@ -450,18 +450,40 @@ def test_monitor_photon_restarts_on_unexpected_exit(manager: process_manager.Pho
     assert call_count["n"] == 1
 
 
-def test_monitor_photon_logs_failed_restart(manager: process_manager.PhotonManager):
+def test_monitor_photon_exits_on_failed_restart(manager: process_manager.PhotonManager):
     fake_proc = MagicMock()
     fake_proc.poll.return_value = 1
     manager.photon_process = fake_proc
     manager.state = process_manager.AppState.RUNNING
 
+    with patch.object(manager, "start_photon", return_value=False), pytest.raises(SystemExit) as exc:
+        manager.monitor_photon()
+    assert exc.value.code == 1
+
+
+def test_monitor_photon_restarts_when_process_handle_missing(manager: process_manager.PhotonManager):
+    manager.photon_process = None
+    manager.state = process_manager.AppState.RUNNING
+
+    call_count = {"n": 0}
+
     def restart():
+        call_count["n"] += 1
         manager.should_exit = True
-        return False
+        return True
 
     with patch.object(manager, "start_photon", side_effect=restart):
         manager.monitor_photon()
+    assert call_count["n"] == 1
+
+
+def test_monitor_photon_exits_when_handle_missing_and_restart_fails(manager: process_manager.PhotonManager):
+    manager.photon_process = None
+    manager.state = process_manager.AppState.RUNNING
+
+    with patch.object(manager, "start_photon", return_value=False), pytest.raises(SystemExit) as exc:
+        manager.monitor_photon()
+    assert exc.value.code == 1
 
 
 def test_shutdown_calls_stop_and_exits(manager: process_manager.PhotonManager):

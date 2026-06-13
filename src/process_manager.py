@@ -289,12 +289,19 @@ class PhotonManager:
 
     def monitor_photon(self):
         while not self.should_exit:
-            if self.photon_process and self.state == AppState.RUNNING:
-                ret = self.photon_process.poll()
-                if ret is not None:
-                    logger.warning(f"Photon exited with code {ret}, restarting...")
+            if self.state == AppState.RUNNING:
+                if self.photon_process is None:
+                    logger.warning("Photon is not running while in RUNNING state, restarting...")
                     if not self.start_photon():
-                        logger.error("Failed to restart Photon after unexpected exit")
+                        logger.error("Failed to restart Photon, exiting for supervisor to recover")
+                        sys.exit(1)
+                else:
+                    ret = self.photon_process.poll()
+                    if ret is not None:
+                        logger.warning(f"Photon exited with code {ret}, restarting...")
+                        if not self.start_photon():
+                            logger.error("Failed to restart Photon, exiting for supervisor to recover")
+                            sys.exit(1)
             time.sleep(5)
 
     def shutdown(self):
