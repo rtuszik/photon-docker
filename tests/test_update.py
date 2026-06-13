@@ -40,6 +40,20 @@ def test_get_download_url_constructs_from_region_and_base(monkeypatch: pytest.Mo
     assert url == "https://example.com/public/europe/photon-db-europe-1.0-latest.tar.bz2"
 
 
+def test_get_download_url_sanitizes_credentials_in_log(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "FILE_URL", None)
+    monkeypatch.setattr(config, "BASE_URL", "https://user:secret@example.com/public")
+    monkeypatch.setattr(config, "REGION", "europe")
+    monkeypatch.setattr(config, "INDEX_DB_VERSION", "1.0")
+    monkeypatch.setattr(config, "INDEX_FILE_EXTENSION", "tar.bz2")
+
+    with patch.object(update.logging, "info") as log_info:
+        url = update.get_download_url()
+
+    assert "secret" in url
+    assert all("secret" not in str(call) for call in log_info.call_args_list)
+
+
 def test_download_index_returns_path(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "INDEX_FILE_EXTENSION", "tar.bz2")
     monkeypatch.setattr(update, "get_download_url", lambda: "https://example.com/x")
@@ -106,6 +120,25 @@ def test_download_md5_constructs_url_when_unset(fake_dirs: Path, monkeypatch: py
         update.download_md5()
 
     assert captured["url"] == "https://example.com/public/photon-db-planet-1.0-latest.tar.bz2.md5"
+
+
+def test_download_md5_sanitizes_credentials_in_log(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "MD5_URL", None)
+    monkeypatch.setattr(config, "FILE_URL", None)
+    monkeypatch.setattr(config, "BASE_URL", "https://user:secret@example.com/public")
+    monkeypatch.setattr(config, "REGION", None)
+    monkeypatch.setattr(config, "INDEX_DB_VERSION", "1.0")
+    monkeypatch.setattr(config, "INDEX_FILE_EXTENSION", "tar.bz2")
+    Path(config.TEMP_DIR).mkdir(parents=True, exist_ok=True)
+
+    def fake_download(url, output):
+        Path(output).write_text("md5")
+        return True
+
+    with patch("src.update.download_file", side_effect=fake_download), patch.object(update.logging, "info") as log_info:
+        update.download_md5()
+
+    assert all("secret" not in str(call) for call in log_info.call_args_list)
 
 
 def test_download_md5_raises_on_failure(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):

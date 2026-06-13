@@ -365,11 +365,13 @@ def test_download_file_returns_false_on_unexpected_exception(tmp_path: Path, mon
         assert downloader.download_file("https://example.com/x", str(dest)) is False
 
 
-def test_download_file_propagates_oserror(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_download_file_propagates_disk_write_oserror(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     dest = tmp_path / "out.bin"
     monkeypatch.setattr(config, "DOWNLOAD_MAX_RETRIES", "1")
+    resp = _mock_response(status_code=200, headers={"content-length": "3"}, chunks=[b"abc"])
     with (
-        patch("src.downloader.requests.get", side_effect=OSError("disk full")),
+        patch("src.downloader.requests.get", return_value=resp),
+        patch("src.downloader.open", side_effect=OSError("disk full")),
         pytest.raises(OSError, match="disk full"),
     ):
         downloader.download_file("https://example.com/x", str(dest))
