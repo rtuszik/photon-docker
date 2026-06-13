@@ -47,13 +47,13 @@ def mark_updated():
         logging.warning(f"Failed to update timestamp marker: {e}")
 
 
-def begin_import():
+def mark_import_started():
     marker_file = _import_in_progress_marker()
     Path(marker_file).touch()
     logging.debug(f"Marked import in progress: {marker_file}")
 
 
-def complete_import():
+def mark_import_complete():
     _clear_import_marker()
     mark_updated()
 

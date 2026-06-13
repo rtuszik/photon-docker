@@ -3,7 +3,7 @@ import shlex
 import subprocess
 
 from src.downloader import clear_temp_dir
-from src.index import begin_import, complete_import
+from src.index import mark_import_complete, mark_import_started
 from src.jsonl.decompressor import stream_decompress
 from src.jsonl.downloader import download_jsonl
 from src.utils import config
@@ -23,8 +23,8 @@ def run_jsonl_import() -> None:
 
     try:
         jsonl_path = download_jsonl(parent_region)
-        begin_import()
         import_proc = _start_photon_import("-", country_codes=country_codes)
+        mark_import_started()
         try:
             if import_proc.stdin is None:
                 raise RuntimeError("Photon import process stdin is unavailable")
@@ -39,7 +39,7 @@ def run_jsonl_import() -> None:
             import_proc.kill()
             import_proc.wait()
             raise
-        complete_import()
+        mark_import_complete()
     finally:
         clear_temp_dir()
 

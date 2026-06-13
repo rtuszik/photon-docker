@@ -8,8 +8,8 @@ from src.utils import config
 
 @pytest.fixture(autouse=True)
 def _stub_index_markers(monkeypatch):
-    monkeypatch.setattr(importer, "begin_import", lambda: None)
-    monkeypatch.setattr(importer, "complete_import", lambda: None)
+    monkeypatch.setattr(importer, "mark_import_started", lambda: None)
+    monkeypatch.setattr(importer, "mark_import_complete", lambda: None)
 
 
 def _noop_makedirs(path: str, exist_ok: bool = False) -> None:
@@ -227,8 +227,8 @@ def test_run_jsonl_import_marks_then_completes_on_success(monkeypatch):
     monkeypatch.setattr(importer, "stream_decompress", lambda path: [b'{"type":"Place"}\n'])
     monkeypatch.setattr(importer, "_start_photon_import", lambda input_source, country_codes=None: process)
     monkeypatch.setattr(importer, "clear_temp_dir", lambda: None)
-    monkeypatch.setattr(importer, "begin_import", lambda: events.append("begin"))
-    monkeypatch.setattr(importer, "complete_import", lambda: events.append("complete"))
+    monkeypatch.setattr(importer, "mark_import_started", lambda: events.append("begin"))
+    monkeypatch.setattr(importer, "mark_import_complete", lambda: events.append("complete"))
 
     importer.run_jsonl_import()
 
@@ -244,8 +244,8 @@ def test_run_jsonl_import_leaves_progress_marker_on_failure(monkeypatch):
     monkeypatch.setattr(importer, "stream_decompress", lambda path: [b'{"type":"Place"}\n'])
     monkeypatch.setattr(importer, "_start_photon_import", lambda input_source, country_codes=None: process)
     monkeypatch.setattr(importer, "clear_temp_dir", lambda: None)
-    monkeypatch.setattr(importer, "begin_import", lambda: events.append("begin"))
-    monkeypatch.setattr(importer, "complete_import", lambda: events.append("complete"))
+    monkeypatch.setattr(importer, "mark_import_started", lambda: events.append("begin"))
+    monkeypatch.setattr(importer, "mark_import_complete", lambda: events.append("complete"))
 
     with pytest.raises(RuntimeError, match="exit code 2"):
         importer.run_jsonl_import()
@@ -262,10 +262,29 @@ def test_run_jsonl_import_sets_no_marker_when_download_fails(monkeypatch):
     monkeypatch.setattr(config, "REGION", "andorra")
     monkeypatch.setattr(importer, "download_jsonl", failing_download)
     monkeypatch.setattr(importer, "clear_temp_dir", lambda: None)
-    monkeypatch.setattr(importer, "begin_import", lambda: events.append("begin"))
-    monkeypatch.setattr(importer, "complete_import", lambda: events.append("complete"))
+    monkeypatch.setattr(importer, "mark_import_started", lambda: events.append("begin"))
+    monkeypatch.setattr(importer, "mark_import_complete", lambda: events.append("complete"))
 
     with pytest.raises(RuntimeError, match="download failed"):
+        importer.run_jsonl_import()
+
+    assert events == []
+
+
+def test_run_jsonl_import_sets_no_marker_when_process_start_fails(monkeypatch):
+    events = []
+
+    def failing_start(input_source, country_codes=None):
+        raise OSError("java not found")
+
+    monkeypatch.setattr(config, "REGION", "andorra")
+    monkeypatch.setattr(importer, "download_jsonl", lambda region: "/photon/data/temp/andorra.jsonl.zst")
+    monkeypatch.setattr(importer, "_start_photon_import", failing_start)
+    monkeypatch.setattr(importer, "clear_temp_dir", lambda: None)
+    monkeypatch.setattr(importer, "mark_import_started", lambda: events.append("begin"))
+    monkeypatch.setattr(importer, "mark_import_complete", lambda: events.append("complete"))
+
+    with pytest.raises(OSError, match="java not found"):
         importer.run_jsonl_import()
 
     assert events == []

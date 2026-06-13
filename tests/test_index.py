@@ -65,39 +65,39 @@ def test_mark_updated_swallows_errors(fake_dirs: Path):
 def test_import_marker_roundtrip(fake_dirs: Path):
     assert index.import_was_interrupted() is False
 
-    index.begin_import()
+    index.mark_import_started()
     assert index.import_was_interrupted() is True
 
-    index.complete_import()
+    index.mark_import_complete()
     assert index.import_was_interrupted() is False
 
 
-def test_complete_import_touches_update_timestamp(fake_dirs: Path):
-    index.begin_import()
-    index.complete_import()
+def test_mark_import_complete_touches_update_timestamp(fake_dirs: Path):
+    index.mark_import_started()
+    index.mark_import_complete()
     assert index.has_update_timestamp() is True
 
 
-def test_complete_import_is_idempotent(fake_dirs: Path):
-    index.complete_import()
+def test_mark_import_complete_is_idempotent(fake_dirs: Path):
+    index.mark_import_complete()
     assert index.import_was_interrupted() is False
 
 
-def test_begin_import_raises_when_marker_cannot_be_written(fake_dirs: Path):
+def test_mark_import_started_raises_when_marker_cannot_be_written(fake_dirs: Path):
     with patch("src.index.Path.touch", side_effect=OSError("read-only")), pytest.raises(OSError, match="read-only"):
-        index.begin_import()
+        index.mark_import_started()
 
 
-def test_complete_import_raises_when_marker_cannot_be_cleared(fake_dirs: Path):
-    index.begin_import()
+def test_mark_import_complete_raises_when_marker_cannot_be_cleared(fake_dirs: Path):
+    index.mark_import_started()
     with patch("src.index.Path.unlink", side_effect=OSError("read-only")), pytest.raises(OSError, match="read-only"):
-        index.complete_import()
+        index.mark_import_complete()
 
 
-def test_complete_import_does_not_mark_updated_when_clear_fails(fake_dirs: Path):
-    index.begin_import()
+def test_mark_import_complete_does_not_mark_updated_when_clear_fails(fake_dirs: Path):
+    index.mark_import_started()
     with patch("src.index.Path.unlink", side_effect=OSError("read-only")), pytest.raises(OSError, match="read-only"):
-        index.complete_import()
+        index.mark_import_complete()
     assert index.has_update_timestamp() is False
 
 
@@ -105,7 +105,7 @@ def test_reconcile_cleans_partial_index(fake_dirs: Path):
     node_dir = Path(config.OS_NODE_DIR)
     node_dir.mkdir(parents=True)
     (node_dir / "segment.bin").write_text("partial")
-    index.begin_import()
+    index.mark_import_started()
 
     index.reconcile()
 
