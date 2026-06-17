@@ -9,7 +9,7 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "requests==2.33.1",
     "schedule>=1.2.2",
-    "tqdm==4.67.3",
+    "tqdm==4.68.2",
     "zstandard>=0.23.0",
 ]
 
