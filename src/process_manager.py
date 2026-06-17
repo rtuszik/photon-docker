@@ -318,8 +318,9 @@ class PhotonManager:
         except update.InsufficientSpaceError:
             logger.error("Setup failed: insufficient disk space")
             sys.exit(75)
-        except Exception:
+        except Exception as e:
             logger.exception("Setup failed!")
+            send_notification(f"Photon-Docker setup failed - {e}")
             sys.exit(1)
 
         if not self.start_photon():

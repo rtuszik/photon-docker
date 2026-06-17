@@ -342,6 +342,92 @@ def test_run_update_checksum_mismatch_prevents_activation(fake_dirs: Path, monke
     assert activated["n"] == 0
 
 
+def test_run_update_redownloads_on_checksum_mismatch(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "SKIP_MD5_CHECK", False)
+    monkeypatch.setattr(config, "CHECKSUM_MAX_RETRIES", "3")
+    _make_pipeline_patches(monkeypatch)
+
+    downloads = {"n": 0}
+
+    def fake_download_index():
+        downloads["n"] += 1
+        return str(Path(config.TEMP_DIR) / "index.tar.bz2")
+
+    monkeypatch.setattr(update, "download_index", fake_download_index)
+
+    verifications = {"n": 0}
+
+    def fake_verify(*_):
+        verifications["n"] += 1
+        if verifications["n"] < 2:
+            raise update.ChecksumMismatchError("mismatch")
+        return True
+
+    monkeypatch.setattr(update, "verify_checksum", fake_verify)
+
+    extracted = {"n": 0}
+    monkeypatch.setattr(update, "extract_index", lambda _: extracted.__setitem__("n", extracted["n"] + 1))
+    activated = {"n": 0}
+    monkeypatch.setattr(update.index, "activate", lambda _: activated.__setitem__("n", activated["n"] + 1))
+
+    with patch("src.update.send_notification") as notify:
+        update.run_update("PARALLEL")
+
+    assert downloads["n"] == 2
+    assert extracted["n"] == 1
+    assert activated["n"] == 1
+    assert notify.call_count == 1
+
+
+def test_run_update_checksum_mismatch_exhausts_retries(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "SKIP_MD5_CHECK", False)
+    monkeypatch.setattr(config, "CHECKSUM_MAX_RETRIES", "2")
+    _make_pipeline_patches(monkeypatch)
+
+    downloads = {"n": 0}
+
+    def fake_download_index():
+        downloads["n"] += 1
+        return str(Path(config.TEMP_DIR) / "index.tar.bz2")
+
+    monkeypatch.setattr(update, "download_index", fake_download_index)
+
+    def always_mismatch(*_):
+        raise update.ChecksumMismatchError("persistent mismatch")
+
+    monkeypatch.setattr(update, "verify_checksum", always_mismatch)
+
+    extracted = {"n": 0}
+    monkeypatch.setattr(update, "extract_index", lambda _: extracted.__setitem__("n", extracted["n"] + 1))
+    activated = {"n": 0}
+    monkeypatch.setattr(update.index, "activate", lambda _: activated.__setitem__("n", activated["n"] + 1))
+
+    with (
+        patch("src.update.send_notification") as notify,
+        pytest.raises(update.ChecksumMismatchError, match="persistent mismatch"),
+    ):
+        update.run_update("SEQUENTIAL")
+
+    assert downloads["n"] == 2
+    assert extracted["n"] == 0
+    assert activated["n"] == 0
+    assert notify.call_count == 1
+
+
+def test_run_update_verifies_before_extracting(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "SKIP_MD5_CHECK", False)
+    monkeypatch.setattr(config, "CHECKSUM_MAX_RETRIES", "1")
+    _make_pipeline_patches(monkeypatch)
+
+    order: list[str] = []
+    monkeypatch.setattr(update, "verify_checksum", lambda *_: order.append("verify") or True)
+    monkeypatch.setattr(update, "extract_index", lambda _: order.append("extract"))
+
+    update.run_update("PARALLEL")
+
+    assert order == ["verify", "extract"]
+
+
 def test_run_update_extraction_failure_prevents_activation(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "SKIP_MD5_CHECK", True)
     _make_pipeline_patches(monkeypatch)
