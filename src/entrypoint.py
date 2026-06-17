@@ -22,6 +22,7 @@ def log_config() -> None:
     logger.info(f"IMPORT_GEOMETRIES: {config.IMPORT_GEOMETRIES}")
     logger.info(f"FORCE_UPDATE: {config.FORCE_UPDATE}")
     logger.info(f"DOWNLOAD_MAX_RETRIES: {config.DOWNLOAD_MAX_RETRIES}")
+    logger.info(f"CHECKSUM_MAX_RETRIES: {config.CHECKSUM_MAX_RETRIES}")
     logger.info(f"FILE_URL (sanitized): {sanitize_url(config.FILE_URL)}")
     logger.info(f"MD5_URL (sanitized): {sanitize_url(config.MD5_URL)}")
     logger.info(f"PHOTON_PARAMS: {config.PHOTON_PARAMS}")

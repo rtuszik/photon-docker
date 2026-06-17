@@ -7,6 +7,7 @@ from src.check_remote import RemoteFileSizeError, get_remote_file_size
 from src.downloader import check_disk_space_requirements, clear_temp_dir, download_file, prepare_temp_dir
 from src.utils import config
 from src.utils.logger import get_logger
+from src.utils.notify import send_notification
 from src.utils.regions import get_index_url_path
 from src.utils.sanitize import sanitize_url
 
@@ -143,6 +144,34 @@ def _ensure_disk_space(download_url: str, *, parallel: bool):
         raise InsufficientSpaceError("Insufficient disk space for update")
 
 
+def _download_verified_index() -> str:
+    max_attempts = max(1, int(config.CHECKSUM_MAX_RETRIES))
+
+    for attempt in range(1, max_attempts + 1):
+        logging.info("Downloading index")
+        index_file = download_index()
+
+        if config.SKIP_MD5_CHECK:
+            return index_file
+
+        md5_file = download_md5()
+        logging.info("Verifying checksum...")
+        try:
+            verify_checksum(md5_file, index_file)
+            return index_file
+        except ChecksumMismatchError as e:
+            if attempt >= max_attempts:
+                logging.error(f"Checksum verification failed after {max_attempts} attempt(s): {e}")
+                raise
+
+            logging.warning(f"Checksum verification failed (attempt {attempt}/{max_attempts}), re-downloading: {e}")
+            send_notification(
+                f"Photon index download corrupted (checksum mismatch), re-downloading (attempt {attempt}/{max_attempts})"
+            )
+
+    raise UpdateError("Index download failed unexpectedly")
+
+
 def run_update(strategy: str):
     logging.info(f"Starting {strategy.lower()} update pipeline...")
 
@@ -151,15 +180,9 @@ def run_update(strategy: str):
     download_url = get_download_url()
     _ensure_disk_space(download_url, parallel=strategy == "PARALLEL")
 
-    logging.info("Downloading index")
-    index_file = download_index()
+    index_file = _download_verified_index()
 
     extract_index(index_file)
-
-    if not config.SKIP_MD5_CHECK:
-        md5_file = download_md5()
-        logging.info("Verifying checksum...")
-        verify_checksum(md5_file, index_file)
 
     logging.info("Activating new index")
     index.activate(os.path.join(config.TEMP_DIR, "photon_data"))
