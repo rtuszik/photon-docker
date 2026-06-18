@@ -1,4 +1,4 @@
-![Docker Pulls](https://img.shields.io/docker/pulls/rtuszik/photon-docker) ![Docker Image Size](https://img.shields.io/docker/image-size/rtuszik/photon-docker) ![Docker Image Version](https://img.shields.io/docker/v/rtuszik/photon-docker) ![GitHub Release](https://img.shields.io/github/v/release/komoot/photon?label=Photon) ![Lint Status](https://github.com/rtuszik/photon-docker/actions/workflows/lint.yml/badge.svg)
+![Docker Pulls](https://img.shields.io/docker/pulls/rtuszik/photon-docker) ![Docker Image Size](https://img.shields.io/docker/imje-size/rtuszik/photon-docker) ![Docker Image Version](https://img.shields.io/docker/v/rtuszik/photon-docker) ![GitHub Release](https://img.shields.io/github/v/release/komoot/photon?label=Photon) ![Lint Status](https://github.com/rtuszik/photon-docker/actions/workflows/lint.yml/badge.svg)
 
 # Photon Docker Image
 
@@ -15,11 +15,14 @@ enhancing data privacy and integration capabilities with services like [Dawarich
 
 ⚠️ **Warning: Large File Sizes** ⚠️
 
-- The Photon index file is fairly large and growing steadily.
-  As of the beginning of 2025, around 90GB are needed for the full index. Note that this will grow over time.
+- The Photon index is quite large and growing steadily.
+  As of mid-2026, the compressed planet index is around 60GB in `db` mode, the planet JSONL dump is around 26GB in `jsonl` mode. These will grow over time.
 - Ensure you have sufficient disk space available before running the container.
 - The initial download and extraction process may take a considerable amount of time.
   Depending on your hardware, checksum verification and decompression may take multiple hours.
+
+- The JSONL import _will_ take a signficant amount of time.
+  As a point of reference, a full planet import, tested on a fresh VPS (4C/16GB) took 10hours and 25minutes.
 
 - To reduce the load on the official Photon servers,
   the default `BASE_URL` for downloading the index files points to a mirror hosted by my.
@@ -55,38 +58,85 @@ docker compose up -d
 
 The container can be configured using the following environment variables:
 
-| Variable               | Parameters                             | Default                          | Description                                                                                                                                                                                                                                                                                 |
-| ---------------------- | -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UPDATE_STRATEGY`      | `PARALLEL`, `SEQUENTIAL`, `DISABLED`   | `SEQUENTIAL`                     | Controls how index updates are handled. `PARALLEL` downloads the new index in the background then swaps with minimal downtime (requires 2x space). `SEQUENTIAL` stops Photon, deletes the existing index, downloads the new one, then restarts. `DISABLED` prevents automatic updates.      |
-| `UPDATE_INTERVAL`      | Time string (e.g., "720h", "30d")      | `30d`                            | How often to check for updates. To reduce server load, it is recommended to set this to a long interval (e.g., `720h` for 30 days) or disable updates altogether if you do not need the latest data.                                                                                        |
-| `REGION`               | Region name, country code, or `planet` | `planet`                         | Optional region for a specific dataset. Can be a continent (`europe`, `asia`), individual country/region (`germany`, `usa`, `japan`), country code (`de`, `us`, `jp`), or `planet` for worldwide data. See [Available Regions](#available-regions) section for details.                     |
-| `LOG_LEVEL`            | `DEBUG`, `INFO`, `ERROR`               | `INFO`                           | Controls logging verbosity.                                                                                                                                                                                                                                                                 |
-| `PHOTON_LISTEN_IP`     | IP Address                             | 0.0.0.0                          | Populates `-listen-ip` parameter for photon                                                                                                                                                                                                                                                 |
-| `FORCE_UPDATE`         | `TRUE`, `FALSE`                        | `FALSE`                          | Forces an index update on container startup, regardless of `UPDATE_STRATEGY`.                                                                                                                                                                                                               |
-| `DOWNLOAD_MAX_RETRIES` | Number                                 | `3`                              | Maximum number of retries for failed downloads.                                                                                                                                                                                                                                             |
-| `INITIAL_DOWNLOAD`     | `TRUE`, `FALSE`                        | `TRUE`                           | Controls whether the container performs the initial index download when the Photon data directory is empty. Useful for manual imports.                                                                                                                                                      |
-| `BASE_URL`             | Valid URL                              | `https://r2.koalasec.org/public` | Custom base URL for index data downloads. Should point to the parent directory of index files. The default has been changed to a community mirror to reduce load on the GraphHopper servers.                                                                                                |
-| `SKIP_MD5_CHECK`       | `TRUE`, `FALSE`                        | `FALSE`                          | Optionally skip MD5 verification of downloaded index files.                                                                                                                                                                                                                                 |
-| `SKIP_SPACE_CHECK`     | `TRUE`, `FALSE`                        | `FALSE`                          | Skip disk space verification before downloading.                                                                                                                                                                                                                                            |
-| `FILE_URL`             | URL to a .tar.bz2 file                 | -                                | Set a custom URL for the index file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2"). This must be a tar.bz2 format. Setting this overrides `UPDATE_STRATEGY` to `DISABLED`, and `SKIP_MD5_CHECK` to true if `MD5_URL` is not set. |
-| `MD5_URL`              | URL to the MD5 file to use             | -                                | Set a custom URL for the md5 file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2.md5").                                                                                                                                            |
-| `PHOTON_PARAMS`        | Photon executable parameters           | -                                | See `https://github.com/komoot/photon#running-photon.`                                                                                                                                                                                                                                      |
-| `APPRISE_URLS`         | Comma-separated Apprise URLs           | -                                | Optional notification URLs for [Apprise](https://github.com/caronc/apprise) to send status updates (e.g., download completion, errors). Supports multiple services like Pushover, Slack, email, etc. Example: `pover://user@token,mailto://user:pass@gmail.com`                             |
-| `PUID`                 | User ID                                | 9011                             | The User ID for the photon process. Set this to your host user's ID (`id -u`) to prevent permission errors when using bind mounts.                                                                                                                                                          |
-| `PGID`                 | Group ID                               | 9011                             | The Group ID for the photon process. Set this to your host group's ID (`id -g`) to prevent permission errors when using bind mounts.                                                                                                                                                        |
-| `ENABLE_METRICS`       | `TRUE`, `FALSE`                        | `FALSE`                          | Enables Prometheus Metrics endpoint at /metrics                                                                                                                                                                                                                                             |
+| Variable               | Parameters                             | Default                          | Description                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------- | -------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IMPORT_MODE`          | `db`, `jsonl`                          | `db`                             | Selects how the index is built. `db` downloads a prebuilt index for a single region. `jsonl` (**experimental**) builds the index in-container from OpenStreetMap JSONL dumps and supports combining multiple regions. See [Import Modes](#import-modes).                                                                                                                                                                      |
+| `UPDATE_STRATEGY`      | `PARALLEL`, `SEQUENTIAL`, `DISABLED`   | `SEQUENTIAL`                     | Controls how index updates are handled. `PARALLEL` downloads the new index in the background then swaps with minimal downtime (requires 2x space). `SEQUENTIAL` stops Photon, deletes the existing index, downloads the new one, then restarts. `DISABLED` prevents automatic updates. Only applies in `db` mode.                                                                                                             |
+| `UPDATE_INTERVAL`      | Time string (e.g., "720h", "30d")      | `30d`                            | How often to check for updates. To reduce server load, it is recommended to set this to a long interval (e.g., `720h` for 30 days) or disable updates altogether if you do not need the latest data.                                                                                                                                                                                                                          |
+| `REGION`               | Region name, country code, or `planet` | `planet`                         | Region for a specific dataset. Can be a continent (`europe`, `asia`), individual country/region (`germany`, `usa`, `japan`), country code (`de`, `us`, `jp`), or `planet` for worldwide data. In `db` mode exactly one region may be set, and it must be one with a prebuilt index. In `jsonl` mode you may pass multiple regions as a comma-separated list. See [Available Regions](#available-regions) section for details. |
+| `LANGUAGES`            | Comma-separated language codes         | -                                | Only used in `jsonl` mode. Languages to import, passed to Photon's `-languages` (e.g. `en,de,fr`).                                                                                                                                                                                                                                                                                                                            |
+| `EXTRA_TAGS`           | Comma-separated OSM tags               | -                                | Only used in `jsonl` mode. Additional OSM tags to import, passed to Photon's `-extra-tags`.                                                                                                                                                                                                                                                                                                                                   |
+| `IMPORT_GEOMETRIES`    | `TRUE`, `FALSE`                        | `FALSE`                          | Only used in `jsonl` mode. When `TRUE`, imports full geometries (`-full-geometries`) instead of centroids.                                                                                                                                                                                                                                                                                                                    |
+| `LOG_LEVEL`            | `DEBUG`, `INFO`, `ERROR`               | `INFO`                           | Controls logging verbosity.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `PHOTON_LISTEN_IP`     | IP Address                             | 0.0.0.0                          | Populates `-listen-ip` parameter for photon                                                                                                                                                                                                                                                                                                                                                                                   |
+| `FORCE_UPDATE`         | `TRUE`, `FALSE`                        | `FALSE`                          | Forces an index update on container startup, regardless of `UPDATE_STRATEGY`.                                                                                                                                                                                                                                                                                                                                                 |
+| `DOWNLOAD_MAX_RETRIES` | Number                                 | `3`                              | Maximum number of retries for failed downloads.                                                                                                                                                                                                                                                                                                                                                                               |
+| `CHECKSUM_MAX_RETRIES` | Number                                 | `3`                              | Maximum number of download attempts when the MD5 checksum of the downloaded index does not match. A corrupted download is re-fetched up to this many times before the update fails. Ignored when `SKIP_MD5_CHECK` is enabled.                                                                                                                                                                                                 |
+| `INITIAL_DOWNLOAD`     | `TRUE`, `FALSE`                        | `TRUE`                           | Controls whether the container performs the initial index download when the Photon data directory is empty. Useful for manual imports.                                                                                                                                                                                                                                                                                        |
+| `BASE_URL`             | Valid URL                              | `https://r2.koalasec.org/public` | Custom base URL for index data downloads. Should point to the parent directory of index files. The default has been changed to a community mirror to reduce load on the GraphHopper servers.                                                                                                                                                                                                                                  |
+| `SKIP_MD5_CHECK`       | `TRUE`, `FALSE`                        | `FALSE`                          | Optionally skip MD5 verification of downloaded index files.                                                                                                                                                                                                                                                                                                                                                                   |
+| `SKIP_SPACE_CHECK`     | `TRUE`, `FALSE`                        | `FALSE`                          | Skip disk space verification before downloading.                                                                                                                                                                                                                                                                                                                                                                              |
+| `FILE_URL`             | URL to a .tar.bz2 file                 | -                                | Set a custom URL for the index file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2"). This must be a tar.bz2 format. Setting this overrides `UPDATE_STRATEGY` to `DISABLED`, and `SKIP_MD5_CHECK` to true if `MD5_URL` is not set.                                                                                                                                   |
+| `MD5_URL`              | URL to the MD5 file to use             | -                                | Set a custom URL for the md5 file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2.md5").                                                                                                                                                                                                                                                                              |
+| `PHOTON_PARAMS`        | Photon executable parameters           | -                                | See `https://github.com/komoot/photon#running-photon.`                                                                                                                                                                                                                                                                                                                                                                        |
+| `JAVA_PARAMS`          | Java parameters                        | -                                | Extra parameters passed to the `java` command that runs Photon (e.g. heap settings like `-Xmx4g`).                                                                                                                                                                                                                                                                                                                            |
+| `APPRISE_URLS`         | Comma-separated Apprise URLs           | -                                | Optional notification URLs for [Apprise](https://github.com/caronc/apprise) to send status updates (e.g., download completion, errors). Supports multiple services like Pushover, Slack, email, etc. Example: `pover://user@token,mailto://user:pass@gmail.com`                                                                                                                                                               |
+| `PUID`                 | User ID                                | 9011                             | The User ID for the photon process. Set this to your host user's ID (`id -u`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                                                                            |
+| `PGID`                 | Group ID                               | 9011                             | The Group ID for the photon process. Set this to your host group's ID (`id -g`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                                                                          |
+| `ENABLE_METRICS`       | `TRUE`, `FALSE`                        | `FALSE`                          | Enables Prometheus Metrics endpoint at /metrics                                                                                                                                                                                                                                                                                                                                                                               |
+
+## Import Modes
+
+The image can build its search index in two ways, selected with `IMPORT_MODE`:
+
+- **`db` (default):** Downloads a prebuilt index (`.tar.bz2`) for a single region. This is the original behaviour and supports scheduled updates via `UPDATE_STRATEGY` / `UPDATE_INTERVAL`.
+- **`jsonl` (experimental):** Builds the index inside the container from compressed OpenStreetMap JSONL dumps. Supports combining multiple regions and tuning the import with `LANGUAGES`, `EXTRA_TAGS`, and `IMPORT_GEOMETRIES`.
+
+### JSONL Import Mode (Experimental)
+
+> ⚠️ **Experimental:** `jsonl` mode is new and still being stabilised. Its behaviour and configuration may change in future releases, and it is not yet recommended for production use. For stable deployments, use the default `db` mode.
+
+Set `IMPORT_MODE=jsonl` and list one or more regions in `REGION` (comma-separated). The dump is streamed and decompressed directly into Photon's importer, so no decompressed copy is written to disk.
+
+```yaml
+services:
+    photon:
+        image: rtuszik/photon-docker:latest
+        environment:
+            - IMPORT_MODE=jsonl
+            - REGION=germany,austria,switzerland-liechtenstein
+            - LANGUAGES=en,de
+            # - EXTRA_TAGS=surface,smoothness  # Optional
+            # - IMPORT_GEOMETRIES=true         # Optional: full geometries
+        volumes:
+            - photon_data:/photon/data
+        restart: unless-stopped
+        ports:
+            - "2322:2322"
+volumes:
+    photon_data:
+```
+
+When multiple regions are requested, the smallest dump that covers all of them (a continent, or `planet`) is downloaded, then filtered down to the requested countries.
+
+> ⚠️ **Note:** `jsonl` mode does not currently support scheduled or automatic updates. `UPDATE_STRATEGY` and `UPDATE_INTERVAL` are ignored, and the index is built once at startup. To rebuild, set `FORCE_UPDATE=TRUE` or recreate the data volume. `FILE_URL` and `MD5_URL` are not supported in this mode.
 
 ## Available Regions
+
+Region availability depends on `IMPORT_MODE`. **All** regions listed below are available as JSONL dumps (`jsonl` mode). Only a subset have a prebuilt **DB** index, these are the only valid `REGION` values when `IMPORT_MODE=db`.
 
 ### 1. Planet-wide Data
 
 (This is the default if no region is specified)
 
 - **Region**: `planet`
-- **Size**: ~116GB
+- **Availability**: DB and JSONL
+- **Size**: ~61GB compressed (DB), ~26GB compressed (JSONL)
 - **Coverage**: Worldwide
 
 ### 2. Continental Data
+
+Available in both DB and JSONL modes. The sizes below are approximate older estimates and may not reflect current dump sizes.
 
 - **africa** (~2.8GB)
 - **asia** (~13.5GB)
@@ -95,9 +145,9 @@ The container can be configured using the following environment variables:
 - **north-america** (~29.5GB)
 - **south-america** (~13.8GB)
 
-### 3. Individual Countries/Regions
+### 3. Individual Countries/Regions (DB and JSONL)
 
-Only **16 regions** have individual database downloads available:
+Only **16 regions** have a prebuilt **DB** index. They are also available as JSONL dumps:
 
 #### Asia (2 regions)
 
@@ -126,6 +176,12 @@ Only **16 regions** have individual database downloads available:
 #### South America (1 region)
 
 - **argentina** (also: `ar`)
+
+### 4. JSONL-only Individual Regions (Experimental)
+
+These regions are available **only** as JSONL dumps (experimental `jsonl` mode); they have no prebuilt DB index. All are sub-regions of Europe. Two-letter country-code aliases work where defined (e.g. `pl`, `se`, `ch`).
+
+- **albania** (`al`), **baltics** (`ee`/`lt`/`lv`), **belarus** (`by`), **belgium** (`be`), **bosnia-herzegovina** (`ba`), **british-islands** (also: `uk`, `great britain`), **bulgaria** (`bg`), **croatia** (`hr`), **cyprus** (`cy`), **czech-republic** (`cz`, `czechia`), **finland** (`fi`), **georgia** (`ge`), **greece** (`gr`), **hungary** (`hu`), **iceland-faroe** (`is`), **ireland** (`ie`), **italy** (`it`), **kosovo** (`xk`), **macedonia** (`mk`), **malta** (`mt`), **moldova** (`md`), **montenegro** (`me`), **norway** (`no`), **poland** (`pl`), **portugal** (`pt`), **romania** (`ro`), **serbia** (`rs`), **slovenia** (`si`), **sweden** (`se`), **switzerland-liechtenstein** (`ch`), **turkey** (`tr`), **ukraine** (`ua`)
 
 ### Usage Examples
 
@@ -157,7 +213,7 @@ If you are hosting a public mirror, please open an issue or pull request to have
 
 ## Metrics
 
-When `ENABLE_METRICS` is set to `TRUE`, Prometheus metrics are exposed through the at the `/metrics` endpoint.
+When `ENABLE_METRICS` is set to `TRUE`, Prometheus metrics are exposed at the `/metrics` endpoint.
 
 An example Grafana Dashboard is available here at [Grafana Labs](https://grafana.com/grafana/dashboards/24901-photon/).
 
@@ -187,7 +243,7 @@ PHOTON_API_USE_HTTPS=false
 ### Build and Run Locally
 
 ```bash
-docker compose -f docker-compose.build.yml build --build-arg PHOTON_VERSION=0.6.2
+docker compose -f docker-compose.build.yml build --build-arg PHOTON_VERSION=1.2.0
 ```
 
 ### Accessing the API
