@@ -1,4 +1,4 @@
-![Docker Pulls](https://img.shields.io/docker/pulls/rtuszik/photon-docker) ![Docker Image Size](https://img.shields.io/docker/imje-size/rtuszik/photon-docker) ![Docker Image Version](https://img.shields.io/docker/v/rtuszik/photon-docker) ![GitHub Release](https://img.shields.io/github/v/release/komoot/photon?label=Photon) ![Lint Status](https://github.com/rtuszik/photon-docker/actions/workflows/lint.yml/badge.svg)
+![Docker Pulls](https://img.shields.io/docker/pulls/rtuszik/photon-docker) ![Docker Image Size](https://img.shields.io/docker/image-size/rtuszik/photon-docker) ![Docker Image Version](https://img.shields.io/docker/v/rtuszik/photon-docker) ![GitHub Release](https://img.shields.io/github/v/release/komoot/photon?label=Photon) ![Lint Status](https://github.com/rtuszik/photon-docker/actions/workflows/lint.yml/badge.svg)
 
 # Photon Docker Image
 
@@ -21,8 +21,8 @@ enhancing data privacy and integration capabilities with services like [Dawarich
 - The initial download and extraction process may take a considerable amount of time.
   Depending on your hardware, checksum verification and decompression may take multiple hours.
 
-- The JSONL import _will_ take a signficant amount of time.
-  As a point of reference, a full planet import, tested on a fresh VPS (4C/16GB) took 10hours and 25minutes.
+- The JSONL import _will_ take a significant amount of time.
+  As a point of reference, a full planet import, tested on a fresh VPS (4C/16GB) took 10 hours and 25 minutes.
 
 - To reduce the load on the official Photon servers,
   the default `BASE_URL` for downloading the index files points to a mirror hosted by my.

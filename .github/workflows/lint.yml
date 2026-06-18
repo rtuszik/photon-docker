@@ -7,7 +7,11 @@ on:
             - "tests/**"
             - "pyproject.toml"
             - "uv.lock"
+            - ".python-version"
     workflow_dispatch:
+
+permissions:
+    contents: read
 
 jobs:
     lint:
