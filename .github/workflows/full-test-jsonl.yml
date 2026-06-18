@@ -67,21 +67,21 @@ jobs:
                   docker logs -f $CONTAINER_NAME &
                   LOGS_PID=$!
 
-                  SECONDS=0
+                  ELAPSED=0
                   TIMEOUT=360
 
-                  while [ $SECONDS -lt $TIMEOUT ]; do
+                  while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
                     HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null || echo "unknown")
 
                     if [ "$HEALTH_STATUS" = "healthy" ]; then
-                      echo "Container is healthy after $SECONDS seconds"
+                      echo "Container is healthy after ${ELAPSED} seconds"
                       kill $LOGS_PID 2>/dev/null || true
                       exit 0
                     fi
 
-                    echo "Health status: $HEALTH_STATUS (elapsed: ${SECONDS}s)"
+                    echo "Health status: $HEALTH_STATUS (elapsed: ${ELAPSED}s)"
                     sleep 10
-                    SECONDS=$((SECONDS + 10))
+                    ELAPSED=$((ELAPSED + 10))
                   done
 
                   kill $LOGS_PID 2>/dev/null || true
