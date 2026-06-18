@@ -13,6 +13,9 @@ on:
             - "pyproject.toml"
             - "uv.lock"
 
+permissions:
+    contents: read
+
 jobs:
     test-container-jsonl:
         runs-on: ubuntu-latest
@@ -101,5 +104,7 @@ jobs:
               run: |
                   echo "## Container Test Summary" >> $GITHUB_STEP_SUMMARY
                   echo "- **PR Number:** ${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Photon Version:** ${{ env.PHOTON_VERSION }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Photon Version:** ${PHOTON_VERSION}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Status:** ${JOB_STATUS}" >> $GITHUB_STEP_SUMMARY
+              env:
+                JOB_STATUS: ${{ job.status }}
