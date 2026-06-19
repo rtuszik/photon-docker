@@ -177,15 +177,17 @@ def run_update(strategy: str):
 
     prepare_temp_dir()
 
-    download_url = get_download_url()
-    _ensure_disk_space(download_url, parallel=strategy == "PARALLEL")
+    try:
+        download_url = get_download_url()
+        _ensure_disk_space(download_url, parallel=strategy == "PARALLEL")
 
-    index_file = _download_verified_index()
+        index_file = _download_verified_index()
 
-    extract_index(index_file)
+        extract_index(index_file)
 
-    logging.info("Activating new index")
-    index.activate(os.path.join(config.TEMP_DIR, "photon_data"))
-    clear_temp_dir()
+        logging.info("Activating new index")
+        index.activate(os.path.join(config.TEMP_DIR, "photon_data"))
 
-    logging.info("Update pipeline completed successfully.")
+        logging.info("Update pipeline completed successfully.")
+    finally:
+        clear_temp_dir()

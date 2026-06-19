@@ -321,6 +321,28 @@ def test_run_update_propagates_download_error(fake_dirs: Path, monkeypatch: pyte
         update.run_update("SEQUENTIAL")
 
 
+def test_run_update_clears_temp_dir_on_failure(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "SKIP_MD5_CHECK", True)
+    _make_pipeline_patches(monkeypatch)
+
+    cleared = {"n": 0}
+
+    def fake_clear():
+        cleared["n"] += 1
+
+    monkeypatch.setattr(update, "clear_temp_dir", fake_clear)
+
+    def boom():
+        raise update.DownloadError("download died")
+
+    monkeypatch.setattr(update, "download_index", boom)
+
+    with pytest.raises(update.DownloadError, match="download died"):
+        update.run_update("SEQUENTIAL")
+
+    assert cleared["n"] == 1
+
+
 def test_run_update_checksum_mismatch_prevents_activation(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "SKIP_MD5_CHECK", False)
     _make_pipeline_patches(monkeypatch)
