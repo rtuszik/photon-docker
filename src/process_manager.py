@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import time
+import json
 from enum import Enum
 
 import psutil
@@ -22,6 +23,7 @@ from src.utils.notify import send_notification
 
 logger = get_logger()
 
+LAST_UPDATE_RUN = os.path.join(config.DATA_DIR, '.last_update_run')
 
 def check_photon_health(timeout=30, max_retries=10) -> bool:
     url = "http://localhost:2322/status"
@@ -236,6 +238,8 @@ class PhotonManager:
                 logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
                 send_notification("Photon Index Updated Successfully")
                 index.drop_backup()
+                with open(LAST_UPDATE_RUN, 'w') as f:
+                    f.write(json.dumps({"ts": time.time()}))
             else:
                 update_duration = time.time() - update_start
                 logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
@@ -254,24 +258,38 @@ class PhotonManager:
         if config.IMPORT_MODE == "jsonl":
             logger.info("Skipping scheduled updates in JSONL mode until rebuild support is implemented")
             return
+        
+        if not os.path.exists(LAST_UPDATE_RUN):
+            with open(LAST_UPDATE_RUN, 'w') as f:
+                f.write(json.dumps({"ts": time.time()}))
+            last_run = time.time()
+            logger.info("No last update timestamp found, treating as first run")
+        else:
+            try:
+                last_run = json.loads(LAST_UPDATE_RUN.read_text())["ts"]
+            except Exception:
+                logger.error("Unable to read last update timestamp")
+                return
 
         interval = config.UPDATE_INTERVAL.lower()
 
         if interval.endswith("d"):
-            days = int(interval[:-1])
-            schedule.every(days).days.do(self.run_update)
-            logger.info(f"Scheduling updates every {days} days")
+            interval_seconds = int(interval[:-1]) * 86400
+            schedule.every(int(interval[:-1])).days.do(self.run_update)
         elif interval.endswith("h"):
-            hours = int(interval[:-1])
-            schedule.every(hours).hours.do(self.run_update)
-            logger.info(f"Scheduling updates every {hours} hours")
+            interval_seconds = int(interval[:-1]) * 3600
+            schedule.every(int(interval[:-1])).hours.do(self.run_update)
         elif interval.endswith("m"):
-            minutes = int(interval[:-1])
-            schedule.every(minutes).minutes.do(self.run_update)
-            logger.info(f"Scheduling updates every {minutes} minutes")
+            interval_seconds = int(interval[:-1]) * 60
+            schedule.every(int(interval[:-1])).minutes.do(self.run_update)
         else:
             logger.warning(f"Invalid UPDATE_INTERVAL format: {interval}, defaulting to daily")
+            interval_seconds = 86400
             schedule.every().day.do(self.run_update)
+
+        if (time.time() - last_run) >= interval_seconds:
+            logger.info("Update interval elapsed since last run, running update now...")
+            threading.Thread(target=self.run_update, daemon=True).start()
 
         def scheduler_loop():
             while not self.should_exit:
