@@ -23,7 +23,8 @@ from src.utils.notify import send_notification
 
 logger = get_logger()
 
-LAST_UPDATE_RUN = os.path.join(config.DATA_DIR, '.last_update_run')
+def _get_last_update_run_path() -> str:
+    return os.path.join(config.DATA_DIR, '.last_update_run')
 
 def check_photon_health(timeout=30, max_retries=10) -> bool:
     url = "http://localhost:2322/status"
@@ -238,7 +239,7 @@ class PhotonManager:
                 logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
                 send_notification("Photon Index Updated Successfully")
                 index.drop_backup()
-                with open(LAST_UPDATE_RUN, 'w') as f:
+                with open(_get_last_update_run_path(), 'w') as f:
                     f.write(json.dumps({"ts": time.time()}))
             else:
                 update_duration = time.time() - update_start
@@ -259,14 +260,15 @@ class PhotonManager:
             logger.info("Skipping scheduled updates in JSONL mode until rebuild support is implemented")
             return
         
-        if not os.path.exists(LAST_UPDATE_RUN):
-            with open(LAST_UPDATE_RUN, 'w') as f:
+        if not os.path.exists(_get_last_update_run_path()):
+            with open(_get_last_update_run_path(), 'w') as f:
                 f.write(json.dumps({"ts": time.time()}))
             last_run = time.time()
             logger.info("No last update timestamp found, treating as first run")
         else:
             try:
-                last_run = json.loads(LAST_UPDATE_RUN.read_text())["ts"]
+                with open(_get_last_update_run_path(), 'r') as f:
+                    last_run = json.loads(f.read())["ts"]
             except Exception:
                 logger.error("Unable to read last update timestamp")
                 return

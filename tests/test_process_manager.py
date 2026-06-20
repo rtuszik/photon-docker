@@ -404,6 +404,7 @@ def test_schedule_updates_parses_intervals(
 ):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
     monkeypatch.setattr(config, "UPDATE_INTERVAL", interval)
+    monkeypatch.setattr(config, "DATA_DIR", "/tmp")
     monkeypatch.setattr(process_manager.threading, "Thread", lambda **_: MagicMock(start=lambda: None))
     manager.schedule_updates()
     jobs = schedule.get_jobs()
@@ -416,6 +417,7 @@ def test_schedule_updates_falls_back_to_daily_on_invalid_interval(
 ):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
     monkeypatch.setattr(config, "UPDATE_INTERVAL", "garbage")
+    monkeypatch.setattr(config, "DATA_DIR", "/tmp")
     monkeypatch.setattr(process_manager.threading, "Thread", lambda **_: MagicMock(start=lambda: None))
     manager.schedule_updates()
     jobs = schedule.get_jobs()
