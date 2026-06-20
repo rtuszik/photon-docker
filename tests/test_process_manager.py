@@ -400,7 +400,11 @@ def test_run_pending_jobs_survives_job_exception(
 
 @pytest.mark.parametrize(("interval", "expected_unit"), [("3d", "days"), ("12h", "hours"), ("30m", "minutes")])
 def test_schedule_updates_parses_intervals(
-    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, interval: str, expected_unit: str
+    manager: process_manager.PhotonManager,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    interval: str,
+    expected_unit: str,
 ):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
     monkeypatch.setattr(config, "UPDATE_INTERVAL", interval)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import os
 import shlex
 import signal
@@ -6,8 +7,8 @@ import subprocess
 import sys
 import threading
 import time
-import json
 from enum import Enum
+from datetime import datetime
 
 import psutil
 import requests
@@ -23,8 +24,10 @@ from src.utils.notify import send_notification
 
 logger = get_logger()
 
+
 def _get_last_update_run_path() -> str:
-    return os.path.join(config.DATA_DIR, '.last_update_run')
+    return os.path.join(config.DATA_DIR, ".last_update_run")
+
 
 def check_photon_health(timeout=30, max_retries=10) -> bool:
     url = "http://localhost:2322/status"
@@ -239,7 +242,7 @@ class PhotonManager:
                 logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
                 send_notification("Photon Index Updated Successfully")
                 index.drop_backup()
-                with open(_get_last_update_run_path(), 'w') as f:
+                with open(_get_last_update_run_path(), "w") as f:
                     f.write(json.dumps({"ts": time.time()}))
             else:
                 update_duration = time.time() - update_start
@@ -259,15 +262,15 @@ class PhotonManager:
         if config.IMPORT_MODE == "jsonl":
             logger.info("Skipping scheduled updates in JSONL mode until rebuild support is implemented")
             return
-        
+
         if not os.path.exists(_get_last_update_run_path()):
-            with open(_get_last_update_run_path(), 'w') as f:
+            with open(_get_last_update_run_path(), "w") as f:
                 f.write(json.dumps({"ts": time.time()}))
             last_run = time.time()
             logger.info("No last update timestamp found, treating as first run")
         else:
             try:
-                with open(_get_last_update_run_path(), 'r') as f:
+                with open(_get_last_update_run_path()) as f:
                     last_run = json.loads(f.read())["ts"]
             except Exception:
                 logger.error("Unable to read last update timestamp")
@@ -292,6 +295,8 @@ class PhotonManager:
         if (time.time() - last_run) >= interval_seconds:
             logger.info("Update interval elapsed since last run, running update now...")
             threading.Thread(target=self.run_update, daemon=True).start()
+        else:
+            logger.info(f"Next update scheduled for {datetime.fromtimestamp(last_run + interval_seconds).strftime('%m-%d-%Y %H:%M')}")
 
         def scheduler_loop():
             while not self.should_exit:
