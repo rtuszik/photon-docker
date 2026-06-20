@@ -400,11 +400,11 @@ def test_run_pending_jobs_survives_job_exception(
 
 @pytest.mark.parametrize(("interval", "expected_unit"), [("3d", "days"), ("12h", "hours"), ("30m", "minutes")])
 def test_schedule_updates_parses_intervals(
-    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, interval: str, expected_unit: str
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, interval: str, expected_unit: str
 ):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
     monkeypatch.setattr(config, "UPDATE_INTERVAL", interval)
-    monkeypatch.setattr(config, "DATA_DIR", "/tmp")
+    monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(process_manager.threading, "Thread", lambda **_: MagicMock(start=lambda: None))
     manager.schedule_updates()
     jobs = schedule.get_jobs()
@@ -413,11 +413,11 @@ def test_schedule_updates_parses_intervals(
 
 
 def test_schedule_updates_falls_back_to_daily_on_invalid_interval(
-    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
     monkeypatch.setattr(config, "UPDATE_INTERVAL", "garbage")
-    monkeypatch.setattr(config, "DATA_DIR", "/tmp")
+    monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(process_manager.threading, "Thread", lambda **_: MagicMock(start=lambda: None))
     manager.schedule_updates()
     jobs = schedule.get_jobs()
