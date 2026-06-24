@@ -95,6 +95,64 @@ def test_start_photon_import_includes_country_codes(monkeypatch):
     ]
 
 
+def test_start_photon_import_includes_reverse_only(monkeypatch):
+    commands = []
+
+    class DummyProcess:
+        def __init__(self):
+            self.stdin = io.BytesIO()
+
+    def fake_popen(cmd, cwd, stdin):
+        commands.append({"cmd": cmd, "cwd": cwd, "stdin": stdin})
+        return DummyProcess()
+
+    monkeypatch.setattr(config, "JAVA_PARAMS", None)
+    monkeypatch.setattr(config, "LANGUAGES", None)
+    monkeypatch.setattr(config, "EXTRA_TAGS", None)
+    monkeypatch.setattr(config, "IMPORT_GEOMETRIES", False)
+    monkeypatch.setattr(config, "REVERSE_ONLY", True)
+    monkeypatch.setattr(importer.os, "makedirs", _noop_makedirs)
+    monkeypatch.setattr(importer.subprocess, "Popen", fake_popen)
+
+    importer._start_photon_import("-")
+
+    assert commands[0]["cmd"] == [
+        "java",
+        "-jar",
+        "/photon/photon.jar",
+        "import",
+        "-import-file",
+        "-",
+        "-data-dir",
+        config.DATA_DIR,
+        "-reverse-only",
+    ]
+
+
+def test_start_photon_import_omits_reverse_only_by_default(monkeypatch):
+    commands = []
+
+    class DummyProcess:
+        def __init__(self):
+            self.stdin = io.BytesIO()
+
+    def fake_popen(cmd, cwd, stdin):
+        commands.append({"cmd": cmd, "cwd": cwd, "stdin": stdin})
+        return DummyProcess()
+
+    monkeypatch.setattr(config, "JAVA_PARAMS", None)
+    monkeypatch.setattr(config, "LANGUAGES", None)
+    monkeypatch.setattr(config, "EXTRA_TAGS", None)
+    monkeypatch.setattr(config, "IMPORT_GEOMETRIES", False)
+    monkeypatch.setattr(config, "REVERSE_ONLY", False)
+    monkeypatch.setattr(importer.os, "makedirs", _noop_makedirs)
+    monkeypatch.setattr(importer.subprocess, "Popen", fake_popen)
+
+    importer._start_photon_import("-")
+
+    assert "-reverse-only" not in commands[0]["cmd"]
+
+
 def test_run_jsonl_import_uses_parent_region_and_country_codes_for_multi_region(monkeypatch):
     process = RecordingProcess()
     download_args = []

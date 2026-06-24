@@ -20,6 +20,7 @@ def log_config() -> None:
     logger.info(f"LANGUAGES: {config.LANGUAGES}")
     logger.info(f"EXTRA_TAGS: {config.EXTRA_TAGS}")
     logger.info(f"IMPORT_GEOMETRIES: {config.IMPORT_GEOMETRIES}")
+    logger.info(f"REVERSE_ONLY: {config.REVERSE_ONLY}")
     logger.info(f"FORCE_UPDATE: {config.FORCE_UPDATE}")
     logger.info(f"DOWNLOAD_MAX_RETRIES: {config.DOWNLOAD_MAX_RETRIES}")
     logger.info(f"CHECKSUM_MAX_RETRIES: {config.CHECKSUM_MAX_RETRIES}")
