@@ -67,5 +67,9 @@ def _start_photon_import(input_source: str, country_codes: list[str] | None = No
     if config.IMPORT_GEOMETRIES:
         cmd.append("-full-geometries")
 
+    if config.REVERSE_ONLY:
+        cmd.append("-reverse-only")
+        logger.info("Reverse-only import enabled: forward search (/api, /structured) and /metrics will be disabled")
+
     logger.info(f"Starting Photon JSONL import for region(s): {', '.join(config.get_jsonl_regions())}")
     return subprocess.Popen(cmd, cwd=config.PHOTON_DIR, stdin=subprocess.PIPE)  # noqa: S603

@@ -11,6 +11,7 @@ def _set_base_config(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "REGION", None)
     monkeypatch.setattr(config, "FILE_URL", None)
     monkeypatch.setattr(config, "MD5_URL", None)
+    monkeypatch.setattr(config, "REVERSE_ONLY", False)
 
 
 def test_validate_config_accepts_valid_configuration(monkeypatch: pytest.MonkeyPatch):
@@ -75,6 +76,23 @@ def test_validate_config_accepts_multiple_jsonl_regions(monkeypatch: pytest.Monk
     monkeypatch.setattr(config, "REGION", "de,fr")
 
     validate_config()
+
+
+def test_validate_config_accepts_reverse_only_in_jsonl_mode(monkeypatch: pytest.MonkeyPatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setattr(config, "IMPORT_MODE", "jsonl")
+    monkeypatch.setattr(config, "REGION", "de")
+    monkeypatch.setattr(config, "REVERSE_ONLY", True)
+
+    validate_config()
+
+
+def test_validate_config_rejects_reverse_only_in_db_mode(monkeypatch: pytest.MonkeyPatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setattr(config, "REVERSE_ONLY", True)
+
+    with pytest.raises(ValueError, match="REVERSE_ONLY is only supported when IMPORT_MODE=jsonl"):
+        validate_config()
 
 
 def test_validate_config_rejects_multiple_db_regions(monkeypatch: pytest.MonkeyPatch):

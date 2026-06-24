@@ -7,6 +7,43 @@ from src.utils.regions import get_region_info, get_regions_for_jsonl, is_valid_r
 logging = get_logger()
 
 
+def _validate_db_mode() -> list[str]:
+    errors = []
+
+    if config.REGION and len(config.get_jsonl_regions()) > 1:
+        errors.append("DB mode supports exactly one region in REGION.")
+    elif config.REGION:
+        if not is_valid_region(config.REGION):
+            errors.append(f"Invalid REGION: '{config.REGION}'. Must be a valid continent, sub-region, or 'planet'.")
+        else:
+            region_info = get_region_info(config.REGION)
+            if region_info and not region_info.get("db_available", False):
+                errors.append(f"DB index is not available for REGION: '{config.REGION}'.")
+
+    if config.REVERSE_ONLY:
+        errors.append("REVERSE_ONLY is only supported when IMPORT_MODE=jsonl, since it is an import-time option.")
+
+    return errors
+
+
+def _validate_jsonl_mode() -> list[str]:
+    errors = []
+
+    if config.FILE_URL:
+        errors.append("FILE_URL is not supported when IMPORT_MODE=jsonl.")
+    if config.MD5_URL:
+        errors.append("MD5_URL is not supported when IMPORT_MODE=jsonl.")
+    if not config.get_jsonl_regions():
+        errors.append("REGION is required when IMPORT_MODE=jsonl.")
+    else:
+        try:
+            get_regions_for_jsonl(config.get_jsonl_regions())
+        except ValueError as exc:
+            errors.append(str(exc))
+
+    return errors
+
+
 def validate_config():
     logging.info("Validating environment variables...")
     error_messages = []
@@ -27,30 +64,10 @@ def validate_config():
         )
 
     if config.IMPORT_MODE == "db":
-        if config.REGION and len(config.get_jsonl_regions()) > 1:
-            error_messages.append("DB mode supports exactly one region in REGION.")
-        elif config.REGION:
-            if not is_valid_region(config.REGION):
-                error_messages.append(
-                    f"Invalid REGION: '{config.REGION}'. Must be a valid continent, sub-region, or 'planet'."
-                )
-            else:
-                region_info = get_region_info(config.REGION)
-                if region_info and not region_info.get("db_available", False):
-                    error_messages.append(f"DB index is not available for REGION: '{config.REGION}'.")
+        error_messages.extend(_validate_db_mode())
 
     if config.IMPORT_MODE == "jsonl":
-        if config.FILE_URL:
-            error_messages.append("FILE_URL is not supported when IMPORT_MODE=jsonl.")
-        if config.MD5_URL:
-            error_messages.append("MD5_URL is not supported when IMPORT_MODE=jsonl.")
-        if not config.get_jsonl_regions():
-            error_messages.append("REGION is required when IMPORT_MODE=jsonl.")
-        else:
-            try:
-                get_regions_for_jsonl(config.get_jsonl_regions())
-            except ValueError as exc:
-                error_messages.append(str(exc))
+        error_messages.extend(_validate_jsonl_mode())
 
     if error_messages:
         full_error_message = "Configuration validation failed:\n" + "\n".join(error_messages)
