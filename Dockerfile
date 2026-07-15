@@ -1,4 +1,4 @@
-FROM ubuntu:noble AS builder
+FROM ubuntu:noble@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90 AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -21,7 +21,7 @@ ENV UV_PYTHON=/usr/bin/python3.12 \
 RUN uv sync --locked --no-dev --no-install-project
 
 
-FROM eclipse-temurin:21.0.9_10-jre-noble
+FROM eclipse-temurin:21.0.9_10-jre-noble@sha256:d3eb69add1874bc785382d6282db53a67841f602a1139dee6c4a1221d8c56568
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG PHOTON_VERSION
