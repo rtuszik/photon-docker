@@ -39,6 +39,10 @@
 			"groupName": "Python Version",
 			"matchPackageNames": ["python"],
 			"matchManagers": ["custom.regex", "pyenv", "pep621"]
+		},
+		{
+			"groupName": "uv",
+			"matchPackageNames": ["uv", "astral-sh/uv", "ghcr.io/astral-sh/uv", "uv_build"]
 		}
 	],
 
