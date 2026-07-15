@@ -7,8 +7,6 @@
 	"labels": ["renovate"],
 	"baseBranchPatterns": ["dev"],
 	"useBaseBranchConfig": "merge",
-	"internalChecksFilter": "strict",
-	"minimumReleaseAge": "3 days",
 	"packageRules": [
 		{
 			"matchUpdateTypes": ["patch"],
