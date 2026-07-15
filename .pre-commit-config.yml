@@ -1,21 +1,33 @@
+---
 repos:
     - repo: https://github.com/pre-commit/pre-commit-hooks
       rev: v6.0.0
       hooks:
-          - id: trailing-whitespace
-          - id: check-yaml
-          - id: end-of-file-fixer
+        - id: trailing-whitespace
+        - id: check-yaml
+        - id: end-of-file-fixer
 
     - repo: https://github.com/astral-sh/ruff-pre-commit
       rev: v0.15.4
       hooks:
-          - id: ruff-check
-            args: [--fix]
-            files: "\\.py$"
-          - id: ruff-format
-            files: "\\.py$"
+        - id: ruff-check
+          args: [--fix]
+          files: "\\.py$"
+        - id: ruff-format
+          files: "\\.py$"
 
     - repo: https://github.com/rhysd/actionlint
       rev: v1.7.12
       hooks:
-          - id: actionlint
+        - id: actionlint
+
+    - repo: https://github.com/betterleaks/betterleaks
+      rev: v1.6.1
+      hooks:
+        - id: betterleaks
+
+    - repo: https://github.com/renovatebot/pre-commit-hooks
+      rev: 43.264.2
+      hooks:
+        - id: renovate-config-validator
+          files: renovate.json
