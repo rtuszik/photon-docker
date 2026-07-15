@@ -1,6 +1,8 @@
+#:schema https://www.schemastore.org/pyproject.json
+
 [project]
 name = "photon-docker"
-version = "2.1.0"
+version = "2.3.1"
 description = "Unofficial docker image for the Photon Geocoder"
 requires-python = ">=3.12"
 dependencies = [
@@ -10,7 +12,6 @@ dependencies = [
     "requests==2.33.1",
     "schedule>=1.2.2",
     "tqdm==4.67.3",
-    "urllib3==2.7.0",
     "zstandard>=0.23.0",
 ]
 
@@ -38,14 +39,14 @@ line-length = 120
 
 [tool.ruff.lint]
 ignore = [
-    "ANN", # flake8-annotations
-    "COM", # flake8-commas
-    "DJ", # django
-    "EXE", # flake8-executable
-    "BLE", # blind except
-    "PTH", # flake8-pathlib
-    "T10", # debugger
-    "TID", # flake8-tidy-imports
+    "ANN",  # flake8-annotations
+    "COM",  # flake8-commas
+    "DJ",  # django
+    "EXE",  # flake8-executable
+    "BLE",  # blind except
+    "PTH",  # flake8-pathlib
+    "T10",  # debugger
+    "TID",  # flake8-tidy-imports
     "D100",
     "D101",
     "D102",
@@ -60,10 +61,10 @@ ignore = [
     "D415",
     "G004",
     "PLR2004",
-    "E501", # line too long
+    "E501",  # line too long
     "TRY",
-    "SIM105", # faster without contextlib
-] # select = ["ALL"]
+    "SIM105",  # faster without contextlib
+]  # select = ["ALL"]
 extend-select = [
     "A",
     "B",
