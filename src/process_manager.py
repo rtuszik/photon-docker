@@ -327,6 +327,8 @@ class PhotonManager:
             logger.error("Failed to start Photon during initial startup")
             sys.exit(1)
 
+        send_notification("Photon started successfully")
+
         self.schedule_updates()
 
         self.monitor_photon()
