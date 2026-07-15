@@ -42,7 +42,12 @@
 		},
 		{
 			"groupName": "uv",
-			"matchPackageNames": ["uv", "astral-sh/uv", "ghcr.io/astral-sh/uv", "uv_build"]
+			"matchPackageNames": [
+				"uv",
+				"astral-sh/uv",
+				"ghcr.io/astral-sh/uv",
+				"uv_build"
+			]
 		}
 	],
 
