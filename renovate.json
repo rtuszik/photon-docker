@@ -1,6 +1,10 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"extends": ["config:best-practices", ":enablePreCommit"],
+	"extends": [
+		"config:best-practices",
+		":enablePreCommit",
+		"local>rtuszik/renovate-config"
+	],
 	"prConcurrentLimit": 0,
 	"prCreation": "not-pending",
 	"rebaseWhen": "behind-base-branch",
