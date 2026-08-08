@@ -2,7 +2,6 @@ import os
 import signal
 import subprocess
 import time
-from datetime import timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -402,7 +401,7 @@ def test_run_pending_jobs_survives_job_exception(
 
 
 @pytest.mark.parametrize("interval", ["3d", "12h", "30m"])
-def test_schedule_updates_polls_daily_regardless_of_interval(
+def test_schedule_updates_ticks_on_a_fixed_cadence(
     manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, interval: str
 ):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
@@ -411,26 +410,20 @@ def test_schedule_updates_polls_daily_regardless_of_interval(
     manager.schedule_updates()
     jobs = schedule.get_jobs()
     assert len(jobs) == 1
-    assert jobs[0].unit == "days"
+    assert jobs[0].unit == "seconds"
+    assert jobs[0].interval == process_manager.POLL_TICK_SECONDS
 
 
-@pytest.mark.parametrize(
-    ("interval", "expected"),
-    [("3d", timedelta(days=3)), ("12h", timedelta(hours=12)), ("30m", timedelta(minutes=30))],
-)
-def test_parse_interval(manager: process_manager.PhotonManager, interval: str, expected: timedelta):
-    assert manager._parse_interval(interval) == expected
-
-
-def test_is_update_due_when_marker_missing(
+def test_is_update_due_when_no_index_timestamp(
     manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "OS_NODE_DIR", str(tmp_path / "photon_data" / "node_1"))
     assert manager._is_update_due() is True
 
 
 @pytest.mark.parametrize(("age_days", "due"), [(31, True), (1, False)])
-def test_is_update_due_compares_marker_age_to_interval(
+def test_is_update_due_compares_index_age_to_interval(
     manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, age_days: int, due: bool
 ):
     monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
@@ -440,6 +433,38 @@ def test_is_update_due_compares_marker_age_to_interval(
     mtime = time.time() - age_days * 86400
     os.utime(marker, (mtime, mtime))
     assert manager._is_update_due() is due
+
+
+def test_maybe_update_runs_when_due_and_arms_throttle(manager: process_manager.PhotonManager):
+    with patch.object(manager, "_is_update_due", return_value=True), patch.object(manager, "run_update") as run:
+        manager._maybe_update()
+    run.assert_called_once()
+    assert manager._next_poll_at > time.monotonic()
+
+
+def test_maybe_update_skips_when_not_due(manager: process_manager.PhotonManager):
+    with patch.object(manager, "_is_update_due", return_value=False), patch.object(manager, "run_update") as run:
+        manager._maybe_update()
+    run.assert_not_called()
+    assert manager._next_poll_at == 0.0
+
+
+def test_maybe_update_throttles_repeated_attempts(manager: process_manager.PhotonManager):
+    with patch.object(manager, "_is_update_due", return_value=True), patch.object(manager, "run_update") as run:
+        manager._maybe_update()
+        manager._maybe_update()
+        manager._maybe_update()
+    run.assert_called_once()
+
+
+def test_maybe_update_retries_once_throttle_expires(
+    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
+):
+    with patch.object(manager, "_is_update_due", return_value=True), patch.object(manager, "run_update") as run:
+        manager._maybe_update()
+        monkeypatch.setattr(process_manager.time, "monotonic", lambda: manager._next_poll_at + 1)
+        manager._maybe_update()
+    assert run.call_count == 2
 
 
 def test_schedule_updates_skipped_when_disabled(
