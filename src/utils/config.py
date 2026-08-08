@@ -51,6 +51,14 @@ def get_jsonl_regions() -> list[str]:
     return _get_csv_values(REGION) or []
 
 
+def parse_interval(interval: str) -> int:
+    value = interval.strip().lower()
+    for suffix, seconds in (("d", 86400), ("h", 3600), ("m", 60)):
+        if value.endswith(suffix) and value[:-1].isdigit():
+            return int(value[:-1]) * seconds
+    return 86400
+
+
 def _get_csv_values(value: str | None) -> list[str] | None:
     if not value:
         return None

@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 from pathlib import Path
 
 from src.utils import config
@@ -36,6 +37,13 @@ def last_updated() -> float:
     if not os.path.exists(config.OS_NODE_DIR):
         return 0.0
     return os.path.getmtime(config.OS_NODE_DIR)
+
+
+def age_seconds() -> float:
+    timestamp = last_updated()
+    if timestamp == 0.0:
+        return float("inf")
+    return max(0.0, time.time() - timestamp)
 
 
 def mark_updated():
