@@ -22,6 +22,9 @@ from src.utils.notify import send_notification
 
 logger = get_logger()
 
+POLL_TICK_SECONDS = 60
+POLL_BACKOFF_SECONDS = 3600
+
 
 def check_photon_health(timeout=30, max_retries=10) -> bool:
     url = "http://localhost:2322/status"
@@ -70,6 +73,7 @@ class PhotonManager:
         self.state = AppState.INITIALIZING
         self.photon_process = None
         self.should_exit = False
+        self._next_poll_at = 0.0
 
         signal.signal(signal.SIGTERM, self.handle_shutdown)
         signal.signal(signal.SIGINT, self.handle_shutdown)
@@ -246,6 +250,21 @@ class PhotonManager:
         finally:
             self.state = AppState.RUNNING
 
+    def _is_update_due(self) -> bool:
+        elapsed = index.age_seconds()
+        interval = config.parse_interval(config.UPDATE_INTERVAL)
+
+        if elapsed == float("inf"):
+            logger.info("No index timestamp found, update is due")
+            return True
+
+        if elapsed < interval:
+            logger.debug(f"Index is {elapsed / 86400:.1f}d old (interval {config.UPDATE_INTERVAL}), not due")
+            return False
+
+        logger.info(f"Index is {elapsed / 86400:.1f}d old (interval {config.UPDATE_INTERVAL}), update due")
+        return True
+
     def schedule_updates(self):
         if config.UPDATE_STRATEGY == "DISABLED":
             logger.info("Updates disabled, not scheduling")
@@ -255,23 +274,11 @@ class PhotonManager:
             logger.info("Skipping scheduled updates in JSONL mode until rebuild support is implemented")
             return
 
-        interval = config.UPDATE_INTERVAL.lower()
-
-        if interval.endswith("d"):
-            days = int(interval[:-1])
-            schedule.every(days).days.do(self.run_update)
-            logger.info(f"Scheduling updates every {days} days")
-        elif interval.endswith("h"):
-            hours = int(interval[:-1])
-            schedule.every(hours).hours.do(self.run_update)
-            logger.info(f"Scheduling updates every {hours} hours")
-        elif interval.endswith("m"):
-            minutes = int(interval[:-1])
-            schedule.every(minutes).minutes.do(self.run_update)
-            logger.info(f"Scheduling updates every {minutes} minutes")
-        else:
-            logger.warning(f"Invalid UPDATE_INTERVAL format: {interval}, defaulting to daily")
-            schedule.every().day.do(self.run_update)
+        logger.info(
+            f"Checking index age every {POLL_TICK_SECONDS}s (UPDATE_INTERVAL={config.UPDATE_INTERVAL}, "
+            f"retry backoff {POLL_BACKOFF_SECONDS}s)"
+        )
+        schedule.every(POLL_TICK_SECONDS).seconds.do(self._maybe_update)
 
         def scheduler_loop():
             while not self.should_exit:
@@ -280,6 +287,18 @@ class PhotonManager:
 
         thread = threading.Thread(target=scheduler_loop, daemon=True)
         thread.start()
+
+    def _maybe_update(self):
+        if not self._is_update_due():
+            return
+
+        now = time.monotonic()
+        if now < self._next_poll_at:
+            logger.debug(f"Update attempt throttled for another {self._next_poll_at - now:.0f}s")
+            return
+
+        self._next_poll_at = now + POLL_BACKOFF_SECONDS
+        self.run_update()
 
     def _run_pending_jobs(self):
         try:

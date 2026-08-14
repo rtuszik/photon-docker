@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -50,6 +51,26 @@ def test_last_updated_falls_back_to_node_dir_mtime(fake_dirs: Path):
 
 def test_last_updated_returns_zero_when_nothing_exists(fake_dirs: Path):
     assert index.last_updated() == 0.0
+
+
+def test_age_seconds_is_infinite_when_nothing_exists(fake_dirs: Path):
+    assert index.age_seconds() == float("inf")
+
+
+def test_age_seconds_measures_marker_age(fake_dirs: Path):
+    marker = fake_dirs / ".photon-index-updated"
+    marker.write_text("")
+    mtime = time.time() - 3600
+    os.utime(marker, (mtime, mtime))
+    assert index.age_seconds() == pytest.approx(3600, abs=5)
+
+
+def test_age_seconds_never_negative_for_future_marker(fake_dirs: Path):
+    marker = fake_dirs / ".photon-index-updated"
+    marker.write_text("")
+    mtime = time.time() + 3600
+    os.utime(marker, (mtime, mtime))
+    assert index.age_seconds() == 0.0
 
 
 def test_mark_updated_creates_marker(fake_dirs: Path):
