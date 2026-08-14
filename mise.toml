@@ -2,7 +2,7 @@
 uv = "0.11.28"
 python = "3.13"
 betterleaks = "1.6.1"
-prek = "0.4.9"
+prek = "0.4.13"
 zizmor = "1.27.0"
 
 [deps]
