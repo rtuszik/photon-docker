@@ -9,6 +9,7 @@ on:
             - "pyproject.toml"
             - "uv.lock"
             - "Dockerfile"
+            - ".github/**"
 
 permissions:
     contents: write

@@ -13,6 +13,7 @@ on:
             - ".last_release"
             - "pyproject.toml"
             - "uv.lock"
+            - ".github/**"
 
 permissions:
     contents: read
