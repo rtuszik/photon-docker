@@ -38,6 +38,18 @@
 			"groupName": "ruff"
 		},
 		{
+			"matchPackageNames": ["betterleaks", "betterleaks/betterleaks"],
+			"groupName": "betterleaks"
+		},
+		{
+			"matchPackageNames": [
+				"docker/build-push-action",
+				"docker/login-action",
+				"docker/setup-buildx-action"
+			],
+			"groupName": "Docker actions"
+		},
+		{
 			"groupName": "Python Version",
 			"matchPackageNames": ["python"],
 			"matchManagers": ["custom.regex", "pyenv", "pep621"]
