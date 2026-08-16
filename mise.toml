@@ -1,3 +1,5 @@
+#:schema https://mise.jdx.dev/schema/mise.json
+
 [tools]
 uv = "0.12.3"
 python = "3.14.7"
@@ -7,3 +9,97 @@ zizmor = "1.29.0"
 
 [deps]
 uv = { auto = true }
+
+[tasks.default]
+description = "Show available tasks"
+run = "mise tasks ls"
+
+[tasks.help]
+description = "Show available tasks"
+run = "mise tasks ls"
+
+[tasks.install]
+description = "Install dev dependencies and git hooks"
+run = '''
+if ! command -v uv >/dev/null 2>&1; then
+    echo "uv is not installed or not on PATH."
+    exit 1
+fi
+
+if ! command -v prek >/dev/null 2>&1; then
+    echo "prek is not installed or not on PATH."
+    exit 1
+fi
+
+prek install
+uv sync --locked --group dev
+'''
+
+[tasks.check]
+description = "Run all quality checks"
+depends = ["lint", "format", "typecheck", "deadcode"]
+
+[tasks.lint]
+description = "Run ruff linter with auto-fix"
+run = "uv run ruff check --fix"
+
+[tasks.format]
+description = "Run ruff formatter"
+run = "uv run ruff format"
+
+[tasks.typecheck]
+description = "Run ty type checker"
+run = "uv run ty check"
+
+[tasks.deadcode]
+description = "Run vulture dead code checker"
+run = 'uv run vulture --min-confidence 100 --exclude ".venv" .'
+
+[tasks.test]
+description = "Run pytest"
+run = "uv run pytest"
+
+[tasks.rebuild]
+description = "Build and run Docker containers"
+usage = '''
+flag "--no-cache" help="Rebuild Docker images without using the cache"
+flag "--volumes" help="Remove volumes before rebuilding"
+'''
+run = '''
+export PHOTON_VERSION="$(tr -d '[:space:]' < .last_release)"
+nocache="${usage_no_cache:-false}"
+volumes="${usage_volumes:-false}"
+
+if [ "$nocache" = "false" ] && [ "$volumes" = "false" ] && [ -t 0 ]; then
+    printf "Rebuild without cache? (y/n): "
+    read -r nocache_input
+    printf "Remove volumes before rebuild? (y/n): "
+    read -r volumes_input
+
+    if [ "$nocache_input" = "y" ] || [ "$nocache_input" = "Y" ]; then
+        nocache="true"
+    fi
+
+    if [ "$volumes_input" = "y" ] || [ "$volumes_input" = "Y" ]; then
+        volumes="true"
+    fi
+fi
+
+if [ "$volumes" = "true" ]; then
+    docker compose -f docker-compose.build.yml down -v
+else
+    docker compose -f docker-compose.build.yml down
+fi
+
+if [ "$nocache" = "true" ]; then
+    docker compose -f docker-compose.build.yml build --no-cache
+else
+    docker compose -f docker-compose.build.yml build
+fi
+
+docker compose -f docker-compose.build.yml up
+'''
+
+[tasks.clean]
+description = "Stop and remove Docker containers"
+run = "docker compose -f docker-compose.build.yml down"
