@@ -9,6 +9,8 @@ on:
             - "uv.lock"
             - ".python-version"
             - ".github/**"
+            - "entrypoint.sh"
+
     workflow_dispatch:
 
 permissions:
