@@ -10,6 +10,7 @@ on:
             - "uv.lock"
             - "Dockerfile"
             - ".github/**"
+            - "entrypoint.sh"
 
 permissions:
     contents: write
