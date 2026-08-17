@@ -29,7 +29,7 @@ jobs:
                 persist-credentials: false
 
             - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+              uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
             - name: Read Photon version from .last_release
               id: photon_version
@@ -43,7 +43,7 @@ jobs:
                 echo "Photon Version: $PHOTON_VERSION"
 
             - name: Build test image
-              uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
+              uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
               with:
                 context: .
                 file: ./Dockerfile
@@ -105,9 +105,11 @@ jobs:
             - name: Output summary
               if: always()
               run: |
-                echo "## Container Test Summary" >> $GITHUB_STEP_SUMMARY
-                echo "- **PR Number:** ${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
-                echo "- **Photon Version:** ${PHOTON_VERSION}" >> $GITHUB_STEP_SUMMARY
-                echo "- **Status:** ${JOB_STATUS}" >> $GITHUB_STEP_SUMMARY
+                {
+                  echo "## Container Test Summary"
+                  echo "- **PR Number:** ${{ github.event.pull_request.number }}"
+                  echo "- **Photon Version:** ${PHOTON_VERSION}"
+                  echo "- **Status:** ${JOB_STATUS}"
+                } >> "$GITHUB_STEP_SUMMARY"
               env:
                 JOB_STATUS: ${{ job.status }}
