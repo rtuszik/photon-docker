@@ -30,7 +30,7 @@ jobs:
             - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
               with:
                 enable-cache: true
-                version: 0.12.3
+                version: 0.12.4
 
             - run: uv sync --locked
             - run: |
@@ -50,7 +50,7 @@ jobs:
             - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
               with:
                 enable-cache: true
-                version: 0.12.3
+                version: 0.12.4
 
             - run: uv sync --locked
             - run: uv run ty check
@@ -68,7 +68,7 @@ jobs:
             - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
               with:
                 enable-cache: true
-                version: 0.12.3
+                version: 0.12.4
 
             - run: uv sync --locked
             - run: uv run vulture --min-confidence 100 --exclude ".venv" .
