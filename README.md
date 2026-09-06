@@ -222,6 +222,35 @@ An example Grafana Dashboard is available here at [Grafana Labs](https://grafana
 
 To see a live preview, [visit the public dashboard](https://r10k.grafana.net/public-dashboards/089de1d08d954a959e3a475af8968e1e) of the photon instance hosted by [rtuszik](https://github.com/rtuszik).
 
+### Exposed Metrics
+
+The metrics are produced by Photon itself, not by this image. Alongside the standard JVM, process and
+`http_server_requests` meters, Photon exposes the following OpenSearch gauges:
+
+| Metric                                    | Description                                                       |
+| ----------------------------------------- | ----------------------------------------------------------------- |
+| `opensearch_documents_count`              | Documents in the `photon` index                                    |
+| `opensearch_index_size_bytes`             | Primary store size of the `photon` index, in bytes                 |
+| `opensearch_search`                       | Total search queries served by the primaries                       |
+| `opensearch_search_time_millis_milliseconds` | Cumulative time spent on search queries, in milliseconds        |
+| `opensearch_indexing`                     | Total documents indexed by the primaries                           |
+| `opensearch_indexing_time_millis_milliseconds` | Cumulative time spent indexing, in milliseconds               |
+| `opensearch_cluster_shards_active`        | Active shards in the cluster                                       |
+| `opensearch_cluster_shards_relocating`    | Relocating shards in the cluster                                   |
+| `opensearch_cluster_shards_unassigned`    | Unassigned shards in the cluster                                   |
+| `opensearch_cluster_health_status`        | Cluster health, encoded numerically (see below)                    |
+
+> [!IMPORTANT]
+> `opensearch_cluster_health_status` uses **`2` = green, `1` = yellow, `0` = red**.
+>
+> This is the inverse of the convention used by `elasticsearch_exporter` and similar tooling, where a
+> higher number means worse health. A steady `2` means the cluster is healthy, not that it is red.
+> Alerts should therefore fire on `opensearch_cluster_health_status < 2`.
+
+All OpenSearch gauges above are served from a shared snapshot that Photon refreshes at most once every
+30 seconds. Scraping more frequently than that will return repeated values, and a value can lag the
+live `_cluster/health` response by up to 30 seconds.
+
 ### Use with Dawarich
 
 This docker container for photon can be used as your reverse-geocoder for the [Dawarich Location History Tracker](https://github.com/Freika/dawarich)
