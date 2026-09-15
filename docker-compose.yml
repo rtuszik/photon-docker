@@ -1,6 +1,6 @@
 services:
     photon:
-        image: ghcr.io/rtuszik/photon-docker:latest@sha256:729f883612bde3215c156111b421d8e0a27b1eb411b92ef4a24bd587b8259b04
+        image: ghcr.io/rtuszik/photon-docker:latest@sha256:21549c60f9e6488fff3217e40429a652c4b445f374800333fe32859e47cec293
         container_name: "photon-docker"
         environment:
             - UPDATE_STRATEGY=PARALLEL
