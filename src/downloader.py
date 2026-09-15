@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -187,17 +188,25 @@ def _get_download_headers(resume_byte_pos, url):
 
 
 def _calculate_total_size(response, headers, resume_byte_pos):
-    if headers and response.status_code == 206:
-        content_range = response.headers.get("content-range", "")
-        if content_range:
-            return int(content_range.split("/")[-1])
-        return resume_byte_pos + int(response.headers.get("content-length", 0))
+    if response.status_code == 206:
+        content_range = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", response.headers.get("content-range", ""))
+        if not headers or content_range is None:
+            raise ValueError("Unexpected or invalid partial download response")
+        start, end, total = map(int, content_range.groups())
+        if start != resume_byte_pos or not start <= end < total or end != total - 1:
+            raise ValueError("Content-Range does not match the requested download range")
+        content_length = response.headers.get("content-length")
+        if content_length is not None and int(content_length) != end - start + 1:
+            raise ValueError("Content-Length does not match Content-Range")
+        return total
+    if int(response.headers.get("content-length", 0)) < 0:
+        raise ValueError("Invalid Content-Length")
     return int(response.headers.get("content-length", 0))
 
 
 def _handle_no_range_support(resume_byte_pos, destination):
     if resume_byte_pos > 0:
-        logging.warning("Server doesn't support range requests, restarting download")
+        logging.warning("Server returned a full response, restarting download from byte zero")
         if os.path.exists(destination):
             os.remove(destination)
         return 0, "wb"
@@ -237,6 +246,9 @@ def _download_content(response, destination, mode, url, total_size, resume_byte_
             for chunk in response.iter_content(chunk_size=chunk_size):
                 if not chunk:
                     continue
+
+                if (total_size > 0 or "content-length" in response.headers) and downloaded + len(chunk) > total_size:
+                    raise ValueError(f"Download exceeds expected size: {downloaded + len(chunk)}/{total_size} bytes")
 
                 size = f.write(chunk)
                 downloaded += size
@@ -295,14 +307,19 @@ def _perform_download(url, destination, resume_byte_pos, mode, start_time):
     headers = _get_download_headers(resume_byte_pos, url)
 
     with requests.get(url, stream=True, headers=headers, timeout=(30, 60)) as response:
+        if response.status_code == 416 and resume_byte_pos > 0:
+            cleanup_download_state(destination)
+            raise RequestException("Resume range rejected; retrying download from byte zero")
         response.raise_for_status()
+        if response.status_code not in (200, 206):
+            raise ValueError(f"Unexpected download response status: {response.status_code}")
 
         total_size = _calculate_total_size(response, headers, resume_byte_pos)
 
         if total_size > 0:
             logging.info(f"Starting download of {total_size / (1024**3):.2f}GB to {os.path.basename(destination)}")
 
-        if not headers and response.status_code != 206:
+        if response.status_code == 200:
             new_pos, new_mode = _handle_no_range_support(resume_byte_pos, destination)
             if new_mode:
                 resume_byte_pos = new_pos
@@ -318,7 +335,7 @@ def _perform_download(url, destination, resume_byte_pos, mode, start_time):
 
             save_download_state(destination, url, downloaded, total_size)
 
-            if total_size > 0 and downloaded < total_size:
+            if (total_size > 0 or "content-length" in response.headers) and downloaded != total_size:
                 raise Exception(f"Download incomplete: {downloaded}/{total_size} bytes")
 
             cleanup_download_state(destination)
