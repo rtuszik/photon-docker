@@ -241,13 +241,8 @@ def test_get_download_headers_empty_when_no_range_support(monkeypatch: pytest.Mo
 
 
 def test_calculate_total_size_with_range_response_using_content_range():
-    resp = _mock_response(status_code=206, headers={"content-range": "bytes 0-99/12345"})
+    resp = _mock_response(status_code=206, headers={"content-range": "bytes 0-12344/12345"})
     assert downloader._calculate_total_size(resp, {"Range": "bytes=0-"}, 0) == 12345
-
-
-def test_calculate_total_size_with_range_response_no_content_range():
-    resp = _mock_response(status_code=206, headers={"content-length": "100"})
-    assert downloader._calculate_total_size(resp, {"Range": "bytes=50-"}, 50) == 150
 
 
 def test_calculate_total_size_without_range_uses_content_length():
@@ -375,3 +370,82 @@ def test_download_file_propagates_disk_write_oserror(tmp_path: Path, monkeypatch
         pytest.raises(OSError, match="disk full"),
     ):
         downloader.download_file("https://example.com/x", str(dest))
+
+
+@pytest.mark.parametrize("status", [200, 206])
+def test_resume_uses_response_status(tmp_path: Path, status: int):
+    dest = tmp_path / "archive"
+    dest.write_bytes(b"abcd")
+    url = "https://example.com/archive"
+    downloader.save_download_state(str(dest), url, 4, 10)
+    headers = {"content-length": "10" if status == 200 else "6"}
+    if status == 206:
+        headers["content-range"] = "bytes 4-9/10"
+    response = _mock_response(status, headers, [b"abcdefghij" if status == 200 else b"efghij"])
+    with (
+        patch.object(downloader, "supports_range_requests", return_value=True),
+        patch.object(downloader.requests, "get", return_value=response) as get,
+    ):
+        assert downloader.download_file(url, str(dest)) is True
+    assert get.call_count == 1
+    assert get.call_args.kwargs["headers"] == {"Range": "bytes=4-"}
+    assert dest.read_bytes() == b"abcdefghij"
+    assert not Path(downloader.get_download_state_file(str(dest))).exists()
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {"content-range": "bytes 0-9/10"},
+        {"content-range": "bytes 4-10/10"},
+        {"content-range": "bytes 4-9/10", "content-length": "10"},
+    ],
+)
+def test_invalid_resume_range_preserves_partial_file(tmp_path: Path, headers: dict):
+    dest = tmp_path / "archive"
+    dest.write_bytes(b"abcd")
+    url = "https://example.com/archive"
+    downloader.save_download_state(str(dest), url, 4, 10)
+    response = _mock_response(206, headers, [b"efghij"])
+    with (
+        patch.object(downloader, "supports_range_requests", return_value=True),
+        patch.object(downloader.requests, "get", return_value=response),
+    ):
+        assert downloader.download_file(url, str(dest)) is False
+    assert dest.read_bytes() == b"abcd"
+    response.iter_content.assert_not_called()
+
+
+def test_oversized_response_rejected_before_writing_chunk(tmp_path: Path):
+    dest = tmp_path / "archive"
+    response = _mock_response(200, {"content-length": "3"}, [b"abcd"])
+    with patch.object(downloader.requests, "get", return_value=response):
+        assert downloader.download_file("https://example.com/archive", str(dest)) is False
+    assert dest.read_bytes() == b""
+
+
+@pytest.mark.parametrize("retries", [1, 2])
+def test_range_rejection_restarts_within_retry_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, retries: int):
+    dest = tmp_path / "archive"
+    dest.write_bytes(b"oversized partial file")
+    url = "https://example.com/archive"
+    downloader.save_download_state(str(dest), url, dest.stat().st_size, 4)
+    monkeypatch.setattr(config, "DOWNLOAD_MAX_RETRIES", str(retries))
+    monkeypatch.setattr(downloader.time, "sleep", lambda _: None)
+    with (
+        patch.object(downloader, "supports_range_requests", return_value=True),
+        patch.object(
+            downloader.requests,
+            "get",
+            side_effect=[_mock_response(416), _mock_response(200, {"content-length": "4"}, [b"abcd"])],
+        ) as get,
+    ):
+        assert downloader.download_file(url, str(dest)) is (retries == 2)
+    assert get.call_count == retries
+    assert not Path(downloader.get_download_state_file(str(dest))).exists()
+    if retries == 2:
+        assert get.call_args.kwargs["headers"] == {}
+        assert dest.read_bytes() == b"abcd"
+    else:
+        assert dest.read_bytes() == b"oversized partial file"
