@@ -189,7 +189,9 @@ def _get_download_headers(resume_byte_pos, url):
 
 def _calculate_total_size(response, headers, resume_byte_pos):
     if response.status_code == 206:
-        content_range = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", response.headers.get("content-range", ""))
+        content_range = re.fullmatch(
+            r"bytes (\d+)-(\d+)/(\d+)", response.headers.get("content-range", ""), flags=re.IGNORECASE
+        )
         if not headers or content_range is None:
             raise ValueError("Unexpected or invalid partial download response")
         start, end, total = map(int, content_range.groups())

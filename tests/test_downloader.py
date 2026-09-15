@@ -372,15 +372,15 @@ def test_download_file_propagates_disk_write_oserror(tmp_path: Path, monkeypatch
         downloader.download_file("https://example.com/x", str(dest))
 
 
-@pytest.mark.parametrize("status", [200, 206])
-def test_resume_uses_response_status(tmp_path: Path, status: int):
+@pytest.mark.parametrize(("status", "range_unit"), [(200, "bytes"), (206, "bytes"), (206, "Bytes")])
+def test_resume_uses_response_status(tmp_path: Path, status: int, range_unit: str):
     dest = tmp_path / "archive"
     dest.write_bytes(b"abcd")
     url = "https://example.com/archive"
     downloader.save_download_state(str(dest), url, 4, 10)
     headers = {"content-length": "10" if status == 200 else "6"}
     if status == 206:
-        headers["content-range"] = "bytes 4-9/10"
+        headers["content-range"] = f"{range_unit} 4-9/10"
     response = _mock_response(status, headers, [b"abcdefghij" if status == 200 else b"efghij"])
     with (
         patch.object(downloader, "supports_range_requests", return_value=True),
