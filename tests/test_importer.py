@@ -156,20 +156,26 @@ def test_start_photon_import_omits_reverse_only_by_default(monkeypatch):
 def test_run_jsonl_import_uses_parent_region_and_country_codes_for_multi_region(monkeypatch):
     process = RecordingProcess()
     download_args = []
+    import_args = []
 
     def fake_download(region):
         download_args.append(region)
         return "/photon/data/temp/europe.jsonl.zst"
 
+    def fake_start_import(input_source, country_codes=None):
+        import_args.append({"input_source": input_source, "country_codes": country_codes})
+        return process
+
     monkeypatch.setattr(config, "REGION", "andorra,luxemburg")
     monkeypatch.setattr(importer, "download_jsonl", fake_download)
     monkeypatch.setattr(importer, "stream_decompress", lambda path: [b'{"type":"Place"}\n'])
-    monkeypatch.setattr(importer, "_start_photon_import", lambda input_source, country_codes=None: process)
+    monkeypatch.setattr(importer, "_start_photon_import", fake_start_import)
     monkeypatch.setattr(importer, "clear_temp_dir", lambda: None)
 
     importer.run_jsonl_import()
 
     assert download_args == ["europe"]
+    assert import_args == [{"input_source": "-", "country_codes": ["AD", "LU"]}]
 
 
 def test_run_jsonl_import_uses_single_region_without_country_codes(monkeypatch):

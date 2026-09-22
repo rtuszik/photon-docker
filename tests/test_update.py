@@ -1,7 +1,7 @@
 import hashlib
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 
@@ -239,9 +239,31 @@ def _make_pipeline_patches(monkeypatch: pytest.MonkeyPatch):
 
 def test_run_update_happy_path(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "SKIP_MD5_CHECK", False)
-    _make_pipeline_patches(monkeypatch)
+    fake_index = str(Path(config.TEMP_DIR) / "index.tar.bz2")
+    fake_md5 = fake_index + ".md5"
+    pipeline = Mock()
+    pipeline.download_index.return_value = fake_index
+    pipeline.download_md5.return_value = fake_md5
+    pipeline.verify_checksum.return_value = True
+    pipeline.attach_mock(Mock(wraps=update.clear_temp_dir), "clear_temp_dir")
+    monkeypatch.setattr(update, "get_download_url", lambda: "https://example.com/x")
+    monkeypatch.setattr(update, "get_remote_file_size", lambda _: 1024)
+    monkeypatch.setattr(update, "check_disk_space_requirements", lambda *_, **__: True)
+    for name in ("download_index", "download_md5", "verify_checksum", "extract_index", "clear_temp_dir"):
+        monkeypatch.setattr(update, name, getattr(pipeline, name))
+    monkeypatch.setattr(update.index, "activate", pipeline.activate)
+
     update.run_update("PARALLEL")
-    assert Path(config.TEMP_DIR).exists()
+
+    assert pipeline.mock_calls == [
+        call.download_index(),
+        call.download_md5(),
+        call.verify_checksum(fake_md5, fake_index),
+        call.extract_index(fake_index),
+        call.activate(str(Path(config.TEMP_DIR) / "photon_data")),
+        call.clear_temp_dir(),
+    ]
+    assert not Path(config.TEMP_DIR).exists()
 
 
 def test_run_update_passes_strategy_to_space_check(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
@@ -290,11 +312,16 @@ def test_run_update_skip_space_check_proceeds_on_size_error(fake_dirs: Path, mon
     monkeypatch.setattr(config, "SKIP_MD5_CHECK", True)
     _make_pipeline_patches(monkeypatch)
 
-    def boom(_url):
-        raise RemoteFileSizeError("no size")
+    with (
+        patch.object(update, "get_remote_file_size", side_effect=RemoteFileSizeError("no size")) as size,
+        patch.object(update, "download_index", wraps=update.download_index) as download,
+        patch.object(update.index, "activate") as activate,
+    ):
+        update.run_update("PARALLEL")
 
-    monkeypatch.setattr(update, "get_remote_file_size", boom)
-    update.run_update("PARALLEL")
+    size.assert_called_once_with("https://example.com/x")
+    download.assert_called_once_with()
+    activate.assert_called_once_with(str(Path(config.TEMP_DIR) / "photon_data"))
 
 
 def test_run_update_raises_on_size_error_without_skip(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
