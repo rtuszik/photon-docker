@@ -396,8 +396,15 @@ def test_run_update_notifies_when_health_check_fails_after_swap(
 def test_run_pending_jobs_survives_job_exception(
     manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
 ):
-    monkeypatch.setattr(process_manager.schedule, "run_pending", MagicMock(side_effect=RuntimeError("job boom")))
+    run_pending = MagicMock(side_effect=[RuntimeError("job boom"), None])
+    monkeypatch.setattr(process_manager.schedule, "run_pending", run_pending)
+
     manager._run_pending_jobs()
+    run_pending.assert_called_once_with()
+
+    run_pending.reset_mock()
+    manager._run_pending_jobs()
+    run_pending.assert_called_once_with()
 
 
 @pytest.mark.parametrize("interval", ["3d", "12h", "30m"])

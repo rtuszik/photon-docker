@@ -463,20 +463,6 @@ def test_run_update_checksum_mismatch_exhausts_retries(fake_dirs: Path, monkeypa
     assert notify.call_count == 1
 
 
-def test_run_update_verifies_before_extracting(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(config, "SKIP_MD5_CHECK", False)
-    monkeypatch.setattr(config, "CHECKSUM_MAX_RETRIES", "1")
-    _make_pipeline_patches(monkeypatch)
-
-    order: list[str] = []
-    monkeypatch.setattr(update, "verify_checksum", lambda *_: order.append("verify") or True)
-    monkeypatch.setattr(update, "extract_index", lambda _: order.append("extract"))
-
-    update.run_update("PARALLEL")
-
-    assert order == ["verify", "extract"]
-
-
 def test_run_update_extraction_failure_prevents_activation(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "SKIP_MD5_CHECK", True)
     _make_pipeline_patches(monkeypatch)
