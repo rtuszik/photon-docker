@@ -236,7 +236,15 @@ def test_cleanup_lock_files_swallows_remove_errors(
 def test_run_update_skips_when_disabled(manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "UPDATE_STRATEGY", "DISABLED")
     with patch("src.process_manager.update.run_update") as run:
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.SKIPPED
+    run.assert_not_called()
+
+
+def test_run_update_skips_in_jsonl_mode(manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
+    monkeypatch.setattr(config, "IMPORT_MODE", "jsonl")
+    with patch("src.process_manager.update.run_update") as run:
+        assert manager.run_update() is process_manager.UpdateOutcome.SKIPPED
     run.assert_not_called()
 
 
@@ -248,7 +256,7 @@ def test_run_update_no_op_when_index_up_to_date(
         patch("src.process_manager.compare_mtime", return_value=False),
         patch("src.process_manager.update.run_update") as run,
     ):
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.UP_TO_DATE
     run.assert_not_called()
     assert manager.state == process_manager.AppState.RUNNING
 
@@ -263,7 +271,7 @@ def test_run_update_parallel_path(manager: process_manager.PhotonManager, monkey
         patch.object(manager, "start_photon", return_value=True) as start,
         patch("src.process_manager.index.drop_backup") as cleanup,
     ):
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.UPDATED
     run.assert_called_once_with("PARALLEL")
     stop.assert_called_once()
     start.assert_called_once()
@@ -283,7 +291,7 @@ def test_run_update_parallel_keeps_backup_when_health_check_fails(
         patch.object(manager, "start_photon", return_value=False),
         patch("src.process_manager.index.drop_backup") as cleanup,
     ):
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.FAILED
     cleanup.assert_not_called()
     assert manager.state == process_manager.AppState.RUNNING
 
@@ -298,7 +306,7 @@ def test_run_update_sequential_path(manager: process_manager.PhotonManager, monk
         patch.object(manager, "start_photon", return_value=True) as start,
         patch("src.process_manager.index.drop_backup") as cleanup,
     ):
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.UPDATED
     run.assert_called_once_with("SEQUENTIAL")
     assert stop.call_count == 2
     start.assert_called_once()
@@ -318,7 +326,7 @@ def test_run_update_restarts_photon_and_notifies_after_failed_update(
         patch.object(manager, "start_photon", return_value=True) as start,
         patch("src.process_manager.index.drop_backup") as cleanup,
     ):
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.FAILED
     start.assert_called_once()
     cleanup.assert_not_called()
     assert manager.state == process_manager.AppState.RUNNING
@@ -337,7 +345,7 @@ def test_run_update_notifies_success(manager: process_manager.PhotonManager, mon
         patch.object(manager, "start_photon", return_value=True),
         patch("src.process_manager.index.drop_backup"),
     ):
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.UPDATED
 
     messages = [call.args[0] for call in notify.call_args_list]
     assert any("Updated Successfully" in m for m in messages)
@@ -355,7 +363,7 @@ def test_run_update_restores_state_when_pipeline_raises_unexpectedly(
         patch.object(manager, "stop_photon") as stop,
         patch.object(manager, "start_photon", return_value=True) as start,
     ):
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.FAILED
     assert manager.state == process_manager.AppState.RUNNING
     stop.assert_not_called()
     start.assert_not_called()
@@ -369,7 +377,7 @@ def test_run_update_survives_error_outside_pipeline(
         patch("src.process_manager.compare_mtime", side_effect=RuntimeError("header parse boom")),
         patch("src.process_manager.send_notification") as notify,
     ):
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.FAILED
     assert manager.state == process_manager.AppState.RUNNING
     messages = [call.args[0] for call in notify.call_args_list]
     assert any("Photon Update Failed" in m for m in messages)
@@ -387,7 +395,7 @@ def test_run_update_notifies_when_health_check_fails_after_swap(
         patch.object(manager, "start_photon", return_value=False),
         patch("src.process_manager.index.drop_backup"),
     ):
-        manager.run_update()
+        assert manager.run_update() is process_manager.UpdateOutcome.FAILED
     messages = [call.args[0] for call in notify.call_args_list]
     assert any("Photon Update Failed" in m for m in messages)
     assert not any("Updated Successfully" in m for m in messages)
@@ -442,36 +450,180 @@ def test_is_update_due_compares_index_age_to_interval(
     assert manager._is_update_due() is due
 
 
-def test_maybe_update_runs_when_due_and_arms_throttle(manager: process_manager.PhotonManager):
-    with patch.object(manager, "_is_update_due", return_value=True), patch.object(manager, "run_update") as run:
+@pytest.fixture
+def data_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "OS_NODE_DIR", str(tmp_path / "photon_data" / "node_1"))
+    monkeypatch.setattr(config, "UPDATE_INTERVAL", "30d")
+    return tmp_path
+
+
+def _set_index_age(data_dir: Path, age_seconds: float):
+    marker = data_dir / ".photon-index-updated"
+    marker.touch()
+    mtime = time.time() - age_seconds
+    os.utime(marker, (mtime, mtime))
+
+
+def _freeze_time(monkeypatch: pytest.MonkeyPatch, now: float):
+    monkeypatch.setattr(process_manager.time, "time", lambda: now)
+
+
+@pytest.mark.parametrize(
+    ("failures", "delay"), [(0, 3600), (1, 7200), (2, 14400), (3, 28800), (4, 57600), (5, 86400), (500, 86400)]
+)
+def test_retry_delay_doubles_per_failure_up_to_cap(failures: int, delay: int):
+    assert process_manager.retry_delay(failures) == delay
+
+
+def test_maybe_update_runs_when_due_and_records_attempt(manager: process_manager.PhotonManager, data_dir: Path):
+    outcome = process_manager.UpdateOutcome.UP_TO_DATE
+    with (
+        patch.object(manager, "_is_update_due", return_value=True),
+        patch.object(manager, "run_update", return_value=outcome) as run,
+    ):
         manager._maybe_update()
     run.assert_called_once()
-    assert manager._next_poll_at > time.monotonic()
+    assert manager._update_failures == 0
+    assert manager._last_attempt_at == pytest.approx(time.time(), abs=5)
+    assert (data_dir / ".photon-update-attempt").read_text() == "0\n"
 
 
-def test_maybe_update_skips_when_not_due(manager: process_manager.PhotonManager):
+def test_maybe_update_skips_when_not_due(manager: process_manager.PhotonManager, data_dir: Path):
     with patch.object(manager, "_is_update_due", return_value=False), patch.object(manager, "run_update") as run:
         manager._maybe_update()
     run.assert_not_called()
-    assert manager._next_poll_at == 0.0
+    assert manager._last_attempt_at == 0.0
+    assert not (data_dir / ".photon-update-attempt").exists()
 
 
-def test_maybe_update_throttles_repeated_attempts(manager: process_manager.PhotonManager):
-    with patch.object(manager, "_is_update_due", return_value=True), patch.object(manager, "run_update") as run:
+def test_maybe_update_throttles_without_checking_index_age(manager: process_manager.PhotonManager, data_dir: Path):
+    outcome = process_manager.UpdateOutcome.UP_TO_DATE
+    with (
+        patch.object(manager, "_is_update_due", return_value=True) as due,
+        patch.object(manager, "run_update", return_value=outcome) as run,
+    ):
         manager._maybe_update()
         manager._maybe_update()
         manager._maybe_update()
     run.assert_called_once()
+    due.assert_called_once()
 
 
-def test_maybe_update_retries_once_throttle_expires(
-    manager: process_manager.PhotonManager, monkeypatch: pytest.MonkeyPatch
+def test_maybe_update_backoff_starts_when_attempt_ends(
+    manager: process_manager.PhotonManager, data_dir: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    with patch.object(manager, "_is_update_due", return_value=True), patch.object(manager, "run_update") as run:
+    clock = {"now": 1_000_000.0}
+    monkeypatch.setattr(process_manager.time, "time", lambda: clock["now"])
+
+    def slow_update():
+        clock["now"] += 6 * 3600
+        return process_manager.UpdateOutcome.UP_TO_DATE
+
+    with (
+        patch.object(manager, "_is_update_due", return_value=True),
+        patch.object(manager, "run_update", side_effect=slow_update) as run,
+    ):
         manager._maybe_update()
-        monkeypatch.setattr(process_manager.time, "monotonic", lambda: manager._next_poll_at + 1)
+        clock["now"] += process_manager.POLL_TICK_SECONDS
+        manager._maybe_update()
+    run.assert_called_once()
+    assert manager._last_attempt_at == 1_000_000.0 + 6 * 3600
+
+
+def test_maybe_update_retries_once_backoff_expires(
+    manager: process_manager.PhotonManager, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _freeze_time(monkeypatch, 1_000_000.0)
+    outcome = process_manager.UpdateOutcome.UP_TO_DATE
+    with (
+        patch.object(manager, "_is_update_due", return_value=True),
+        patch.object(manager, "run_update", return_value=outcome) as run,
+    ):
+        manager._maybe_update()
+        _freeze_time(monkeypatch, 1_000_000.0 + process_manager.POLL_BACKOFF_SECONDS)
         manager._maybe_update()
     assert run.call_count == 2
+
+
+def test_maybe_update_backs_off_exponentially_after_failures(
+    manager: process_manager.PhotonManager, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _freeze_time(monkeypatch, 1_000_000.0)
+    outcome = process_manager.UpdateOutcome.FAILED
+    with (
+        patch.object(manager, "_is_update_due", return_value=True),
+        patch.object(manager, "run_update", return_value=outcome) as run,
+    ):
+        manager._maybe_update()
+        assert manager._update_failures == 1
+
+        _freeze_time(monkeypatch, 1_000_000.0 + 3600)
+        manager._maybe_update()
+        assert run.call_count == 1
+
+        _freeze_time(monkeypatch, 1_000_000.0 + 7200)
+        manager._maybe_update()
+    assert run.call_count == 2
+    assert manager._update_failures == 2
+    assert (data_dir / ".photon-update-attempt").read_text() == "2\n"
+
+
+@pytest.mark.parametrize("outcome", [process_manager.UpdateOutcome.UP_TO_DATE, process_manager.UpdateOutcome.UPDATED])
+def test_record_attempt_resets_failures_on_success(
+    manager: process_manager.PhotonManager, data_dir: Path, outcome: process_manager.UpdateOutcome
+):
+    _set_index_age(data_dir, 0)
+    manager._update_failures = 3
+    manager._record_attempt(outcome)
+    assert manager._update_failures == 0
+    assert (data_dir / ".photon-update-attempt").read_text() == "0\n"
+
+
+def test_record_attempt_counts_update_as_failed_when_index_still_stale(
+    manager: process_manager.PhotonManager, data_dir: Path
+):
+    _set_index_age(data_dir, 31 * 86400)
+    manager._record_attempt(process_manager.UpdateOutcome.UPDATED)
+    assert manager._update_failures == 1
+
+
+def test_maybe_update_survives_failing_age_check(manager: process_manager.PhotonManager, data_dir: Path):
+    with (
+        patch.object(manager, "_is_update_due", side_effect=OSError("stale file handle")),
+        patch.object(manager, "run_update") as run,
+    ):
+        manager._maybe_update()
+    run.assert_not_called()
+
+
+def test_scheduled_job_is_rescheduled_when_age_check_fails(
+    manager: process_manager.PhotonManager, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
+    monkeypatch.setattr(process_manager.threading, "Thread", lambda **_: MagicMock(start=lambda: None))
+    manager.schedule_updates()
+    job = schedule.get_jobs()[0]
+
+    with patch.object(manager, "_is_update_due", side_effect=OSError("stale file handle")):
+        job.run()
+    assert job.last_run is not None
+
+
+def test_schedule_updates_resumes_persisted_backoff(
+    manager: process_manager.PhotonManager, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(config, "UPDATE_STRATEGY", "SEQUENTIAL")
+    monkeypatch.setattr(process_manager.threading, "Thread", lambda **_: MagicMock(start=lambda: None))
+    process_manager.index.record_update_attempt(2)
+
+    manager.schedule_updates()
+
+    assert manager._update_failures == 2
+    assert manager._last_attempt_at == pytest.approx(time.time(), abs=5)
+    with patch.object(manager, "_is_update_due", return_value=True), patch.object(manager, "run_update") as run:
+        manager._maybe_update()
+    run.assert_not_called()
 
 
 def test_schedule_updates_skipped_when_disabled(
