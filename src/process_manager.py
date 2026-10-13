@@ -24,6 +24,11 @@ logger = get_logger()
 
 POLL_TICK_SECONDS = 60
 POLL_BACKOFF_SECONDS = 3600
+MAX_FAILURE_BACKOFF_SECONDS = 86400
+
+
+def retry_delay(failures: int) -> int:
+    return min(POLL_BACKOFF_SECONDS * 2 ** min(failures, 8), MAX_FAILURE_BACKOFF_SECONDS)
 
 
 def check_photon_health(timeout=30, max_retries=10) -> bool:
@@ -68,12 +73,20 @@ class AppState(Enum):
     SHUTTING_DOWN = 4
 
 
+class UpdateOutcome(Enum):
+    SKIPPED = 1
+    UP_TO_DATE = 2
+    UPDATED = 3
+    FAILED = 4
+
+
 class PhotonManager:
     def __init__(self):
         self.state = AppState.INITIALIZING
         self.photon_process = None
         self.should_exit = False
-        self._next_poll_at = 0.0
+        self._last_attempt_at = 0.0
+        self._update_failures = 0
 
         signal.signal(signal.SIGTERM, self.handle_shutdown)
         signal.signal(signal.SIGINT, self.handle_shutdown)
@@ -198,14 +211,14 @@ class PhotonManager:
                 except Exception as e:
                     logger.debug(f"Could not remove lock file {lock_file}: {e}")
 
-    def run_update(self):
+    def run_update(self) -> UpdateOutcome:
         if config.UPDATE_STRATEGY == "DISABLED":
             logger.info("Updates disabled, skipping")
-            return
+            return UpdateOutcome.SKIPPED
 
         if config.IMPORT_MODE == "jsonl":
             logger.info("Scheduled JSONL rebuilds are not implemented yet, skipping")
-            return
+            return UpdateOutcome.SKIPPED
 
         self.state = AppState.UPDATING
         logger.info(f"Running {config.UPDATE_STRATEGY.lower()} update...")
@@ -215,7 +228,7 @@ class PhotonManager:
             if not compare_mtime():
                 update_duration = time.time() - update_start
                 logger.info(f"Index already up to date - no restart needed ({update_duration:.1f}s)")
-                return
+                return UpdateOutcome.UP_TO_DATE
 
             if config.UPDATE_STRATEGY == "SEQUENTIAL":
                 self.stop_photon()
@@ -230,7 +243,7 @@ class PhotonManager:
                     logger.info("Attempting to restart Photon after failed update")
                     if not self.start_photon():
                         logger.error("Failed to restart Photon after update failure")
-                return
+                return UpdateOutcome.FAILED
 
             logger.info("Update process completed, verifying Photon health...")
 
@@ -240,13 +253,16 @@ class PhotonManager:
                 logger.info(f"Update completed successfully - Photon healthy ({update_duration:.1f}s)")
                 send_notification("Photon Index Updated Successfully")
                 index.drop_backup()
-            else:
-                update_duration = time.time() - update_start
-                logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
-                send_notification("Photon Update Failed - health check failed after index swap, service may be down")
+                return UpdateOutcome.UPDATED
+
+            update_duration = time.time() - update_start
+            logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
+            send_notification("Photon Update Failed - health check failed after index swap, service may be down")
+            return UpdateOutcome.FAILED
         except Exception:
             logger.exception("Update run failed unexpectedly")
             send_notification("Photon Update Failed - unexpected error during update run")
+            return UpdateOutcome.FAILED
         finally:
             self.state = AppState.RUNNING
 
@@ -274,9 +290,13 @@ class PhotonManager:
             logger.info("Skipping scheduled updates in JSONL mode until rebuild support is implemented")
             return
 
+        self._last_attempt_at, self._update_failures = index.last_update_attempt()
+        if self._update_failures:
+            logger.info(f"Resuming update backoff after {self._update_failures} consecutive failed attempt(s)")
+
         logger.info(
             f"Checking index age every {POLL_TICK_SECONDS}s (UPDATE_INTERVAL={config.UPDATE_INTERVAL}, "
-            f"retry backoff {POLL_BACKOFF_SECONDS}s)"
+            f"retry backoff {POLL_BACKOFF_SECONDS}s, up to {MAX_FAILURE_BACKOFF_SECONDS}s after failures)"
         )
         schedule.every(POLL_TICK_SECONDS).seconds.do(self._maybe_update)
 
@@ -289,16 +309,35 @@ class PhotonManager:
         thread.start()
 
     def _maybe_update(self):
-        if not self._is_update_due():
-            return
+        try:
+            delay = retry_delay(self._update_failures)
+            elapsed = time.time() - self._last_attempt_at
+            if 0 <= elapsed < delay:
+                logger.debug(f"Update attempt throttled for another {delay - elapsed:.0f}s")
+                return
 
-        now = time.monotonic()
-        if now < self._next_poll_at:
-            logger.debug(f"Update attempt throttled for another {self._next_poll_at - now:.0f}s")
-            return
+            if not self._is_update_due():
+                return
 
-        self._next_poll_at = now + POLL_BACKOFF_SECONDS
-        self.run_update()
+            self._record_attempt(self.run_update())
+        except Exception:
+            logger.exception("Scheduled update check failed")
+
+    def _record_attempt(self, outcome: UpdateOutcome):
+        failed = outcome is UpdateOutcome.FAILED
+        if outcome is UpdateOutcome.UPDATED and index.age_seconds() >= config.parse_interval(config.UPDATE_INTERVAL):
+            logger.error("Index timestamp did not advance after the update, treating the attempt as failed")
+            failed = True
+
+        self._update_failures = self._update_failures + 1 if failed else 0
+        self._last_attempt_at = time.time()
+        index.record_update_attempt(self._update_failures)
+
+        if failed:
+            logger.warning(
+                f"Update attempt failed ({self._update_failures} in a row), "
+                f"next attempt in {retry_delay(self._update_failures) / 3600:g}h"
+            )
 
     def _run_pending_jobs(self):
         try:
