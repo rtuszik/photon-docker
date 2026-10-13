@@ -21,6 +21,10 @@ def _import_in_progress_marker() -> str:
     return os.path.join(config.DATA_DIR, ".photon-import-in-progress")
 
 
+def _update_attempt_marker() -> str:
+    return os.path.join(config.DATA_DIR, ".photon-update-attempt")
+
+
 def is_present() -> bool:
     return os.path.isdir(config.OS_NODE_DIR)
 
@@ -52,7 +56,27 @@ def mark_updated():
         Path(marker_file).touch()
         logging.info(f"Updated timestamp marker: {marker_file}")
     except Exception as e:
-        logging.warning(f"Failed to update timestamp marker: {e}")
+        logging.error(f"Failed to update timestamp marker: {e}")
+
+
+def last_update_attempt() -> tuple[float, int]:
+    marker_file = _update_attempt_marker()
+    try:
+        failures = int(Path(marker_file).read_text().strip() or 0)
+        return os.path.getmtime(marker_file), max(0, failures)
+    except FileNotFoundError:
+        return 0.0, 0
+    except (OSError, ValueError) as e:
+        logging.warning(f"Ignoring unreadable update attempt marker: {e}")
+        return 0.0, 0
+
+
+def record_update_attempt(failures: int):
+    marker_file = _update_attempt_marker()
+    try:
+        Path(marker_file).write_text(f"{failures}\n")
+    except OSError as e:
+        logging.warning(f"Failed to record update attempt: {e}")
 
 
 def mark_import_started():
