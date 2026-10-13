@@ -34,6 +34,10 @@
 			"automerge": true
 		},
 		{
+			"matchFileNames": ["docker-compose.yml"],
+			"pinDigests": false
+		},
+		{
 			"matchPackageNames": ["ruff", "astral-sh/ruff-pre-commit"],
 			"groupName": "ruff"
 		},
