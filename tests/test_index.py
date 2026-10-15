@@ -78,9 +78,44 @@ def test_mark_updated_creates_marker(fake_dirs: Path):
     assert (fake_dirs / ".photon-index-updated").exists()
 
 
-def test_mark_updated_swallows_errors(fake_dirs: Path):
-    with patch("src.index.Path.touch", side_effect=OSError("nope")):
+def test_mark_updated_logs_error_and_continues(fake_dirs: Path):
+    with patch("src.index.Path.touch", side_effect=OSError("nope")), patch.object(index.logging, "error") as error:
         index.mark_updated()
+    error.assert_called_once()
+
+
+def test_last_update_attempt_defaults_when_never_recorded(fake_dirs: Path):
+    assert index.last_update_attempt() == (0.0, 0)
+
+
+def test_update_attempt_roundtrip(fake_dirs: Path):
+    index.record_update_attempt(3)
+    marker = fake_dirs / ".photon-update-attempt"
+    os.utime(marker, (1_500_000, 1_500_000))
+    assert index.last_update_attempt() == (1_500_000, 3)
+
+
+@pytest.mark.parametrize(("content", "failures"), [("", 0), ("-4\n", 0), ("2", 2)])
+def test_last_update_attempt_normalises_failure_count(fake_dirs: Path, content: str, failures: int):
+    (fake_dirs / ".photon-update-attempt").write_text(content)
+    assert index.last_update_attempt()[1] == failures
+
+
+def test_last_update_attempt_ignores_malformed_marker(fake_dirs: Path):
+    (fake_dirs / ".photon-update-attempt").write_text("garbage")
+    assert index.last_update_attempt() == (0.0, 0)
+
+
+def test_last_update_attempt_ignores_unreadable_marker(fake_dirs: Path):
+    (fake_dirs / ".photon-update-attempt").write_text("1")
+    with patch("src.index.Path.read_text", side_effect=PermissionError("denied")):
+        assert index.last_update_attempt() == (0.0, 0)
+
+
+def test_record_update_attempt_swallows_write_errors(fake_dirs: Path):
+    with patch("src.index.Path.write_text", side_effect=PermissionError("denied")):
+        index.record_update_attempt(1)
+    assert not (fake_dirs / ".photon-update-attempt").exists()
 
 
 def test_import_marker_roundtrip(fake_dirs: Path):
