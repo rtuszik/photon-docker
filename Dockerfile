@@ -54,6 +54,7 @@ ENV PATH="/photon/.venv/bin:${PATH}" \
     VIRTUAL_ENV=/photon/.venv
 
 RUN chmod 644 /photon/photon.jar && \
+    chmod 755 /photon && \
     chown -R photon:photon /photon
 
 LABEL org.opencontainers.image.title="photon-docker" \

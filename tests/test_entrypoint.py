@@ -9,14 +9,7 @@ from src.utils import config
 
 
 @pytest.fixture
-def base_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    data_dir = tmp_path / "data"
-    photon_data_dir = data_dir / "photon_data"
-    os_node_dir = photon_data_dir / "node_1"
-    data_dir.mkdir()
-    monkeypatch.setattr(config, "DATA_DIR", str(data_dir))
-    monkeypatch.setattr(config, "PHOTON_DATA_DIR", str(photon_data_dir))
-    monkeypatch.setattr(config, "OS_NODE_DIR", str(os_node_dir))
+def base_config(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "IMPORT_MODE", "db")
     monkeypatch.setattr(config, "FORCE_UPDATE", False)
     monkeypatch.setattr(config, "INITIAL_DOWNLOAD", True)

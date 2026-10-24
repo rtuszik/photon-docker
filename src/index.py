@@ -52,11 +52,9 @@ def age_seconds() -> float:
 
 def mark_updated():
     marker_file = _updated_marker()
-    try:
-        Path(marker_file).touch()
-        logging.info(f"Updated timestamp marker: {marker_file}")
-    except Exception as e:
-        logging.error(f"Failed to update timestamp marker: {e}")
+    Path(marker_file).touch()
+    Path(_update_attempt_marker()).unlink(missing_ok=True)
+    logging.info(f"Updated timestamp marker: {marker_file}")
 
 
 def last_update_attempt() -> tuple[float, int]:
@@ -73,8 +71,10 @@ def last_update_attempt() -> tuple[float, int]:
 
 def record_update_attempt(failures: int):
     marker_file = _update_attempt_marker()
+    temp_file = f"{marker_file}.tmp"
     try:
-        Path(marker_file).write_text(f"{failures}\n")
+        Path(temp_file).write_text(f"{failures}\n")
+        os.replace(temp_file, marker_file)
     except OSError as e:
         logging.warning(f"Failed to record update attempt: {e}")
 

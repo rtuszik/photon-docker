@@ -104,7 +104,7 @@ mkdir -p photon_data
 sudo chown -R 1000:1000 photon_data
 ```
 
-A new named volume is owned by UID/GID 9011, and data written by an earlier root-mode container is owned by its `PUID`/`PGID`. Change the ownership to match `user:` before you switch. If `/photon/data` is not writable, the container exits at startup with an error.
+A new named volume is owned by UID/GID 9011, and data written by an earlier root-mode container is owned by its `PUID`/`PGID`. Change the ownership to match `user:` before you switch. If any file or directory under `/photon/data` is not writable, the container exits at startup and names the first one it found.
 
 ## Import Modes
 
