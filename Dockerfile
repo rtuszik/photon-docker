@@ -34,6 +34,7 @@ RUN apt-get update \
     gosu \
     python3.12 \
     curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g ${PGID} -o photon && \

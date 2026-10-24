@@ -8,7 +8,7 @@ repos:
         - id: end-of-file-fixer
 
     - repo: https://github.com/astral-sh/ruff-pre-commit
-      rev: v0.15.4
+      rev: v0.17.1
       hooks:
         - id: ruff-check
           args: [--fix]
@@ -27,7 +27,7 @@ repos:
         - id: betterleaks
 
     - repo: https://github.com/renovatebot/pre-commit-hooks
-      rev: 44.14.10
+      rev: 44.173.1
       hooks:
         - id: renovate-config-validator
           files: renovate.json
