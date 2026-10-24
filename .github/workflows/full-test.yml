@@ -95,7 +95,6 @@ jobs:
 
                     echo "Health status: $HEALTH_STATUS (elapsed: ${SECONDS}s)"
                     sleep 10
-                    SECONDS=$((SECONDS + 10))
                   done
 
                   kill $LOGS_PID 2>/dev/null || true
