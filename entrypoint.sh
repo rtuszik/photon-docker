@@ -30,13 +30,12 @@ else
         echo "WARNING: PUID/PGID are ignored when the container runs as non-root user $(id -u):$(id -g)" >&2
     fi
 
-    for dir in /photon/data /photon/data/photon_data /photon/data/photon_data/node_1; do
-        if [ -d "$dir" ] && [ ! -w "$dir" ]; then
-            echo "ERROR: $dir is not writable by $(id -u):$(id -g)." >&2
-            echo "Change the ownership of the mounted data directory to match the container user." >&2
-            exit 1
-        fi
-    done
+    UNWRITABLE=$(find /photon/data ! -writable -print -quit)
+    if [ -n "$UNWRITABLE" ]; then
+        echo "ERROR: $UNWRITABLE is not writable by $(id -u):$(id -g)." >&2
+        echo "Change the ownership of the mounted data directory and its contents to match the container user." >&2
+        exit 1
+    fi
 fi
 
 if [ -d "/photon/data/photon_data/node_1" ]; then

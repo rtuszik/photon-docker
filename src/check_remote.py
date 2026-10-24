@@ -8,11 +8,16 @@ from src import index
 from src.utils import config
 from src.utils.logger import get_logger
 from src.utils.regions import get_index_url_path
+from src.utils.sanitize import sanitize_url
 
 logging = get_logger()
 
 
 class RemoteFileSizeError(Exception):
+    pass
+
+
+class RemoteCheckError(Exception):
     pass
 
 
@@ -58,16 +63,14 @@ def compare_mtime() -> bool:
     try:
         index_path = get_index_url_path(config.REGION, config.INDEX_DB_VERSION, config.INDEX_FILE_EXTENSION)
     except ValueError as e:
-        logging.error(str(e))
-        return False
+        raise RemoteCheckError(str(e)) from e
 
     remote_url = config.BASE_URL + index_path
 
     remote_dt = get_remote_time(remote_url)
 
     if remote_dt is None:
-        logging.warning("Could not determine remote time. Assuming no update is needed.")
-        return False
+        raise RemoteCheckError(f"Could not determine remote time for {sanitize_url(remote_url)}")
 
     using_marker_file = index.has_update_timestamp()
 
