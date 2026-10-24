@@ -240,7 +240,7 @@ wheels = [
 
 [[package]]
 name = "photon-docker"
-version = "2.3.1"
+version = "2.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "apprise" },
