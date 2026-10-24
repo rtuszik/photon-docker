@@ -23,8 +23,18 @@ def get_available_space(path: str) -> int:
         return 0
 
 
+def get_reclaimable_index_size(temp_path: str) -> int:
+    index_dir = config.PHOTON_DATA_DIR
+    if not os.path.isdir(index_dir) or os.stat(index_dir).st_dev != os.stat(temp_path).st_dev:
+        return 0
+    return sum(
+        os.lstat(os.path.join(root, name)).st_blocks * 512 for root, _, files in os.walk(index_dir) for name in files
+    )
+
+
 def check_disk_space_requirements(download_size: int, *, is_parallel: bool = True) -> bool:
-    temp_available = get_available_space(config.TEMP_DIR if os.path.exists(config.TEMP_DIR) else config.DATA_DIR)
+    temp_path = config.TEMP_DIR if os.path.exists(config.TEMP_DIR) else config.DATA_DIR
+    temp_available = get_available_space(temp_path)
     data_available = get_available_space(
         config.PHOTON_DATA_DIR if os.path.exists(config.PHOTON_DATA_DIR) else config.DATA_DIR
     )
@@ -58,11 +68,14 @@ def check_disk_space_requirements(download_size: int, *, is_parallel: bool = Tru
 
     else:
         temp_needed = compressed_size + extracted_size
+        reclaimable = get_reclaimable_index_size(temp_path)
+        temp_available += reclaimable
 
         logging.info("Sequential update space requirements:")
         logging.info(f"  Download size: {compressed_size / (1024**3):.2f} GB")
         logging.info(f"  Estimated extracted size: {extracted_size / (1024**3):.2f} GB")
         logging.info(f"  Temp space needed: {temp_needed / (1024**3):.2f} GB")
+        logging.info(f"  Existing index to be removed: {reclaimable / (1024**3):.2f} GB")
         logging.info(f"  Temp space available: {temp_available / (1024**3):.2f} GB")
 
         if temp_available < temp_needed:

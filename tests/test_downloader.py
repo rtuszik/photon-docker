@@ -56,6 +56,17 @@ def test_check_disk_space_requirements_sequential_fails(monkeypatch: pytest.Monk
     assert downloader.check_disk_space_requirements(10 * 1024**3, is_parallel=False) is False
 
 
+def test_check_disk_space_requirements_sequential_counts_existing_index(monkeypatch: pytest.MonkeyPatch):
+    segment = Path(config.OS_NODE_DIR) / "segment"
+    segment.parent.mkdir(parents=True)
+    segment.write_bytes(b"x" * 1024**2)
+    monkeypatch.setattr(downloader, "get_available_space", lambda _: 0)
+
+    assert downloader.check_disk_space_requirements(300 * 1024, is_parallel=False) is True
+    assert downloader.check_disk_space_requirements(300 * 1024, is_parallel=True) is False
+    assert downloader.check_disk_space_requirements(1024**2, is_parallel=False) is False
+
+
 def test_get_download_state_file_appends_suffix():
     assert downloader.get_download_state_file("/x/y/file.bin") == "/x/y/file.bin.download_state"
 

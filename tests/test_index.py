@@ -177,6 +177,17 @@ def test_reconcile_noop_without_marker(fake_dirs: Path):
     assert Path(config.OS_NODE_DIR).exists()
 
 
+def test_remove_deletes_index(fake_dirs: Path):
+    node_dir = Path(config.OS_NODE_DIR)
+    node_dir.mkdir(parents=True)
+    (node_dir / "segment.bin").write_text("old")
+
+    index.remove()
+    index.remove()
+
+    assert not Path(config.PHOTON_DATA_DIR).exists()
+
+
 def test_activate_swaps_into_target(fake_dirs: Path):
     source = fake_dirs / "source"
     source.mkdir()

@@ -179,7 +179,11 @@ def run_update(strategy: str):
 
     try:
         download_url = get_download_url()
-        _ensure_disk_space(download_url, parallel=strategy == "PARALLEL")
+        parallel = strategy == "PARALLEL"
+        _ensure_disk_space(download_url, parallel=parallel)
+
+        if not parallel:
+            index.remove()
 
         index_file = _download_verified_index()
 

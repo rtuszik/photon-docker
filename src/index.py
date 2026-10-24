@@ -108,6 +108,12 @@ def reconcile():
     _clear_import_marker()
 
 
+def remove():
+    if os.path.isdir(config.PHOTON_DATA_DIR):
+        logging.info(f"Removing existing index at {config.PHOTON_DATA_DIR}")
+        shutil.rmtree(config.PHOTON_DATA_DIR)
+
+
 def activate(source_dir: str):
     target_dir = config.PHOTON_DATA_DIR
     staging_dir = target_dir + ".staging"
