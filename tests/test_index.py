@@ -9,21 +9,6 @@ from src import index
 from src.utils import config
 
 
-@pytest.fixture
-def fake_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    data_dir = tmp_path / "data"
-    photon_data_dir = data_dir / "photon_data"
-    temp_dir = data_dir / "temp"
-    os_node_dir = photon_data_dir / "node_1"
-    data_dir.mkdir()
-
-    monkeypatch.setattr(config, "DATA_DIR", str(data_dir))
-    monkeypatch.setattr(config, "PHOTON_DATA_DIR", str(photon_data_dir))
-    monkeypatch.setattr(config, "TEMP_DIR", str(temp_dir))
-    monkeypatch.setattr(config, "OS_NODE_DIR", str(os_node_dir))
-    return data_dir
-
-
 def test_is_present_false_when_no_index(fake_dirs: Path):
     assert index.is_present() is False
 
@@ -78,10 +63,16 @@ def test_mark_updated_creates_marker(fake_dirs: Path):
     assert (fake_dirs / ".photon-index-updated").exists()
 
 
-def test_mark_updated_logs_error_and_continues(fake_dirs: Path):
-    with patch("src.index.Path.touch", side_effect=OSError("nope")), patch.object(index.logging, "error") as error:
+def test_mark_updated_raises_when_marker_cannot_be_written(fake_dirs: Path):
+    with patch("src.index.Path.touch", side_effect=OSError("read-only")), pytest.raises(OSError, match="read-only"):
         index.mark_updated()
-    error.assert_called_once()
+
+
+def test_mark_updated_clears_update_attempt_record(fake_dirs: Path):
+    index.record_update_attempt(5)
+    index.mark_updated()
+    assert not (fake_dirs / ".photon-update-attempt").exists()
+    assert index.last_update_attempt() == (0.0, 0)
 
 
 def test_last_update_attempt_defaults_when_never_recorded(fake_dirs: Path):
@@ -116,6 +107,13 @@ def test_record_update_attempt_swallows_write_errors(fake_dirs: Path):
     with patch("src.index.Path.write_text", side_effect=PermissionError("denied")):
         index.record_update_attempt(1)
     assert not (fake_dirs / ".photon-update-attempt").exists()
+
+
+def test_record_update_attempt_keeps_previous_record_when_replace_fails(fake_dirs: Path):
+    index.record_update_attempt(2)
+    with patch("src.index.os.replace", side_effect=OSError("disk full")):
+        index.record_update_attempt(5)
+    assert index.last_update_attempt()[1] == 2
 
 
 def test_import_marker_roundtrip(fake_dirs: Path):
@@ -191,6 +189,18 @@ def test_activate_swaps_into_target(fake_dirs: Path):
     assert not source.exists()
     assert not Path(str(target) + ".staging").exists()
     assert index.has_update_timestamp() is True
+
+
+def test_activate_raises_after_swap_when_marker_cannot_be_written(fake_dirs: Path):
+    source = fake_dirs / "source"
+    source.mkdir()
+    (source / "data.txt").write_text("new")
+
+    with patch("src.index.Path.touch", side_effect=OSError("read-only")), pytest.raises(OSError, match="read-only"):
+        index.activate(str(source))
+
+    assert (Path(config.PHOTON_DATA_DIR) / "data.txt").read_text() == "new"
+    assert index.has_update_timestamp() is False
 
 
 def test_activate_replaces_existing_target_keeping_backup(fake_dirs: Path):

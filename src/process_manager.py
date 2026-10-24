@@ -14,7 +14,7 @@ import schedule
 from requests.exceptions import RequestException
 
 from src import index, update
-from src.check_remote import compare_mtime
+from src.check_remote import RemoteCheckError, compare_mtime
 from src.entrypoint import run_setup
 from src.utils import config
 from src.utils.logger import get_logger, setup_logging
@@ -74,10 +74,9 @@ class AppState(Enum):
 
 
 class UpdateOutcome(Enum):
-    SKIPPED = 1
-    UP_TO_DATE = 2
-    UPDATED = 3
-    FAILED = 4
+    UP_TO_DATE = 1
+    UPDATED = 2
+    FAILED = 3
 
 
 class PhotonManager:
@@ -212,14 +211,6 @@ class PhotonManager:
                     logger.debug(f"Could not remove lock file {lock_file}: {e}")
 
     def run_update(self) -> UpdateOutcome:
-        if config.UPDATE_STRATEGY == "DISABLED":
-            logger.info("Updates disabled, skipping")
-            return UpdateOutcome.SKIPPED
-
-        if config.IMPORT_MODE == "jsonl":
-            logger.info("Scheduled JSONL rebuilds are not implemented yet, skipping")
-            return UpdateOutcome.SKIPPED
-
         self.state = AppState.UPDATING
         logger.info(f"Running {config.UPDATE_STRATEGY.lower()} update...")
         update_start = time.time()
@@ -258,6 +249,9 @@ class PhotonManager:
             update_duration = time.time() - update_start
             logger.error(f"Update failed - Photon health check failed after restart ({update_duration:.1f}s)")
             send_notification("Photon Update Failed - health check failed after index swap, service may be down")
+            return UpdateOutcome.FAILED
+        except RemoteCheckError as e:
+            logger.warning(f"Could not check the mirror for a newer index: {e}")
             return UpdateOutcome.FAILED
         except Exception:
             logger.exception("Update run failed unexpectedly")
@@ -310,34 +304,39 @@ class PhotonManager:
 
     def _maybe_update(self):
         try:
-            delay = retry_delay(self._update_failures)
-            elapsed = time.time() - self._last_attempt_at
-            if 0 <= elapsed < delay:
-                logger.debug(f"Update attempt throttled for another {delay - elapsed:.0f}s")
+            now = time.time()
+            if now < self._last_attempt_at:
+                logger.warning("System clock is behind the last update attempt, restarting the retry delay")
+                self._last_attempt_at = now
+
+            remaining = retry_delay(self._update_failures) - (now - self._last_attempt_at)
+            if remaining > 0:
+                logger.debug(f"Update attempt throttled for another {remaining:.0f}s")
                 return
 
             if not self._is_update_due():
                 return
 
+            index.record_update_attempt(self._update_failures + 1)
             self._record_attempt(self.run_update())
         except Exception:
             logger.exception("Scheduled update check failed")
 
     def _record_attempt(self, outcome: UpdateOutcome):
         failed = outcome is UpdateOutcome.FAILED
-        if outcome is UpdateOutcome.UPDATED and index.age_seconds() >= config.parse_interval(config.UPDATE_INTERVAL):
-            logger.error("Index timestamp did not advance after the update, treating the attempt as failed")
-            failed = True
-
         self._update_failures = self._update_failures + 1 if failed else 0
         self._last_attempt_at = time.time()
         index.record_update_attempt(self._update_failures)
 
-        if failed:
-            logger.warning(
-                f"Update attempt failed ({self._update_failures} in a row), "
-                f"next attempt in {retry_delay(self._update_failures) / 3600:g}h"
-            )
+        if not failed:
+            return
+
+        next_attempt = (
+            f"next attempt in {retry_delay(self._update_failures) / 3600:g}h"
+            if self._is_update_due()
+            else f"next attempt once the index is older than {config.UPDATE_INTERVAL}"
+        )
+        logger.warning(f"Update attempt failed ({self._update_failures} in a row), {next_attempt}")
 
     def _run_pending_jobs(self):
         try:

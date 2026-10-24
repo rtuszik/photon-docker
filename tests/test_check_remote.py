@@ -10,19 +10,6 @@ from src import check_remote
 from src.utils import config
 
 
-@pytest.fixture
-def fake_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    data_dir = tmp_path / "data"
-    photon_data_dir = data_dir / "photon_data"
-    os_node_dir = photon_data_dir / "node_1"
-    data_dir.mkdir()
-    photon_data_dir.mkdir()
-    monkeypatch.setattr(config, "DATA_DIR", str(data_dir))
-    monkeypatch.setattr(config, "PHOTON_DATA_DIR", str(photon_data_dir))
-    monkeypatch.setattr(config, "OS_NODE_DIR", str(os_node_dir))
-    return data_dir
-
-
 def _mock_response(status_code=200, headers=None):
     resp = MagicMock()
     resp.status_code = status_code
@@ -98,16 +85,21 @@ def test_get_remote_time_returns_none_on_request_error():
         assert check_remote.get_remote_time("https://example.com") is None
 
 
-def test_compare_mtime_returns_false_when_remote_time_unknown(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
+def test_compare_mtime_raises_when_remote_time_unknown(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "REGION", None)
-    monkeypatch.setattr(config, "BASE_URL", "https://example.com")
-    with patch("src.check_remote.get_remote_time", return_value=None):
-        assert check_remote.compare_mtime() is False
+    monkeypatch.setattr(config, "BASE_URL", "https://user:secret@example.com")
+    with (
+        patch("src.check_remote.get_remote_time", return_value=None),
+        pytest.raises(check_remote.RemoteCheckError, match="Could not determine remote time") as exc,
+    ):
+        check_remote.compare_mtime()
+    assert "secret" not in str(exc.value)
 
 
-def test_compare_mtime_returns_false_on_invalid_region(monkeypatch: pytest.MonkeyPatch):
+def test_compare_mtime_raises_on_invalid_region(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "REGION", "atlantis")
-    assert check_remote.compare_mtime() is False
+    with pytest.raises(check_remote.RemoteCheckError):
+        check_remote.compare_mtime()
 
 
 def test_compare_mtime_with_marker_compares_directly(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
@@ -143,7 +135,7 @@ def test_compare_mtime_directory_uses_grace_period(fake_dirs: Path, monkeypatch:
     monkeypatch.setattr(config, "BASE_URL", "https://example.com")
 
     node_dir = Path(config.OS_NODE_DIR)
-    node_dir.mkdir()
+    node_dir.mkdir(parents=True)
     local_ts = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC).timestamp()
     os.utime(node_dir, (local_ts, local_ts))
 
@@ -176,7 +168,7 @@ def test_check_index_age_returns_true_when_update_required_due_to_old_index(
 ):
     monkeypatch.setattr(config, "MIN_INDEX_DATE", "01.06.26")
     node_dir = Path(config.OS_NODE_DIR)
-    node_dir.mkdir()
+    node_dir.mkdir(parents=True)
     local_ts = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC).timestamp()
     os.utime(node_dir, (local_ts, local_ts))
     assert check_remote.check_index_age() is True
@@ -185,7 +177,7 @@ def test_check_index_age_returns_true_when_update_required_due_to_old_index(
 def test_check_index_age_returns_false_when_local_meets_min(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config, "MIN_INDEX_DATE", "01.01.26")
     node_dir = Path(config.OS_NODE_DIR)
-    node_dir.mkdir()
+    node_dir.mkdir(parents=True)
     local_ts = datetime.datetime(2026, 6, 1, tzinfo=datetime.UTC).timestamp()
     os.utime(node_dir, (local_ts, local_ts))
     assert check_remote.check_index_age() is False
