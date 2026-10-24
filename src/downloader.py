@@ -25,11 +25,11 @@ def get_available_space(path: str) -> int:
 
 def get_reclaimable_index_size(temp_path: str) -> int:
     index_dir = config.PHOTON_DATA_DIR
-    if not os.path.isdir(index_dir) or os.stat(index_dir).st_dev != os.stat(temp_path).st_dev:
+    if not os.path.isdir(index_dir):
         return 0
-    return sum(
-        os.lstat(os.path.join(root, name)).st_blocks * 512 for root, _, files in os.walk(index_dir) for name in files
-    )
+    temp_dev = os.stat(temp_path).st_dev
+    stats = (os.lstat(os.path.join(root, name)) for root, _, files in os.walk(index_dir) for name in files)
+    return sum(st.st_blocks * 512 for st in stats if st.st_dev == temp_dev)
 
 
 def check_disk_space_requirements(download_size: int, *, is_parallel: bool = True) -> bool:
