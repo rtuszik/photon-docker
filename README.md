@@ -20,10 +20,8 @@ enhancing data privacy and integration capabilities with services like [Dawarich
 - Ensure you have sufficient disk space available before running the container.
 - The initial download and extraction process may take a considerable amount of time.
   Depending on your hardware, checksum verification and decompression may take multiple hours.
-
 - The JSONL import _will_ take a significant amount of time.
   As a point of reference, a full planet import, tested on a fresh VPS (4C/16GB) took 10 hours and 25 minutes.
-
 - To reduce the load on the official Photon servers,
   the default `BASE_URL` for downloading the index files points to a mirror hosted by my.
   Please see the **Community Mirrors** section for more details.
@@ -62,7 +60,7 @@ The container can be configured using the following environment variables:
 | ---------------------- | -------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `IMPORT_MODE`          | `db`, `jsonl`                          | `db`                             | Selects how the index is built. `db` downloads a prebuilt index for a single region. `jsonl` (**experimental**) builds the index in-container from OpenStreetMap JSONL dumps and supports combining multiple regions. See [Import Modes](#import-modes).                                                                                                                                                                      |
 | `UPDATE_STRATEGY`      | `PARALLEL`, `SEQUENTIAL`, `DISABLED`   | `SEQUENTIAL`                     | Controls how index updates are handled. `PARALLEL` downloads the new index in the background then swaps with minimal downtime (requires 2x space). `SEQUENTIAL` stops Photon, deletes the existing index, downloads the new one, then restarts. `DISABLED` prevents automatic updates. Only applies in `db` mode.                                                                                                             |
-| `UPDATE_INTERVAL`      | Time string (e.g., "720h", "30d")      | `30d`                            | Minimum age of the local index before checking the mirror for a newer version. Once reached, the mirror is checked at most once per hour until a newer index is available. The age persists across container restarts. To reduce server load, set this to a long interval (e.g., `720h` for 30 days) or disable updates altogether if you do not need the latest data. |
+| `UPDATE_INTERVAL`      | Time string (e.g., "720h", "30d")      | `30d`                            | Minimum age of the local index before checking the mirror for a newer version. Once reached, the mirror is checked at most once per hour until a newer index is available. After a failed update, the retry delay doubles with each consecutive failure (2h, 4h, 8h, ...) up to 24 hours. The index age and the retry delay persist across container restarts. To reduce server load, set this to a long interval (e.g., `720h` for 30 days) or disable updates altogether if you do not need the latest data. |
 | `REGION`               | Region name, country code, or `planet` | `planet`                         | Region for a specific dataset. Can be a continent (`europe`, `asia`), individual country/region (`germany`, `usa`, `japan`), country code (`de`, `us`, `jp`), or `planet` for worldwide data. In `db` mode exactly one region may be set, and it must be one with a prebuilt index. In `jsonl` mode you may pass multiple regions as a comma-separated list. See [Available Regions](#available-regions) section for details. |
 | `LANGUAGES`            | Comma-separated language codes         | -                                | Only used in `jsonl` mode. Languages to import, passed to Photon's `-languages` (e.g. `en,de,fr`).                                                                                                                                                                                                                                                                                                                            |
 | `EXTRA_TAGS`           | Comma-separated OSM tags               | -                                | Only used in `jsonl` mode. Additional OSM tags to import, passed to Photon's `-extra-tags`.                                                                                                                                                                                                                                                                                                                                   |
@@ -77,14 +75,36 @@ The container can be configured using the following environment variables:
 | `BASE_URL`             | Valid URL                              | `https://r2.koalasec.org/public` | Custom base URL for index data downloads. Should point to the parent directory of index files. The default has been changed to a community mirror to reduce load on the GraphHopper servers.                                                                                                                                                                                                                                  |
 | `SKIP_MD5_CHECK`       | `TRUE`, `FALSE`                        | `FALSE`                          | Optionally skip MD5 verification of downloaded index files.                                                                                                                                                                                                                                                                                                                                                                   |
 | `SKIP_SPACE_CHECK`     | `TRUE`, `FALSE`                        | `FALSE`                          | Skip disk space verification before downloading.                                                                                                                                                                                                                                                                                                                                                                              |
-| `FILE_URL`             | URL to a .tar.bz2 file                 | -                                | Set a custom URL for the index file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2"). This must be a tar.bz2 format. Setting this overrides `UPDATE_STRATEGY` to `DISABLED`, and `SKIP_MD5_CHECK` to true if `MD5_URL` is not set.                                                                                                                                   |
-| `MD5_URL`              | URL to the MD5 file to use             | -                                | Set a custom URL for the md5 file to be downloaded (e.g., "https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2.md5").                                                                                                                                                                                                                                                                              |
+| `FILE_URL`             | URL to a .tar.bz2 file                 | -                                | Set a custom URL for the index file to be downloaded (e.g., "<https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2>"). This must be a tar.bz2 format. Setting this overrides `UPDATE_STRATEGY` to `DISABLED`, and `SKIP_MD5_CHECK` to true if `MD5_URL` is not set.                                                                                                                                   |
+| `MD5_URL`              | URL to the MD5 file to use             | -                                | Set a custom URL for the md5 file to be downloaded (e.g., "<https://download1.graphhopper.com/public/experimental/photon-db-latest.tar.bz2.md5>").                                                                                                                                                                                                                                                                              |
 | `PHOTON_PARAMS`        | Photon executable parameters           | -                                | See `https://github.com/komoot/photon#running-photon.`                                                                                                                                                                                                                                                                                                                                                                        |
 | `JAVA_PARAMS`          | Java parameters                        | -                                | Extra parameters passed to the `java` command that runs Photon (e.g. heap settings like `-Xmx4g`).                                                                                                                                                                                                                                                                                                                            |
 | `APPRISE_URLS`         | Comma-separated Apprise URLs           | -                                | Optional notification URLs for [Apprise](https://github.com/caronc/apprise) to send status updates (e.g., download completion, errors). Supports multiple services like Pushover, Slack, email, etc. Example: `pover://user@token,mailto://user:pass@gmail.com`                                                                                                                                                               |
-| `PUID`                 | User ID                                | 9011                             | The User ID for the photon process. Set this to your host user's ID (`id -u`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                                                                            |
-| `PGID`                 | Group ID                               | 9011                             | The Group ID for the photon process. Set this to your host group's ID (`id -g`) to prevent permission errors when using bind mounts.                                                                                                                                                                                                                                                                                          |
+| `PUID`                 | User ID                                | 9011                             | The User ID for the photon process. Set this to your host user's ID (`id -u`) to prevent permission errors when using bind mounts. Ignored when the container runs as a non-root user, see [Running as a Non-Root User](#running-as-a-non-root-user).                                                                                                                                                                                                                                                                                            |
+| `PGID`                 | Group ID                               | 9011                             | The Group ID for the photon process. Set this to your host group's ID (`id -g`) to prevent permission errors when using bind mounts. Ignored when the container runs as a non-root user, see [Running as a Non-Root User](#running-as-a-non-root-user).                                                                                                                                                                                                                                                                                          |
 | `ENABLE_METRICS`       | `TRUE`, `FALSE`                        | `FALSE`                          | Enables Prometheus Metrics endpoint at /metrics                                                                                                                                                                                                                                                                                                                                                                               |
+
+### Running as a Non-Root User
+
+By default, the container starts as root, sets the UID/GID of the `photon` user to `PUID`/`PGID`, changes the ownership of `/photon` to that user, and then runs Photon as `photon`.
+
+To run the whole container as a non-root user instead, set `user:` in your compose file (or `--user` with `docker run`). In this mode `PUID` and `PGID` are ignored and the container does not change any file ownership, so the data directory must already be writable by that user:
+
+```yaml
+services:
+    photon:
+        image: rtuszik/photon-docker:latest
+        user: "1000:1000"
+        volumes:
+            - ./photon_data:/photon/data
+```
+
+```bash
+mkdir -p photon_data
+sudo chown -R 1000:1000 photon_data
+```
+
+A new named volume is owned by UID/GID 9011, and data written by an earlier root-mode container is owned by its `PUID`/`PGID`. Change the ownership to match `user:` before you switch. If any file or directory under `/photon/data` is not writable, the container exits at startup and names the first one it found.
 
 ## Import Modes
 
@@ -218,6 +238,8 @@ If you are hosting a public mirror, please open an issue or pull request to have
 
 When `ENABLE_METRICS` is set to `TRUE`, Prometheus metrics are exposed at the `/metrics` endpoint.
 
+Photon 1.3.0 (photon-docker 2.4.0 and later) renamed the request timer metrics from `jetty_server_requests_seconds*` to `http_server_requests_seconds*`. Update dashboards and alerts that use the old names.
+
 An example Grafana Dashboard is available here at [Grafana Labs](https://grafana.com/grafana/dashboards/24901-photon/).
 
 To see a live preview, [visit the public dashboard](https://r10k.grafana.net/public-dashboards/089de1d08d954a959e3a475af8968e1e) of the photon instance hosted by [rtuszik](https://github.com/rtuszik).
@@ -253,7 +275,7 @@ docker compose -f docker-compose.build.yml build --build-arg PHOTON_VERSION=1.2.
 
 The Photon API is available at:
 
-```
+```text
 http://localhost:2322/api?q=Harare
 ```
 

@@ -7,8 +7,10 @@ if [ "$(id -u)" -eq 0 ]; then
     PUID=${PUID:-9011}
     PGID=${PGID:-9011}
 
-    CURRENT_UID=$(id -u photon 2>/dev/null || echo "0")
-    CURRENT_GID=$(id -g photon 2>/dev/null || echo "0")
+    if ! CURRENT_UID=$(id -u photon 2>/dev/null) || ! CURRENT_GID=$(id -g photon 2>/dev/null); then
+        echo "ERROR: user 'photon' does not exist in this image, refusing to change file ownership" >&2
+        exit 1
+    fi
 
     if [ "$CURRENT_GID" != "$PGID" ]; then
         echo "Updating photon group GID from $CURRENT_GID to $PGID"
@@ -22,6 +24,17 @@ if [ "$(id -u)" -eq 0 ]; then
         usermod -o -u "$PUID" photon
         echo "Updating ownership of files from UID $CURRENT_UID to $PUID"
         find / -user "$CURRENT_UID" -exec chown -h "$PUID" {} \; 2>/dev/null
+    fi
+else
+    if [ -n "$PUID" ] || [ -n "$PGID" ]; then
+        echo "WARNING: PUID/PGID are ignored when the container runs as non-root user $(id -u):$(id -g)" >&2
+    fi
+
+    UNWRITABLE=$(find /photon/data ! -writable -print -quit)
+    if [ -n "$UNWRITABLE" ]; then
+        echo "ERROR: $UNWRITABLE is not writable by $(id -u):$(id -g)." >&2
+        echo "Change the ownership of the mounted data directory and its contents to match the container user." >&2
+        exit 1
     fi
 fi
 
