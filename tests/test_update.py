@@ -237,6 +237,7 @@ def test_run_update_happy_path(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch)
     for name in ("download_index", "download_md5", "verify_checksum", "extract_index", "clear_temp_dir"):
         monkeypatch.setattr(update, name, getattr(pipeline, name))
     monkeypatch.setattr(update.index, "activate", pipeline.activate)
+    monkeypatch.setattr(update.index, "remove", pipeline.remove)
 
     update.run_update("PARALLEL")
 
@@ -268,6 +269,31 @@ def test_run_update_passes_strategy_to_space_check(fake_dirs: Path, monkeypatch:
 
     update.run_update("SEQUENTIAL")
     assert captured["is_parallel"] is False
+
+
+def test_run_update_sequential_removes_index_after_space_check(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "SKIP_MD5_CHECK", True)
+    _make_pipeline_patches(monkeypatch)
+    pipeline = Mock()
+    pipeline.download_index.return_value = str(Path(config.TEMP_DIR) / "index.tar.bz2")
+    for name in ("check_disk_space_requirements", "download_index"):
+        monkeypatch.setattr(update, name, getattr(pipeline, name))
+    monkeypatch.setattr(update.index, "remove", pipeline.remove)
+
+    update.run_update("SEQUENTIAL")
+
+    assert [c[0] for c in pipeline.mock_calls] == ["check_disk_space_requirements", "remove", "download_index"]
+
+
+def test_run_update_sequential_keeps_index_when_space_insufficient(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
+    _make_pipeline_patches(monkeypatch)
+    monkeypatch.setattr(update, "check_disk_space_requirements", lambda *_, **__: False)
+    Path(config.OS_NODE_DIR).mkdir(parents=True)
+
+    with pytest.raises(update.InsufficientSpaceError):
+        update.run_update("SEQUENTIAL")
+
+    assert Path(config.OS_NODE_DIR).is_dir()
 
 
 def test_run_update_skips_md5_when_configured(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
