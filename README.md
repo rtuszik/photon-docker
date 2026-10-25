@@ -157,6 +157,15 @@ Region availability depends on `IMPORT_MODE`. **All** regions listed below are a
 - **Size**: ~61GB compressed (DB), ~26GB compressed (JSONL)
 - **Coverage**: Worldwide
 
+#### Reverse Only
+
+A reverse-geocoding-only dump is kindly provided and kept up-to-date by @binnichtaktiv.
+
+It can be used with:
+`FILE_URL=https://r2.koalasec.org/public/photon-db-planet-reverse-only.tar.bz2`
+
+It sits at roughly half the size of the full planet-wide index dump.
+
 ### 2. Continental Data
 
 Available in both DB and JSONL modes. The sizes below are approximate older estimates and may not reflect current dump sizes.
