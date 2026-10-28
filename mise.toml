@@ -2,7 +2,7 @@
 
 [tools]
 uv = "0.13.4"
-python = "3.14.7"
+python = "3.15.2"
 betterleaks = "1.9.0"
 prek = "0.5.7"
 zizmor = "1.31.1"
