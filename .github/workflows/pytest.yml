@@ -47,7 +47,7 @@ jobs:
                   | tee pytest-coverage.txt
 
             - name: Pytest coverage comment
-              uses: MishaKav/pytest-coverage-comment@c772f8e59c8562befa8eabbbf7cfabd2e4d69f00 # main
+              uses: MishaKav/pytest-coverage-comment@9516bf7f32a9229cf18d5e1717ae387c7154f279 # main
               with:
                 pytest-coverage-path: ./pytest-coverage.txt
                 junitxml-path: ./pytest.xml
