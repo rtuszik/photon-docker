@@ -1,0 +1,72 @@
+---
+name: Release Please
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    release-please:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Run release-please
+              id: release
+              uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+              with:
+                token: ${{ secrets.MY_PAT_TOKEN }}
+
+            - name: Checkout release PR branch
+              if: steps.release.outputs.prs_created == 'true'
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+              with:
+                ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+                persist-credentials: false
+
+            - name: Install uv
+              if: steps.release.outputs.prs_created == 'true'
+              uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+              with:
+                version: 0.13.4
+
+            - name: Sync uv.lock with release version
+              if: steps.release.outputs.prs_created == 'true'
+              env:
+                GH_TOKEN: ${{ secrets.MY_PAT_TOKEN }}
+                HEAD_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+              run: |
+                uv lock
+                if git diff --quiet uv.lock; then
+                  echo "uv.lock already up to date"
+                  exit 0
+                fi
+                git config user.name "github-actions[bot]"
+                git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                git add uv.lock
+                git commit -m "chore: sync uv.lock with release version"
+                git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${HEAD_BRANCH}"
+
+            - name: Checkout release tag
+              if: steps.release.outputs.release_created == 'true'
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+              with:
+                ref: ${{ steps.release.outputs.tag_name }}
+                persist-credentials: false
+
+            - name: Add upstream Photon release notes link
+              if: steps.release.outputs.release_created == 'true'
+              env:
+                GH_TOKEN: ${{ secrets.MY_PAT_TOKEN }}
+                TAG_NAME: ${{ steps.release.outputs.tag_name }}
+              run: |
+                PHOTON_VERSION=$(tr -d '[:space:]' < .last_release)
+                {
+                  gh release view "$TAG_NAME" --json body --jq .body
+                  printf '\n\n---\n **[Photon release notes](https://github.com/komoot/photon/releases/tag/%s) (%s):** \n' \
+                    "$PHOTON_VERSION" "$PHOTON_VERSION"
+                } > "$RUNNER_TEMP/release_body.md"
+                gh release edit "$TAG_NAME" --notes-file "$RUNNER_TEMP/release_body.md"
