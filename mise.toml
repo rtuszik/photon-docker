@@ -10,6 +10,9 @@ zizmor = "1.31.1"
 [deps]
 uv = { auto = true }
 
+[settings]
+lockfile = false
+
 [tasks.default]
 description = "Show available tasks"
 run = "mise tasks ls"
