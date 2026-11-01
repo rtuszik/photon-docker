@@ -38,24 +38,20 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g ${PGID} -o photon && \
-    useradd -l -u ${PUID} -g photon -o -s /bin/false -m -d /photon photon
+    useradd -l -u ${PUID} -g photon -o -s /bin/false -m -d /photon photon && \
+    chmod 755 /photon && \
+    install -d -o photon -g photon /photon/data
 
 WORKDIR /photon
 
-RUN mkdir -p /photon/data/
+ADD --chown=photon:photon --chmod=644 https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-${PHOTON_VERSION}.jar /photon/photon.jar
 
-ADD https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-${PHOTON_VERSION}.jar /photon/photon.jar
-
-COPY src/ ./src/
-COPY entrypoint.sh .
-COPY --from=builder /photon/.venv /photon/.venv
+COPY --chown=photon:photon src/ ./src/
+COPY --chown=photon:photon entrypoint.sh .
+COPY --chown=photon:photon --from=builder /photon/.venv /photon/.venv
 
 ENV PATH="/photon/.venv/bin:${PATH}" \
     VIRTUAL_ENV=/photon/.venv
-
-RUN chmod 644 /photon/photon.jar && \
-    chmod 755 /photon && \
-    chown -R photon:photon /photon
 
 LABEL org.opencontainers.image.title="photon-docker" \
     org.opencontainers.image.description="Unofficial docker image for the Photon Geocoder" \
