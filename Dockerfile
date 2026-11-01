@@ -21,7 +21,7 @@ ENV UV_PYTHON=/usr/bin/python3.12 \
 RUN uv sync --locked --no-dev --no-install-project
 
 
-FROM eclipse-temurin:21.0.12_8-jre-noble@sha256:d35199d74a3b2dff1bfb435d9adde4ef974e74a7d2a4fcb3079063c55926edb5
+FROM eclipse-temurin:25.0.5_8-jre-noble@sha256:39d8a64f84d4c0aab4639757e1502264da350be831df4bb25d182d6a514113c2
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG PHOTON_VERSION
