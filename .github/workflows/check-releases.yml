@@ -67,7 +67,7 @@ jobs:
               with:
                 token: ${{ secrets.MY_PAT_TOKEN }}
                 commit-message: |
-                    Update Photon version to ${{ steps.prepare_update.outputs.new_version }}
+                    fix(photon): update Photon to ${{ steps.prepare_update.outputs.new_version }}
 
                     Automated update of the .last_release file
                     to reflect the new Photon release: ${{ steps.prepare_update.outputs.new_version }}.
@@ -76,7 +76,7 @@ jobs:
                 branch: ${{ steps.prepare_update.outputs.new_branch_name }}
                 base: dev
                 delete-branch: true
-                title: "Update Photon to version ${{ steps.prepare_update.outputs.new_version }}"
+                title: "fix(photon): update Photon to ${{ steps.prepare_update.outputs.new_version }}"
                 body: |
                     A new version of Photon (${{ steps.prepare_update.outputs.new_version }}) has been released.
 
