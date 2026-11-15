@@ -165,6 +165,62 @@ def test_extract_index_raises_extraction_error_on_failure(fake_dirs: Path):
         update.extract_index(str(index_file))
 
 
+def _make_index_dir(parent: Path) -> Path:
+    index_dir = parent / "photon_data"
+    (index_dir / "node_1").mkdir(parents=True)
+    return index_dir
+
+
+def test_find_index_in_extract_returns_top_level_index(tmp_path: Path):
+    expected = _make_index_dir(tmp_path)
+    assert update.find_index_in_extract(str(tmp_path)) == str(expected)
+
+
+def test_find_index_in_extract_returns_nested_index(tmp_path: Path):
+    expected = _make_index_dir(tmp_path / "db")
+    (tmp_path / "index.tar.bz2").write_bytes(b"x")
+    assert update.find_index_in_extract(str(tmp_path)) == str(expected)
+
+
+def test_find_index_in_extract_ignores_photon_data_without_node(tmp_path: Path):
+    (tmp_path / "photon_data").mkdir()
+    expected = _make_index_dir(tmp_path / "db")
+    assert update.find_index_in_extract(str(tmp_path)) == str(expected)
+
+
+def test_find_index_in_extract_raises_when_missing(tmp_path: Path):
+    (tmp_path / "db" / "other").mkdir(parents=True)
+    with pytest.raises(update.ExtractionError, match="No photon_data"):
+        update.find_index_in_extract(str(tmp_path))
+
+
+def test_find_index_in_extract_raises_when_too_deep(tmp_path: Path):
+    _make_index_dir(tmp_path / "a" / "b" / "c")
+    with pytest.raises(update.ExtractionError, match="No photon_data"):
+        update.find_index_in_extract(str(tmp_path))
+
+
+def test_find_index_in_extract_raises_on_multiple_matches(tmp_path: Path):
+    _make_index_dir(tmp_path)
+    _make_index_dir(tmp_path / "db")
+    with pytest.raises(update.ExtractionError, match="Multiple photon_data"):
+        update.find_index_in_extract(str(tmp_path))
+
+
+def test_run_update_activates_nested_index(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(config, "SKIP_MD5_CHECK", True)
+    find_index_in_extract = update.find_index_in_extract
+    _make_pipeline_patches(monkeypatch)
+    monkeypatch.setattr(update, "find_index_in_extract", find_index_in_extract)
+    nested = Path(config.TEMP_DIR) / "db"
+    monkeypatch.setattr(update, "extract_index", lambda _: _make_index_dir(nested))
+
+    with patch.object(update.index, "activate") as activate:
+        update.run_update("SEQUENTIAL")
+
+    activate.assert_called_once_with(str(nested / "photon_data"))
+
+
 def test_verify_checksum_returns_true_on_match(tmp_path: Path):
     index_file = tmp_path / "index.bin"
     index_file.write_bytes(b"hello world")
@@ -217,6 +273,7 @@ def _make_pipeline_patches(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(update, "download_index", lambda: fake_index)
     monkeypatch.setattr(update, "download_md5", lambda: fake_md5)
     monkeypatch.setattr(update, "extract_index", lambda _: None)
+    monkeypatch.setattr(update, "find_index_in_extract", lambda root: str(Path(root) / "photon_data"))
     monkeypatch.setattr(update, "verify_checksum", lambda *_: True)
     monkeypatch.setattr(update.index, "activate", lambda _: None)
     monkeypatch.setattr(update, "clear_temp_dir", lambda: None)
@@ -238,6 +295,7 @@ def test_run_update_happy_path(fake_dirs: Path, monkeypatch: pytest.MonkeyPatch)
         monkeypatch.setattr(update, name, getattr(pipeline, name))
     monkeypatch.setattr(update.index, "activate", pipeline.activate)
     monkeypatch.setattr(update.index, "remove", pipeline.remove)
+    monkeypatch.setattr(update, "find_index_in_extract", lambda root: str(Path(root) / "photon_data"))
 
     update.run_update("PARALLEL")
 
