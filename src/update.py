@@ -97,6 +97,25 @@ def extract_index(index_file: str):
         raise ExtractionError(f"Index extraction failed with return code {e.returncode}") from e
 
 
+def find_index_in_extract(root: str, max_depth: int = 3) -> str:
+    matches = []
+    for dirpath, dirnames, _ in os.walk(root):
+        depth = 0 if dirpath == root else os.path.relpath(dirpath, root).count(os.sep) + 1
+        if os.path.basename(dirpath) == "photon_data" and "node_1" in dirnames:
+            matches.append(dirpath)
+            dirnames.clear()
+        elif depth >= max_depth:
+            dirnames.clear()
+
+    if not matches:
+        raise ExtractionError(f"No photon_data directory containing node_1 found in {root}")
+    if len(matches) > 1:
+        raise ExtractionError(f"Multiple photon_data directories found in {root}: {sorted(matches)}")
+
+    logging.info(f"Found extracted index at {matches[0]}")
+    return matches[0]
+
+
 def verify_checksum(md5_file: str, index_file: str) -> bool:
     hash_md5 = hashlib.md5()  # noqa S303
     try:
@@ -190,7 +209,7 @@ def run_update(strategy: str):
         extract_index(index_file)
 
         logging.info("Activating new index")
-        index.activate(os.path.join(config.TEMP_DIR, "photon_data"))
+        index.activate(find_index_in_extract(config.TEMP_DIR))
 
         logging.info("Update pipeline completed successfully.")
     finally:
